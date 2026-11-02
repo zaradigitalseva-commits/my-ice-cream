@@ -31,6 +31,8 @@ export default function ShopPage() {
   const [stock, setStock] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [imageBusy, setImageBusy] = useState(false);
+  const [utr, setUtr] = useState("");
+  const [paymentNotice, setPaymentNotice] = useState("");
 
   async function loadProducts(shopId: string) {
     if (!db) return;
@@ -58,6 +60,18 @@ export default function ShopPage() {
       finally { setLoading(false); }
     });
   }, [router]);
+
+  async function submitSubscription(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!db || !shop || !user) return;
+    setBusy(true); setError(""); setPaymentNotice("");
+    try {
+      await addDoc(collection(db, "subscriptionPayments"), { ownerUid: user.uid, shopId: shop.id, shopName: shop.name || shop.shopName || "", amount: 299, utr: utr.trim(), status: "pending", createdAt: serverTimestamp() });
+      setPaymentNotice("₹299 payment details submitted. Admin verification is pending.");
+      setUtr("");
+    } catch (e) { setError(e instanceof Error ? e.message : "Payment details could not be submitted."); }
+    finally { setBusy(false); }
+  }
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -133,6 +147,7 @@ export default function ShopPage() {
           <label>About your shop<textarea rows={3} value={description} onChange={e=>setDescription(e.target.value)} /></label>
           <button className="admin-primary" disabled={busy}>Save shop profile</button>
         </form></section>
+        <section className="admin-panel"><h2>Monthly subscription</h2><p>Plan amount: ₹299 per month. Pay by UPI and submit the UTR number for Admin verification. Your subscription activates only after Admin confirms payment.</p><form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()}>Submit ₹299 payment for verification</button></form>{paymentNotice&&<p className="admin-success">{paymentNotice}</p>}</section>
         {live ? <section className="admin-panel"><h2>Products & stock</h2><p>Add products with price and available stock. Only active LIVE shops are visible to customers.</p>
           <form className="register-form" onSubmit={saveProduct}>
             <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>
