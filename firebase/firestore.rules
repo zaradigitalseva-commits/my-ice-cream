@@ -7,7 +7,7 @@ service cloud.firestore {
   function liveShop(shopId){return get(/databases/$(database)/documents/shops/$(shopId)).data.status=="live";}
   match /shops/{shopId}{
    allow read:if isAdmin() || (signedIn()&&resource.data.ownerUid==request.auth.uid) || resource.data.status=="live";
-   allow create:if signedIn()&&request.resource.data.ownerUid==request.auth.uid&&request.resource.data.status=="pending";
+   allow create:if signedIn()&&request.resource.data.ownerUid==request.auth.uid&&request.resource.data.status=="pending"&&getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId==shopId;
    allow update:if isAdmin() || (signedIn()&&resource.data.ownerUid==request.auth.uid&&request.resource.data.ownerUid==resource.data.ownerUid&&request.resource.data.status==resource.data.status&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["name","shopName","phone","city","address","description","logoUrl","bannerUrl","category","updatedAt"]));
    allow delete:if isAdmin();
    match /products/{productId}{
