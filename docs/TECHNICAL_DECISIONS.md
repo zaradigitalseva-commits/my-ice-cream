@@ -1,10 +1,22 @@
 # Technical decisions
 
-## Status
+## Current foundation
 
-No hosting, database, authentication provider, payment gateway, or paid plan has been selected or connected yet.
+- Web framework: Next.js App Router with TypeScript.
+- Client authentication/database SDK: Firebase Web SDK.
+- Firebase project: `my-ice-cream-75a08`.
+- Firebase web app: `MY ICE CREAM WEB`.
+- Firebase services already enabled by the project owner: Google Authentication and Cloud Firestore in `asia-south1` (Mumbai).
+- Billing remains on Firebase Spark (no-cost) plan.
+- Firebase client configuration is read from `NEXT_PUBLIC_FIREBASE_*` environment variables. Real values belong in local `.env.local` or a hosting provider's environment settings, never in this public repository.
+- Firestore rules currently deny all client access as a temporary safe baseline. Do not open reads/writes until role and ownership rules are implemented and tested.
 
-## Requirements for the eventual stack
+## Status and limitations
+
+This repository contains an initial responsive storefront shell and Firebase client initialization. It is not yet a complete marketplace and is not production-ready. Shop onboarding, database schema, secure role assignment, shop-level authorization, orders, uploads, subscription review, admin tools, tests, deployment and backup/restore workflows remain to be implemented.
+
+## Requirements for the next releases
+
 - Mobile-first responsive web app with installable PWA support.
 - Secure Google sign-in for customers and shopkeepers.
 - Server-enforced roles and strict shop/customer data isolation.
@@ -14,7 +26,8 @@ No hosting, database, authentication provider, payment gateway, or paid plan has
 - No paid service activated without explicit approval.
 
 ## Selection checklist
-Before choosing providers, verify current free-tier limits and terms for:
+
+Before production use, verify current free-tier limits and terms for:
 1. Commercial use and production eligibility.
 2. Monthly active users, database reads/writes, bandwidth, and storage.
 3. Image/file storage, egress, and backup costs.
@@ -23,5 +36,4 @@ Before choosing providers, verify current free-tier limits and terms for:
 6. Data export, backup frequency, and restore capabilities.
 7. Data region, privacy terms, and account ownership.
 
-## Decision rule
-Choose the simplest stack that meets the security and backup requirements for the pilot. Re-check provider pricing and terms immediately before connecting or deploying. A free tier is a limited starting allowance, not a promise of permanently unlimited free operation.
+A free tier is a limited starting allowance, not a promise of permanently unlimited free operation.
