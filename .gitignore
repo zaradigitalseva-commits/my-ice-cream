@@ -21,3 +21,9 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# Cloudflare Workers / OpenNext
+.open-next/
+.wrangler/
+.dev.vars
+cloudflare-env.d.ts
