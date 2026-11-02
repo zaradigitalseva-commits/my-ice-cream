@@ -1,8 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Admin identity helper. Firebase Auth must provide a verified email.
-    // Keep data access closed until collection-specific permissions are added.
+
     function isAdmin() {
       return request.auth != null
         && request.auth.token.email_verified == true
@@ -12,9 +11,8 @@ service cloud.firestore {
         ];
     }
 
-    // Safe baseline: no client access until collection ownership and
-    // role-specific authorization rules have been implemented and reviewed.
-    // Use isAdmin() in the relevant collection rules when those are added.
+    // Temporary safe setting: all database access remains blocked.
+    // Admin permissions will be enabled only after collection rules are added.
     match /{document=**} {
       allow read, write: if false;
     }
