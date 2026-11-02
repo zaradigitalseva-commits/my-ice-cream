@@ -3,7 +3,7 @@ import Link from "next/link";
 import {useEffect,useState} from "react";
 import {useRouter} from "next/navigation";
 import {onAuthStateChanged,type User} from "firebase/auth";
-import {collection,doc,getDocs,query,runTransaction,where} from "firebase/firestore";
+import {collection,doc,getDocs,query,runTransaction,updateDoc,where} from "firebase/firestore";
 import {auth,db} from "@/lib/firebase";
 import {isAdminEmail} from "@/lib/admin";
 type Payment={id:string;ownerUid?:string;shopId?:string;shopName?:string;amount?:number;utr?:string;status?:string};
