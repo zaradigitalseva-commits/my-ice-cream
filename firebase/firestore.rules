@@ -17,7 +17,7 @@ service cloud.firestore {
     allow delete:if isAdmin()||(ownsShop(shopId)&&liveShop(shopId)&&resource.data.ownerUid==request.auth.uid);
    }
   }
-  match /orders/{orderId}{
+  match /shopOwnerLocks/{ownerUid}{\n   allow read: if signedIn() && request.auth.uid == ownerUid;\n   allow create: if signedIn() && request.auth.uid == ownerUid && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid)) && request.resource.data.ownerUid == request.auth.uid && request.resource.data.shopId is string;\n   allow update, delete: if false;\n  }\n  match /orders/{orderId}{
    allow create:if signedIn()&&request.resource.data.customerUid==request.auth.uid&&request.resource.data.status=="placed"&&request.resource.data.paymentStatus=="unpaid"&&request.resource.data.shopId is string&&liveShop(request.resource.data.shopId)&&request.resource.data.total is number&&request.resource.data.total>=0;
    allow read:if isAdmin()||(signedIn()&&resource.data.customerUid==request.auth.uid)||(signedIn()&&ownsShop(resource.data.shopId));
    allow update:if isAdmin()||(signedIn()&&ownsShop(resource.data.shopId)&&request.resource.data.customerUid==resource.data.customerUid&&request.resource.data.shopId==resource.data.shopId&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","paymentStatus","updatedAt"]));
