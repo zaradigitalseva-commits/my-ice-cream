@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
+import { isAdminEmail } from "@/lib/admin";
 const categories = ["All treats", "Ice cream", "Kulfi", "Cones", "Family packs", "Party orders"];
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -16,6 +17,7 @@ export default function HomePage() {
     catch (error) { setMessage(error instanceof Error ? error.message : "Sign-in could not be completed."); }
     finally { setBusy(false); }
   }
+  const adminAccount = isAdminEmail(user?.email);
   return <main className="site-shell">
     <header className="topbar">
       <Link className="brand" href="/" aria-label="MY ICE CREAM home"><span className="brand-mark">🍦</span><span>MY ICE CREAM</span></Link>
@@ -28,7 +30,7 @@ export default function HomePage() {
         <p className="hero-copy">Discover neighbourhood ice-cream shops, explore delicious treats and find something sweet for every celebration.</p>
         <div className="pills"><span className="pill active">🍨 Discover treats</span><span className="pill">🎉 Party & bulk orders</span><span className="pill">🏪 Local ice-cream shops</span></div>
         <button className="primary-button" onClick={() => document.getElementById("discover")?.scrollIntoView({behavior:"smooth"})}>Explore the marketplace</button>
-        <div className="status" aria-live="polite">{user ? "Signed in as " + (user.displayName || user.email) : message}</div>
+        <div className="status" aria-live="polite">{user ? <>Signed in as {user.displayName || user.email}{adminAccount ? " · Admin account recognized (dashboard setup pending)" : ""}</> : message}</div>
       </div>
       <div className="hero-art" aria-label="Ice cream illustration"><div className="icecream-emoji">🍦</div><div className="art-note">Made for every sweet moment ✨</div></div>
     </section>
