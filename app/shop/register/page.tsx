@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
-import { addDoc, collection, getDocs, query, serverTimestamp, where } from "firebase/firestore";
+import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
 export default function ShopRegisterPage() {
@@ -23,12 +23,17 @@ export default function ShopRegisterPage() {
     try {
       const existing = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid)));
       if (!existing.empty) { setMessage("A shop registration already exists for this Google account. Open Shop Dashboard to check its status."); return; }
-      await addDoc(collection(db, "shops"), {
+      const shopRef = doc(collection(db, "shops"));
+      const lockRef = doc(db, "shopOwnerLocks", user.uid);
+      const batch = writeBatch(db);
+      batch.set(shopRef, {
         name: name.trim(), shopName: name.trim(), ownerUid: user.uid,
         ownerName: user.displayName || "", ownerEmail: user.email || "",
         phone: phone.trim(), city: city.trim(), address: address.trim(),
         description: description.trim(), status: "pending", createdAt: serverTimestamp()
       });
+      batch.set(lockRef, { ownerUid: user.uid, shopId: shopRef.id, createdAt: serverTimestamp() });
+      await batch.commit();
       setMessage("Registration submitted. Your shop is PENDING until Admin reviews and approves it.");
       setName(""); setPhone(""); setCity(""); setAddress(""); setDescription("");
     } catch (error) {
