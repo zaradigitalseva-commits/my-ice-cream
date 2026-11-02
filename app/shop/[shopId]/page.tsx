@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
-import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
 type Shop={id:string;name?:string;shopName?:string;city?:string;address?:string;phone?:string;description?:string;status?:string};
@@ -24,7 +24,7 @@ export default function ShopDetailsPage(){
   if(!items.length){setMessage("Cart is empty.");return;}
   if(phone.trim().length<10||!address.trim()){setMessage("Enter your mobile number and delivery/pickup address.");return;}
   setBusy(true);setMessage("");
-  try{const order=await addDoc(collection(db,"orders"),{shopId,shopName:shop.name||shop.shopName||"Shop",customerUid:user.uid,customerName:user.displayName||"",customerEmail:user.email||"",customerPhone:phone.trim(),deliveryAddress:address.trim(),items,total,status:"placed",paymentStatus:"unpaid",createdAt:serverTimestamp()});setCart({});setMessage("Order placed successfully. Order ID: "+order.id);}
+  try{const orderRef=doc(collection(db,"orders"));const changes=items.reduce<Record<string,number>>((acc,item)=>{acc[item.productId]=item.quantity;return acc;},{});await runTransaction(db,async tx=>{const refs=items.map(item=>({item,ref:doc(db,"shops",shopId,"products",item.productId)}));const snapshots=[];for(const entry of refs)snapshots.push(await tx.get(entry.ref));for(let i=0;i<refs.length;i++){const {item,ref}=refs[i];const snap=snapshots[i];if(!snap.exists())throw new Error(item.name+" is no longer available.");const current=snap.data();const available=Number(current.stock||0);if(available<item.quantity)throw new Error("Insufficient stock for "+item.name+". Available: "+available);if(Number(current.price||0)!==item.price)throw new Error("Price changed for "+item.name+". Please refresh and try again.");}for(let i=0;i<refs.length;i++){const {item,ref}=refs[i];tx.update(ref,{stock:Number(snapshots[i].data().stock||0)-item.quantity,lastOrderId:orderRef.id,updatedAt:serverTimestamp()});}tx.set(orderRef,{shopId,shopName:shop.name||shop.shopName||"Shop",customerUid:user.uid,customerName:user.displayName||"",customerEmail:user.email||"",customerPhone:phone.trim(),deliveryAddress:address.trim(),items,total,stockChanges:changes,status:"placed",paymentStatus:"unpaid",createdAt:serverTimestamp()});});setCart({});setProducts(current=>current.map(p=>changes[p.id]?{...p,stock:Math.max(0,Number(p.stock||0)-changes[p.id])}:p));setMessage("Order placed successfully. Order ID: "+orderRef.id);}
   catch(e){setMessage(e instanceof Error?e.message:"Order could not be placed.");}
   finally{setBusy(false)}
  }
