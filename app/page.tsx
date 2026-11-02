@@ -6,7 +6,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
-type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string };
+type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };
 const categories = ["All treats", "Ice cream", "Kulfi", "Cones", "Family packs", "Party orders"];
 
 export default function HomePage() {
@@ -84,7 +84,7 @@ export default function HomePage() {
           <div className="shop-card-body"><div className="shop-card-title">{shop.logoUrl ? <img src={shop.logoUrl} alt="" /> : <span>🏪</span>}<h3>{shop.name || shop.shopName || "Ice Cream Shop"}</h3></div>
             <p>{[shop.city, shop.address].filter(Boolean).join(" · ") || "Location not added"}</p>
             {shop.description && <p className="shop-description">{shop.description}</p>}
-            {shop.category && <span className="pill">{shop.category}</span>}
+            {shop.category && <span className="pill">{shop.category}</span>}{shop.offerTitle && (!shop.offerExpiresAt || new Date(shop.offerExpiresAt + "T23:59:59").getTime() >= Date.now()) && <div className="shop-offer"><strong>🎉 {shop.offerTitle}</strong>{shop.offerDescription && <p>{shop.offerDescription}</p>}{shop.offerExpiresAt && <small>Offer valid until {shop.offerExpiresAt}</small>}</div>}
           </div>
         </Link>)}</div>}
       {!loadingShops && shops.length > 0 && visibleShops.length === 0 && <div className="empty-panel"><h3>No matching shops</h3><p>Try another search or choose All treats.</p><button className="admin-secondary" onClick={() => {setSearchText("");setActiveCategory("All treats");}}>Clear filters</button></div>}
