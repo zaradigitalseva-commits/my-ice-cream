@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
-import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
+import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
 export default function ShopRegisterPage() {
