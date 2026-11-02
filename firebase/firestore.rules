@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Safe temporary baseline: no client access until role and ownership
+    // authorization is implemented and reviewed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
