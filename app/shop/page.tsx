@@ -30,6 +30,7 @@ export default function ShopPage() {
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [imageBusy, setImageBusy] = useState(false);
 
   async function loadProducts(shopId: string) {
     if (!db) return;
@@ -68,6 +69,31 @@ export default function ShopPage() {
       setNotice("Shop profile updated.");
     } catch (e) { setError(e instanceof Error ? e.message : "Profile update failed."); }
     finally { setBusy(false); }
+  }
+
+  async function compressProductImage(file: File) {
+    if (!file.type.startsWith("image/")) { setError("Please choose an image file."); return; }
+    setImageBusy(true); setError("");
+    try {
+      const source = URL.createObjectURL(file);
+      const image = new Image();
+      image.src = source;
+      await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("Image could not be opened.")); });
+      const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Image compression is not supported in this browser.");
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(source);
+      let quality = 0.82;
+      let result = canvas.toDataURL("image/webp", quality);
+      while (result.length > 300000 && quality > 0.35) { quality -= 0.1; result = canvas.toDataURL("image/webp", quality); }
+      if (result.length > 300000) throw new Error("Image is too large after compression. Choose a smaller photo.");
+      setImageUrl(result); setNotice("Image compressed to WebP and ready to save.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Image compression failed."); }
+    finally { setImageBusy(false); }
   }
 
   function resetProduct() { setProductId(""); setProductName(""); setProductDescription(""); setPrice(""); setStock(""); setImageUrl(""); }
@@ -113,8 +139,8 @@ export default function ShopPage() {
             <label>Description<input value={productDescription} onChange={e=>setProductDescription(e.target.value)} /></label>
             <label>Price (₹)<input required type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} /></label>
             <label>Stock quantity<input required type="number" min="0" step="1" value={stock} onChange={e=>setStock(e.target.value)} /></label>
-            <label>Product image URL (optional)<input type="url" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} placeholder="https://…" /></label>
-            <div><button className="admin-primary" disabled={busy}>{productId ? "Update product" : "Add product"}</button>{productId && <button type="button" className="admin-secondary" onClick={resetProduct}>Cancel edit</button>}</div>
+            <label>Product photo (auto-compressed to WebP)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProductImage(file);}} /></label>{imageUrl && <div><img src={imageUrl} alt="Product preview" style={{maxWidth:140,maxHeight:100,borderRadius:12}}/><button type="button" className="admin-secondary small" onClick={()=>setImageUrl("")}>Remove photo</button></div>}{imageBusy && <p className="admin-muted">Compressing image…</p>}
+            <div><button className="admin-primary" disabled={busy||imageBusy}>{productId ? "Update product" : "Add product"}</button>{productId && <button type="button" className="admin-secondary" onClick={resetProduct}>Cancel edit</button>}</div>
           </form>
           <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead><tbody>
             {products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.description || ""}</small></td><td>₹{Number(p.price || 0).toFixed(2)}</td><td>{p.stock ?? 0}</td><td className="admin-actions"><button className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setStock(String(p.stock??""));setImageUrl(p.imageUrl||"");}}>Edit</button><button className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td></tr>)}
