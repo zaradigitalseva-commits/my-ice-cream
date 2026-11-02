@@ -1,32 +1,33 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null;
-    }
-
+    function signedIn() { return request.auth != null; }
     function isAdmin() {
       return signedIn()
         && request.auth.token.email_verified == true
-        && request.auth.token.email in [
-          "zaradigitalseva@gmail.com",
-          "ngogrant454@gmail.com"
-        ];
+        && request.auth.token.email in ["zaradigitalseva@gmail.com", "ngogrant454@gmail.com"];
+    }
+
+    match /users/{userId} {
+      allow read: if (signedIn() && request.auth.uid == userId) || isAdmin();
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role in ["customer", "shop"]
+        && request.resource.data.email == request.auth.token.email;
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email;
+      allow delete: if isAdmin();
     }
 
     match /shops/{shopId} {
-      // Customers can see only live shops; owners can see their own shop;
-      // verified admins can review every shop.
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
         || resource.data.status == "live";
-
-      // Shop registrations start pending and belong to the signed-in owner.
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.status == "pending";
-
-      // Only a verified admin may approve, deactivate, or edit a shop.
       allow update, delete: if isAdmin();
     }
 
@@ -39,7 +40,6 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // Everything else remains blocked until its access rules are designed.
     match /{document=**} {
       allow read, write: if false;
     }
