@@ -3,7 +3,7 @@ import Link from "next/link";
 import {useEffect,useState} from "react";
 import {useRouter} from "next/navigation";
 import {onAuthStateChanged,signOut} from "firebase/auth";
-import {collection,doc,getDocs,query,updateDoc,where} from "firebase/firestore";
+import {collection,doc,getDocs,query,updateDoc,where} from "firebase/firestore/lite";
 import {auth,db} from "@/lib/firebase";
 import {isAdminEmail} from "@/lib/admin";
 type Order={id:string;shopName?:string;customerName?:string;customerPhone?:string;deliveryAddress?:string;fulfillmentType?:"pickup"|"delivery";items?:{name:string;quantity:number;price:number}[];total?:number;status?:string;paymentStatus?:string;shopId?:string};
