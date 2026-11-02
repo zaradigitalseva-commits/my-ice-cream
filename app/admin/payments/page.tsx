@@ -1,0 +1,14 @@
+"use client";
+import Link from "next/link";
+import {useEffect,useState} from "react";
+import {useRouter} from "next/navigation";
+import {onAuthStateChanged,type User} from "firebase/auth";
+import {collection,doc,getDocs,query,updateDoc,where} from "firebase/firestore";
+import {auth,db} from "@/lib/firebase";
+import {isAdminEmail} from "@/lib/admin";
+type Payment={id:string;ownerUid?:string;shopId?:string;shopName?:string;amount?:number;utr?:string;status?:string};
+export default function AdminPaymentsPage(){const router=useRouter();const[user,setUser]=useState<User|null>(null);const[items,setItems]=useState<Payment[]>([]);const[error,setError]=useState("");const[loading,setLoading]=useState(true);
+useEffect(()=>{if(!auth)return;return onAuthStateChanged(auth,async u=>{setUser(u);if(!u){router.replace("/admin");return;}if(!isAdminEmail(u.email)||!u.emailVerified){router.replace("/");return;}if(!db)return;try{const r=await getDocs(query(collection(db,"subscriptionPayments"),where("status","==","pending")));setItems(r.docs.map(d=>({id:d.id,...d.data()} as Payment)));}catch(e){setError(e instanceof Error?e.message:"Payments could not be loaded.");}finally{setLoading(false)}})},[router]);
+async function verify(p:Payment){if(!db||!p.shopId)return;try{const expiry=new Date();expiry.setDate(expiry.getDate()+30);await updateDoc(doc(db,"subscriptionPayments",p.id),{status:"verified",verifiedAt:new Date(),verifiedBy:user?.email});await updateDoc(doc(db,"shops",p.shopId),{subscriptionStatus:"active",subscriptionExpiresAt:expiry,updatedAt:new Date()});setItems(v=>v.filter(x=>x.id!==p.id));}catch(e){setError(e instanceof Error?e.message:"Could not verify payment.");}}
+async function reject(p:Payment){if(!db)return;try{await updateDoc(doc(db,"subscriptionPayments",p.id),{status:"rejected",verifiedAt:new Date(),verifiedBy:user?.email});setItems(v=>v.filter(x=>x.id!==p.id));}catch(e){setError(e instanceof Error?e.message:"Could not reject payment.");}}
+return <main className="admin-wrap"><header className="admin-header"><Link href="/admin" className="admin-brand">🍦 MY ICE CREAM <span>ADMIN</span></Link><Link href="/admin" className="admin-secondary">Dashboard</Link></header><section className="admin-panel"><h1>Subscription payments</h1><p>Review ₹299 UPI UTR submissions. Verification activates the shop subscription for 30 days.</p>{error&&<p className="admin-error">{error}</p>}{loading?<p>Loading…</p>:items.length===0?<p className="admin-muted">No pending payments.</p>:items.map(p=><article className="admin-panel" key={p.id}><h2>{p.shopName||p.shopId}</h2><p>Amount: ₹{p.amount} · UTR: <b>{p.utr}</b></p><p>Shop ID: {p.shopId}</p><div className="admin-actions"><button className="admin-primary small" onClick={()=>void verify(p)}>Verify & activate 30 days</button><button className="admin-secondary small" onClick={()=>void reject(p)}>Reject</button></div></article>)}</section></main>}
