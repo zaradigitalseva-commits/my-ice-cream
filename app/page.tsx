@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
@@ -17,7 +18,7 @@ export default function HomePage() {
   }
   return <main className="site-shell">
     <header className="topbar">
-      <a className="brand" href="/" aria-label="MY ICE CREAM home"><span className="brand-mark">🍦</span><span>MY ICE CREAM</span></a>
+      <Link className="brand" href="/" aria-label="MY ICE CREAM home"><span className="brand-mark">🍦</span><span>MY ICE CREAM</span></Link>
       <nav className="navlinks" aria-label="Main navigation"><a href="#discover">Discover</a><a href="#shops">For shops</a><a href="#about">About</a></nav>
       <button className="login-button" onClick={handleAuth} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
     </header>
