@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
 type Shop={id:string;name?:string;shopName?:string;city?:string;address?:string;phone?:string;description?:string;status?:string;pickupAvailable?:boolean;deliveryAvailable?:boolean};
