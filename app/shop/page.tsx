@@ -3,16 +3,40 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
-type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string };
+
+type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string };
+type Product = { id: string; name?: string; description?: string; price?: number; stock?: number; imageUrl?: string; active?: boolean };
+
 export default function ShopPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [shop, setShop] = useState<Shop | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
+  const [address, setAddress] = useState("");
+  const [description, setDescription] = useState("");
+  const [productId, setProductId] = useState("");
+  const [productName, setProductName] = useState("");
+  const [productDescription, setProductDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [stock, setStock] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+
+  async function loadProducts(shopId: string) {
+    if (!db) return;
+    const result = await getDocs(query(collection(db, "shops", shopId, "products")));
+    setProducts(result.docs.map((item) => ({ id: item.id, ...item.data() } as Product)));
+  }
+
   useEffect(() => {
     if (!auth) { setLoading(false); return; }
     return onAuthStateChanged(auth, async (nextUser) => {
@@ -23,21 +47,82 @@ export default function ShopPage() {
       try {
         const result = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
         const owned = result.docs[0];
-        if (owned) setShop({ id: owned.id, ...owned.data() } as Shop);
+        if (owned) {
+          const data = { id: owned.id, ...owned.data() } as Shop;
+          setShop(data); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
+          setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || "");
+          if ((data.status || "").toLowerCase() === "live") await loadProducts(data.id);
+        }
       } catch (e) { setError(e instanceof Error ? e.message : "Could not load your shop."); }
       finally { setLoading(false); }
     });
   }, [router]);
-  const status = (shop?.status || "pending").toLowerCase();
+
+  async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!db || !shop) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await updateDoc(doc(db, "shops", shop.id), { name: name.trim(), shopName: name.trim(), phone: phone.trim(), city: city.trim(), address: address.trim(), description: description.trim(), updatedAt: serverTimestamp() });
+      setShop({ ...shop, name: name.trim(), shopName: name.trim(), phone, city, address, description });
+      setNotice("Shop profile updated.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Profile update failed."); }
+    finally { setBusy(false); }
+  }
+
+  function resetProduct() { setProductId(""); setProductName(""); setProductDescription(""); setPrice(""); setStock(""); setImageUrl(""); }
+
+  async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!db || !shop || !user || shop.status !== "live") return;
+    setBusy(true); setError(""); setNotice("");
+    const data = { shopId: shop.id, ownerUid: user.uid, name: productName.trim(), description: productDescription.trim(), price: Number(price), stock: Number(stock), imageUrl: imageUrl.trim(), active: true, updatedAt: serverTimestamp() };
+    try {
+      if (productId) await updateDoc(doc(db, "shops", shop.id, "products", productId), data);
+      else await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
+      await loadProducts(shop.id); resetProduct(); setNotice(productId ? "Product updated." : "Product added.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Product could not be saved."); }
+    finally { setBusy(false); }
+  }
+
+  async function removeProduct(id: string) {
+    if (!db || !shop || !confirm("Delete this product?")) return;
+    try { await deleteDoc(doc(db, "shops", shop.id, "products", id)); await loadProducts(shop.id); setNotice("Product deleted."); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not delete product."); }
+  }
+
+  const live = (shop?.status || "").toLowerCase() === "live";
   return <main className="admin-wrap">
     <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></header>
-    <section className="admin-panel"><p className="admin-kicker">SHOPKEEPER AREA</p>
-      {loading ? <h1>Checking shop registration…</h1> : error ? <p className="admin-error">{error}</p> : !shop ?
-        <><h1>Register your shop</h1><p>Shopkeeper access starts with a separate shop registration. Admin approval is required before your shop goes LIVE.</p><Link href="/shop/register" className="admin-primary role-link">Register Shop</Link></> :
-        <><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""}</p><p>Your registration status: <span className={"admin-status " + status}>{status}</span></p>
-          {status === "live" ? <p>Your shop is approved and LIVE. Product and order management will be added to this dashboard next.</p> : <p>Your shop is not public yet. Admin must approve it before customers can see it.</p>}
-        </>}
-      {user && <p className="admin-muted">Signed in as {user.email}</p>}
-    </section>
+    {loading ? <section className="admin-panel"><h1>Loading your shop…</h1></section> : !shop ?
+      <section className="admin-panel"><h1>Register your shop</h1><p>Shopkeeper access starts with a separate shop registration. Admin approval is required before your shop is LIVE.</p><Link href="/shop/register" className="admin-primary role-link">Register Shop</Link></section> :
+      <>
+        <section className="admin-heading"><div><p className="admin-kicker">SHOPKEEPER AREA</p><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""} · Status: <span className={"admin-status " + (shop.status || "pending")}>{shop.status || "pending"}</span></p></div></section>
+        {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
+        <section className="admin-panel"><h2>Shop profile</h2><form className="register-form" onSubmit={saveProfile}>
+          <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
+          <label>Mobile number<input required value={phone} onChange={e=>setPhone(e.target.value)} /></label>
+          <label>City<input required value={city} onChange={e=>setCity(e.target.value)} /></label>
+          <label>Full address<input required value={address} onChange={e=>setAddress(e.target.value)} /></label>
+          <label>About your shop<textarea rows={3} value={description} onChange={e=>setDescription(e.target.value)} /></label>
+          <button className="admin-primary" disabled={busy}>Save shop profile</button>
+        </form></section>
+        {live ? <section className="admin-panel"><h2>Products & stock</h2><p>Add products with price and available stock. Only active LIVE shops are visible to customers.</p>
+          <form className="register-form" onSubmit={saveProduct}>
+            <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>
+            <label>Description<input value={productDescription} onChange={e=>setProductDescription(e.target.value)} /></label>
+            <label>Price (₹)<input required type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} /></label>
+            <label>Stock quantity<input required type="number" min="0" step="1" value={stock} onChange={e=>setStock(e.target.value)} /></label>
+            <label>Product image URL (optional)<input type="url" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} placeholder="https://…" /></label>
+            <div><button className="admin-primary" disabled={busy}>{productId ? "Update product" : "Add product"}</button>{productId && <button type="button" className="admin-secondary" onClick={resetProduct}>Cancel edit</button>}</div>
+          </form>
+          <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead><tbody>
+            {products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.description || ""}</small></td><td>₹{Number(p.price || 0).toFixed(2)}</td><td>{p.stock ?? 0}</td><td className="admin-actions"><button className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setStock(String(p.stock??""));setImageUrl(p.imageUrl||"");}}>Edit</button><button className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td></tr>)}
+            {products.length===0 && <tr><td colSpan={4}>No products added yet.</td></tr>}
+          </tbody></table></div>
+        </section> : <section className="admin-panel"><h2>Approval pending</h2><p>Your shop profile can be updated, but product management unlocks after Admin approves your shop and changes its status to LIVE.</p></section>}
+      </>
+    }
+    {user && <p className="admin-muted">Signed in as {user.email}</p>}
   </main>;
 }
