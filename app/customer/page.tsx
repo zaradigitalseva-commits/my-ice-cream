@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { collection, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
+import { collection, doc, getDocs, query, updateDoc, where } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 type Order={id:string;shopId?:string;shopName?:string;items?:{name:string;quantity:number;price:number}[];total?:number;status?:string;paymentStatus?:string;createdAt?:{toDate?:()=>Date}};
