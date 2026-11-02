@@ -15,6 +15,8 @@ export default function HomePage() {
   const [loadingShops, setLoadingShops] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All treats");
 
   useEffect(() => {
     if (!auth) return;
@@ -47,6 +49,12 @@ export default function HomePage() {
   }
 
   const adminAccount = isAdminEmail(user?.email);
+  const visibleShops = shops.filter((shop) => {
+    const haystack = [shop.name, shop.shopName, shop.city, shop.address, shop.description, shop.category].filter(Boolean).join(" ").toLowerCase();
+    const matchesSearch = haystack.includes(searchText.trim().toLowerCase());
+    const matchesCategory = activeCategory === "All treats" || (shop.category || "").toLowerCase().includes(activeCategory.toLowerCase());
+    return matchesSearch && matchesCategory;
+  });
   return <main className="site-shell">
     <header className="topbar">
       <Link className="brand" href="/" aria-label="MY ICE CREAM home"><span className="brand-mark">🍦</span><span>MY ICE CREAM</span></Link>
@@ -68,10 +76,10 @@ export default function HomePage() {
     </section>
     <section id="discover">
       <div className="section-head"><div><h2>Find your kind of sweet</h2><p>Browse all approved LIVE shops freely. Login is needed only for account features.</p></div></div>
-      <div className="pills">{categories.map((category,index)=><span className={index===0?"pill active":"pill"} key={category}>{category}</span>)}</div>
-      <div id="shops" className="shop-list-heading"><h2>LIVE Ice Cream Shops</h2><span>{shops.length} shops</span></div>
+      <div className="marketplace-tools"><label className="marketplace-search"><span>Search shops</span><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Shop name, city or category" /></label><div className="pills" aria-label="Shop categories">{categories.map((category)=><button type="button" className={activeCategory===category?"pill active":"pill"} key={category} aria-pressed={activeCategory===category} onClick={()=>setActiveCategory(category)}>{category}</button>)}</div></div>
+      <div id="shops" className="shop-list-heading"><h2>LIVE Ice Cream Shops</h2><span>{visibleShops.length} shops</span></div>
       {loadingShops ? <div className="empty-panel"><p>Loading live shops…</p></div> : shops.length === 0 ? <div className="empty-panel"><div className="empty-icon">🏪</div><h3>No LIVE shops yet</h3><p>Approved shops will appear here automatically. You can browse this website without signing in.</p></div> :
-        <div className="shop-grid">{shops.map((shop) => <Link href={"/shop/" + shop.id} className="shop-card" key={shop.id}>
+        <div className="shop-grid">{visibleShops.map((shop) => <Link href={"/shop/" + shop.id} className="shop-card" key={shop.id}>
           {shop.bannerUrl ? <img className="shop-banner" src={shop.bannerUrl} alt="" /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
           <div className="shop-card-body"><div className="shop-card-title">{shop.logoUrl ? <img src={shop.logoUrl} alt="" /> : <span>🏪</span>}<h3>{shop.name || shop.shopName || "Ice Cream Shop"}</h3></div>
             <p>{[shop.city, shop.address].filter(Boolean).join(" · ") || "Location not added"}</p>
@@ -79,6 +87,7 @@ export default function HomePage() {
             {shop.category && <span className="pill">{shop.category}</span>}
           </div>
         </Link>)}</div>}
+      {!loadingShops && shops.length > 0 && visibleShops.length === 0 && <div className="empty-panel"><h3>No matching shops</h3><p>Try another search or choose All treats.</p><button className="admin-secondary" onClick={() => {setSearchText("");setActiveCategory("All treats");}}>Clear filters</button></div>}
     </section>
     <section id="for-shops" className="shop-onboarding"><div><p className="eyebrow">For ice cream businesses</p><h2>Bring your shop to MY ICE CREAM</h2><p>Register your shop for free review. Your shop becomes public only after Admin approval.</p></div><Link href="/shop/register" className="primary-button">Register your shop</Link></section>
     <footer className="footer" id="about"><span>© {new Date().getFullYear()} MY ICE CREAM</span><span>Unlimited shops · Sweet moments · Easy ordering</span></footer>
