@@ -34,8 +34,8 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       match /products/{productId} {
-        allow read: if isAdmin() || (liveShop(shopId) && resource.data.active == true)
-          || (ownsShop(shopId) && !liveShop(shopId));
+        allow read: if isAdmin() || ownsShop(shopId)
+          || (liveShop(shopId) && resource.data.active == true);
         allow create: if isAdmin() || (ownsShop(shopId) && liveShop(shopId)
           && request.resource.data.shopId == shopId
           && request.resource.data.ownerUid == request.auth.uid);
