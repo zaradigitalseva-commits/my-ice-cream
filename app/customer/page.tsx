@@ -3,22 +3,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
-
-export default function CustomerPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      if (!nextUser) router.replace("/");
-      else if (isAdminEmail(nextUser.email) && nextUser.emailVerified) router.replace("/admin");
-    });
-  }, [router]);
-  return <main className="admin-wrap">
-    <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>CUSTOMER</span></Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></header>
-    <section className="admin-panel"><p className="admin-kicker">CUSTOMER ACCOUNT</p><h1>Welcome{user?.displayName ? ", " + user.displayName : ""}!</h1><p>You are using MY ICE CREAM as a customer. Browse all LIVE shops without needing to sign in.</p><Link href="/" className="admin-primary role-link">Explore all shops</Link><p className="admin-muted">Your orders, favourites and bills will appear here as those features are added.</p></section>
-  </main>;
+type Order={id:string;shopId?:string;shopName?:string;items?:{name:string;quantity:number;price:number}[];total?:number;status?:string;paymentStatus?:string;createdAt?:{toDate?:()=>Date}};
+export default function CustomerPage(){
+ const router=useRouter();const[user,setUser]=useState<User|null>(null);const[orders,setOrders]=useState<Order[]>([]);const[loading,setLoading]=useState(true);const[error,setError]=useState("");
+ useEffect(()=>{if(!auth)return;return onAuthStateChanged(auth,async u=>{setUser(u);if(!u){router.replace("/");return;}if(isAdminEmail(u.email)&&u.emailVerified){router.replace("/admin");return;}if(!db){setLoading(false);return;}try{const q=await getDocs(query(collection(db,"orders"),where("customerUid","==",u.uid)));setOrders(q.docs.map(d=>({id:d.id,...d.data()} as Order)).sort((a,b)=>(b.createdAt?.toDate?.().getTime()||0)-(a.createdAt?.toDate?.().getTime()||0)));}catch(e){setError(e instanceof Error?e.message:"Orders could not be loaded.");}finally{setLoading(false)}})},[router]);
+ return <main className="admin-wrap"><header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>CUSTOMER</span></Link><button className="admin-secondary" onClick={()=>auth&&signOut(auth)}>Sign out</button></header>
+ <section className="admin-panel"><p className="admin-kicker">CUSTOMER ACCOUNT</p><h1>Welcome{user?.displayName?", "+user.displayName:""}!</h1><p>Browse shops and manage your orders here.</p><Link href="/" className="admin-primary role-link">Explore all shops</Link></section>
+ <section className="admin-panel"><h2>My orders</h2>{loading?<p className="admin-muted">Loading orders…</p>:error?<p className="admin-error">{error}</p>:orders.length===0?<p className="admin-muted">You have not placed any orders yet.</p>:<div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Shop / Items</th><th>Total</th><th>Status</th><th>Payment</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><strong>{o.shopName}</strong><small>{(o.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")}</small><small>Order {o.id}</small></td><td>₹{Number(o.total||0).toFixed(2)}</td><td><span className={"admin-status "+(o.status||"placed")}>{o.status||"placed"}</span></td><td>{o.paymentStatus||"unpaid"}</td></tr>)}</tbody></table></div>}</section></main>
 }
