@@ -71,7 +71,7 @@ export default function HomePage() {
       <div className="pills">{categories.map((category,index)=><span className={index===0?"pill active":"pill"} key={category}>{category}</span>)}</div>
       <div id="shops" className="shop-list-heading"><h2>LIVE Ice Cream Shops</h2><span>{shops.length} shops</span></div>
       {loadingShops ? <div className="empty-panel"><p>Loading live shops…</p></div> : shops.length === 0 ? <div className="empty-panel"><div className="empty-icon">🏪</div><h3>No LIVE shops yet</h3><p>Approved shops will appear here automatically. You can browse this website without signing in.</p></div> :
-        <div className="shop-grid">{shops.map((shop) => <article className="shop-card" key={shop.id}>
+        <div className="shop-grid">{shops.map((shop) => <Link href={"/shop/" + shop.id} className="shop-card" key={shop.id}>
           {shop.bannerUrl ? <img className="shop-banner" src={shop.bannerUrl} alt="" /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
           <div className="shop-card-body"><div className="shop-card-title">{shop.logoUrl ? <img src={shop.logoUrl} alt="" /> : <span>🏪</span>}<h3>{shop.name || shop.shopName || "Ice Cream Shop"}</h3></div>
             <p>{[shop.city, shop.address].filter(Boolean).join(" · ") || "Location not added"}</p>
