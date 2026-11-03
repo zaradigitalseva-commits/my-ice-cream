@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, getDocs, orderBy, query, updateDoc, doc, Timestamp } from "firebase/firestore/lite";
+import { collection, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
@@ -18,6 +18,8 @@ export default function AdminPage() {
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [siteLogo, setSiteLogo] = useState("");
+  const [logoBusy, setLogoBusy] = useState(false);
 
   useEffect(() => {
     if (!auth) { setAuthReady(true); setError("Firebase configuration is missing."); return; }
@@ -36,6 +38,38 @@ export default function AdminPage() {
   }
 
   useEffect(() => { if (user && isAdminEmail(user.email) && user.emailVerified) void loadShops(); }, [user]);
+
+  useEffect(() => {
+    if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
+    getDoc(doc(db, "siteSettings", "branding")).then((snapshot) => {
+      if (snapshot.exists()) setSiteLogo(String(snapshot.data().logoDataUrl || ""));
+    }).catch((err) => setError(err instanceof Error ? err.message : "Logo load failed."));
+  }, [user]);
+
+  async function saveSiteLogo(file?: File) {
+    if (!db) return;
+    setLogoBusy(true); setError(""); setNotice("");
+    try {
+      let logoDataUrl = "";
+      if (file) {
+        if (!file.type.startsWith("image/")) throw new Error("कृपया image file चुनें।");
+        const source = await createImageBitmap(file);
+        const scale = Math.min(1, 900 / source.width, 900 / source.height);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(source.width * scale));
+        canvas.height = Math.max(1, Math.round(source.height * scale));
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Image process नहीं हो पाई।");
+        context.drawImage(source, 0, 0, canvas.width, canvas.height);
+        logoDataUrl = canvas.toDataURL("image/webp", 0.78);
+        if (logoDataUrl.length > 850000) throw new Error("Logo बहुत बड़ा है। छोटी image चुनें।");
+      }
+      await setDoc(doc(db, "siteSettings", "branding"), { logoDataUrl, updatedAt: new Date() }, { merge: true });
+      setSiteLogo(logoDataUrl);
+      setNotice(file ? "वेबसाइट का लोगो सेव हो गया।" : "वेबसाइट का लोगो हटा दिया गया।");
+    } catch (err) { setError(err instanceof Error ? err.message : "Logo save नहीं हो पाया।"); }
+    finally { setLogoBusy(false); }
+  }
 
   async function setShopStatus(shop: Shop, status: "live" | "inactive" | "pending" | "rejected") {
     if (!db) return;
@@ -68,7 +102,13 @@ export default function AdminPage() {
   return <main className="admin-wrap">
     <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>ADMIN</span></Link><div className="admin-user"><span>{user.displayName || user.email}</span><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></div></header>
     <div className="admin-heading"><div><p className="admin-kicker">PLATFORM CONTROL</p><h1>Admin dashboard</h1><p>Review shop registrations and control which shops are visible to customers.</p></div><button className="admin-secondary" onClick={() => void loadShops()} disabled={loading}>↻ Refresh</button></div>
-    <div className="admin-actions"><Link href="/admin/payments" className="admin-primary">Subscription payments</Link></div><section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>
+    <div className="admin-actions"><Link href="/admin/payments" className="admin-primary">Subscription payments</Link></div>
+    <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Website logo</h2><p>यह लोगो वेबसाइट के नाम की जगह सभी ग्राहकों को दिखेगा।</p></div></div>
+      <div className="site-logo-editor">{siteLogo ? <img src={siteLogo} alt="Current website logo" /> : <div className="site-logo-empty">🍦 MY ICE CREAM</div>}
+        <label className="admin-primary small">{logoBusy ? "सेव हो रहा है…" : "नया लोगो चुनें"}<input type="file" accept="image/*" disabled={logoBusy} hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void saveSiteLogo(file); event.currentTarget.value = ""; }} /></label>
+        {siteLogo && <button className="admin-secondary small" disabled={logoBusy} onClick={() => void saveSiteLogo()}>लोगो हटाएँ</button>}
+      </div><small className="admin-muted">PNG, JPG या WebP image चुनें। लोगो अपने-आप छोटा करके सेव होगा।</small>
+    </section><section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>
       <div className="admin-filters"><label>Search shops<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Shop, owner, mobile, city or ID…" /></label><label>Filter by status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="live">Live</option><option value="inactive">Inactive</option><option value="rejected">Rejected</option></select></label></div>
