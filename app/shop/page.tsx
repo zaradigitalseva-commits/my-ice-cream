@@ -92,8 +92,8 @@ export default function ShopPage() {
   async function searchCustomer(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!db || !shop) return;
-    const digits = customerPhone.replace(/\\D/g, "");
-    if (!/^\\d{10}$/.test(digits)) { setCustomerMessage("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।"); return; }
+    const digits = customerPhone.replace(/\D/g, "");
+    if (!/^\d{10}$/.test(digits)) { setCustomerMessage("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।"); return; }
     setCustomerLoading(true); setCustomerMessage(""); setCustomer(null); setCustomerOrders([]); setCustomerFound(false);
     try {
       const customerRef = doc(db, "shops", shop.id, "customers", digits);
@@ -117,8 +117,8 @@ export default function ShopPage() {
 
   async function registerCustomer() {
     if (!db || !shop) return;
-    const digits = customerPhone.replace(/\\D/g, "");
-    if (!/^\\d{10}$/.test(digits)) { setCustomerMessage("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।"); return; }
+    const digits = customerPhone.replace(/\D/g, "");
+    if (!/^\d{10}$/.test(digits)) { setCustomerMessage("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।"); return; }
     setCustomerBusy(true); setCustomerMessage("");
     try {
       await setDoc(doc(db, "shops", shop.id, "customers", digits), { phone: digits, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
@@ -231,7 +231,7 @@ export default function ShopPage() {
           <p className="admin-kicker">CUSTOMER DESK</p><h2>सबसे पहले ग्राहक खोजें</h2>
           <p>मोबाइल नंबर डालकर ग्राहक की जानकारी और पुराने ऑर्डर देखें। नया ग्राहक सिर्फ नंबर से रजिस्टर होगा।</p>
           <form className="register-form" onSubmit={searchCustomer}>
-            <label>ग्राहक का मोबाइल नंबर<input required inputMode="numeric" autoComplete="tel" maxLength={10} value={customerPhone} onChange={e=>setCustomerPhone(e.target.value.replace(/\\D/g,"").slice(0,10))} placeholder="10 अंकों का मोबाइल नंबर" /></label>
+            <label>ग्राहक का मोबाइल नंबर<input required inputMode="numeric" autoComplete="tel" maxLength={10} value={customerPhone} onChange={e=>setCustomerPhone(e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="10 अंकों का मोबाइल नंबर" /></label>
             <button className="admin-primary" disabled={customerLoading || customerPhone.length!==10}>{customerLoading?"खोज रहे हैं…":"ग्राहक खोजें"}</button>
           </form>
           {customerMessage && <p className={customerFound?"admin-success":"admin-muted"} role="status">{customerMessage}</p>}
