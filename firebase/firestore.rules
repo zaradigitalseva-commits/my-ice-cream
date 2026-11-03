@@ -12,7 +12,7 @@ service cloud.firestore {
   match /shops/{shopId}{
    allow read:if isAdmin() || (signedIn()&&resource.data.ownerUid==request.auth.uid) || resource.data.status=="live";
    allow create:if signedIn()&&request.resource.data.ownerUid==request.auth.uid&&request.resource.data.status=="pending"&&getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId==shopId;
-   allow update:if isAdmin() || (signedIn()&&resource.data.ownerUid==request.auth.uid&&request.resource.data.ownerUid==resource.data.ownerUid&&request.resource.data.status==resource.data.status&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["name","shopName","phone","city","address","description","logoUrl","bannerUrl","category","pickupAvailable","deliveryAvailable","offerTitle","offerDescription","offerExpiresAt","updatedAt"]));
+   allow update:if isAdmin() || (signedIn()&&resource.data.ownerUid==request.auth.uid&&request.resource.data.ownerUid==resource.data.ownerUid&&request.resource.data.status==resource.data.status&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["name","shopName","phone","city","address","description","logoUrl","bannerUrl","category","pickupAvailable","deliveryAvailable","openingTime","closingTime","closedDays","manualClosed","deliveryFee","minimumOrder","offerTitle","offerDescription","offerExpiresAt","updatedAt"]));
    allow delete:if isAdmin();
    match /products/{productId}{
     allow read:if isAdmin()||ownsShop(shopId)||(liveShop(shopId)&&resource.data.active==true);
