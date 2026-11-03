@@ -3,12 +3,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore/lite";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
 type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number };
 type Order = { id: string; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
+type Customer = { id: string; phone: string; createdAt?: { toDate?: () => Date } };
+type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; stock?: number; imageUrl?: string; active?: boolean };
 
 export default function ShopPage() {
@@ -51,6 +53,13 @@ export default function ShopPage() {
   const [imageBusy, setImageBusy] = useState(false);
   const [utr, setUtr] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerBusy, setCustomerBusy] = useState(false);
+  const [customerMessage, setCustomerMessage] = useState("");
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
+  const [customerFound, setCustomerFound] = useState(false);
 
   async function loadProducts(shopId: string) {
     if (!db) return;
@@ -78,6 +87,45 @@ export default function ShopPage() {
       finally { setLoading(false); }
     });
   }, [router]);
+
+  async function searchCustomer(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!db || !shop) return;
+    const digits = customerPhone.replace(/\\D/g, "");
+    if (!/^\\d{10}$/.test(digits)) { setCustomerMessage("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।"); return; }
+    setCustomerLoading(true); setCustomerMessage(""); setCustomer(null); setCustomerOrders([]); setCustomerFound(false);
+    try {
+      const customerRef = doc(db, "shops", shop.id, "customers", digits);
+      const [customerSnap, orderResult] = await Promise.all([
+        getDoc(customerRef),
+        getDocs(query(collection(db, "orders"), where("shopId", "==", shop.id), where("customerPhone", "==", digits)))
+      ]);
+      const foundOrders = orderResult.docs.map(d => ({ id: d.id, ...d.data() } as CustomerOrder))
+        .sort((a,b)=>(b.createdAt?.toDate?.().getTime()||0)-(a.createdAt?.toDate?.().getTime()||0));
+      setCustomerOrders(foundOrders);
+      if (customerSnap.exists() || foundOrders.length) {
+        setCustomerFound(true);
+        setCustomer(customerSnap.exists() ? ({ id: customerSnap.id, ...customerSnap.data() } as Customer) : { id: digits, phone: digits });
+        setCustomerMessage("ग्राहक मिल गया। उपलब्ध जानकारी नीचे दिखाई गई है।");
+      } else {
+        setCustomerMessage("यह ग्राहक अभी रजिस्टर नहीं है। सिर्फ मोबाइल नंबर से रजिस्टर कर सकते हैं।");
+      }
+    } catch (e) { setCustomerMessage(e instanceof Error ? e.message : "ग्राहक की जानकारी नहीं मिल सकी।"); }
+    finally { setCustomerLoading(false); }
+  }
+
+  async function registerCustomer() {
+    if (!db || !shop) return;
+    const digits = customerPhone.replace(/\\D/g, "");
+    if (!/^\\d{10}$/.test(digits)) { setCustomerMessage("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।"); return; }
+    setCustomerBusy(true); setCustomerMessage("");
+    try {
+      await setDoc(doc(db, "shops", shop.id, "customers", digits), { phone: digits, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      setCustomer({ id: digits, phone: digits }); setCustomerFound(true);
+      setCustomerMessage("ग्राहक सिर्फ मोबाइल नंबर से रजिस्टर हो गया।");
+    } catch (e) { setCustomerMessage(e instanceof Error ? e.message : "ग्राहक रजिस्टर नहीं हो सका।"); }
+    finally { setCustomerBusy(false); }
+  }
 
   async function submitSubscription(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -178,6 +226,23 @@ export default function ShopPage() {
       <>
         <section className="admin-heading"><div><p className="admin-kicker">SHOPKEEPER AREA</p><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""} · Status: <span className={"admin-status " + (shop.status || "pending")}>{shop.status || "pending"}</span></p></div></section>
         {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
+        <section className="admin-panel">
+          <p className="admin-kicker">CUSTOMER DESK</p><h2>सबसे पहले ग्राहक खोजें</h2>
+          <p>मोबाइल नंबर डालकर ग्राहक की जानकारी और पुराने ऑर्डर देखें। नया ग्राहक सिर्फ नंबर से रजिस्टर होगा।</p>
+          <form className="register-form" onSubmit={searchCustomer}>
+            <label>ग्राहक का मोबाइल नंबर<input required inputMode="numeric" autoComplete="tel" maxLength={10} value={customerPhone} onChange={e=>setCustomerPhone(e.target.value.replace(/\\D/g,"").slice(0,10))} placeholder="10 अंकों का मोबाइल नंबर" /></label>
+            <button className="admin-primary" disabled={customerLoading || customerPhone.length!==10}>{customerLoading?"खोज रहे हैं…":"ग्राहक खोजें"}</button>
+          </form>
+          {customerMessage && <p className={customerFound?"admin-success":"admin-muted"} role="status">{customerMessage}</p>}
+          {customerFound && customer && <div className="admin-panel">
+            <h3>ग्राहक की जानकारी</h3><p><strong>मोबाइल:</strong> {customer.phone}</p>
+            {customerOrders.length>0 ? <>
+              <p><strong>पुराने ऑर्डर:</strong> {customerOrders.length}</p>
+              {customerOrders.map(o=><article key={o.id} className="admin-panel"><strong>ऑर्डर #{o.id}</strong><p>नाम: {o.customerName||"उपलब्ध नहीं"} · ईमेल: {o.customerEmail||"उपलब्ध नहीं"}</p><p>पता: {o.deliveryAddress||"उपलब्ध नहीं"}</p><p>ऑर्डर: {(o.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")||"—"}</p><p>कुल: ₹{Number(o.total||0).toFixed(2)} · स्थिति: {o.status||"—"}</p></article>)}
+            </> : <p className="admin-muted">इस ग्राहक का अभी कोई पुराना ऑर्डर नहीं है।</p>}
+          </div>}
+          {!customerLoading && customerPhone.length===10 && !customerFound && customerMessage.startsWith("यह ग्राहक") && <button type="button" className="admin-primary" disabled={customerBusy} onClick={()=>void registerCustomer()}>{customerBusy?"रजिस्टर हो रहा है…":"सिर्फ मोबाइल नंबर से ग्राहक रजिस्टर करें"}</button>}
+        </section>
         <section className="admin-panel"><h2>Business overview</h2><div className="admin-stats"><div><strong>{orders.length}</strong><span>Total orders</span></div><div><strong>₹{orders.filter(o=>o.paymentStatus==="paid").reduce((s,o)=>s+Number(o.total||0),0).toFixed(0)}</strong><span>Paid sales</span></div><div><strong>{orders.filter(o=>["placed","accepted","preparing","ready"].includes(o.status||"")).length}</strong><span>Open orders</span></div><div><strong>{products.filter(p=>Number(p.stock||0)<=5).length}</strong><span>Low stock</span></div></div></section><section className="admin-panel"><h2>Orders & customers</h2><p>View orders from customers who purchased from your shop.</p><Link href="/shop/orders" className="admin-primary role-link">Open orders</Link></section><section className="admin-panel"><h2>Shop profile</h2><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
           <label>Mobile number<input required value={phone} onChange={e=>setPhone(e.target.value)} /></label>
