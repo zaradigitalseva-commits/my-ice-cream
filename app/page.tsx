@@ -91,7 +91,7 @@ export default function HomePage() {
   const filteredBottomShops = shops.filter((shop) => [shop.name, shop.shopName, shop.city, shop.address, shop.description, shop.category].filter(Boolean).join(" ").toLowerCase().includes(shopSearchText.trim().toLowerCase()));
   return <main className="site-shell marketplace-3d">
     <header className="topbar">
-      <Link className="brand" href="/" aria-label="MY ICE CREAM home"><span className="brand-mark">🍦</span><span>MY ICE CREAM</span></Link>
+      <Link className="brand brand-3d-logo" href="/" aria-label="MY ICE CREAM home"><span className="brand-mark">🍦</span><span className="brand-logo-text"><span className="brand-my">MY</span> <span className="brand-ice">ICE</span> <span className="brand-cream">CREAM</span></span></Link>
       <nav className="navlinks" aria-label="Main navigation"><a href="#discover">Discover</a><a href="#shops">For shops</a><a href="#about">About</a></nav>
       <div className="top-actions">
         {user && (adminAccount ? <Link className="account-link" href="/admin">Admin Dashboard</Link> : shopOwner ? <Link className="account-link" href="/shop">Shop Dashboard</Link> : <Link className="account-link" href="/customer">My Account</Link>)}
