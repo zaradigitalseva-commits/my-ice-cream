@@ -79,3 +79,62 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .admin-address b{font-size:11px;color:#9b542e}
 .admin-address span{font-size:12px;color:var(--ink);line-height:1.5;overflow-wrap:anywhere;white-space:normal}
 .admin-address small{font-size:10px;color:var(--muted)}
+
+
+/* 3D colorful customer storefront */
+.customer-store{
+  --store-ink:#382044;
+  --store-muted:#806b8b;
+  max-width:1180px;
+  padding-top:22px;
+  background:
+    radial-gradient(ellipse at 8% 8%,#ffd8e8 0,transparent 28%),
+    radial-gradient(ellipse at 92% 16%,#ffe8a8 0,transparent 25%),
+    radial-gradient(ellipse at 50% 82%,#d9f4ff 0,transparent 34%);
+  color:var(--store-ink);
+}
+.customer-store-header{border:0;padding:12px 18px;margin-bottom:22px;border-radius:22px;background:#ffffffb8;box-shadow:0 10px 30px #8a4e9b14;backdrop-filter:blur(12px)}
+.customer-store .admin-brand{font-size:17px;color:#693d83}
+.customer-store .admin-secondary{background:linear-gradient(135deg,#fff,#ffe8f2);border:1px solid #f4d7e8;color:#78446f;box-shadow:0 5px 0 #e8c6dc}
+.customer-store .admin-panel{position:relative;overflow:hidden;border:1px solid #ffffffd9;border-radius:28px;background:linear-gradient(145deg,#ffffffed,#fff8fded);box-shadow:0 16px 0 #ead9ee,0 24px 48px #71427b20;padding:clamp(20px,3vw,32px);margin-top:25px}
+.customer-store-hero{min-height:250px;background:linear-gradient(120deg,#ffe0eb 0%,#fff0c4 48%,#e7ddff 100%)!important;box-shadow:0 13px 0 #e6c7df,0 24px 50px #a35c8a25!important}
+.customer-store-hero:after{content:"";position:absolute;width:220px;height:220px;border-radius:50%;right:7%;top:12px;background:radial-gradient(circle at 35% 30%,#ffffffd9 0 8%,#ffffff70 9% 35%,#f8a9cf55 36% 65%,transparent 66%);pointer-events:none}
+.customer-store-hero h1{position:relative;z-index:1;color:#542a67;font-size:clamp(38px,6vw,58px);text-shadow:0 3px 0 #ffffffa8,0 9px 18px #8a4b9630}
+.customer-store-hero p{position:relative;z-index:1;color:#71517d}
+.customer-store-orbit{position:absolute;right:12%;top:28px;z-index:1;font-size:105px;filter:drop-shadow(0 18px 12px #8c4d733c);transform:rotate(10deg);animation:store-float 4s ease-in-out infinite}
+@keyframes store-float{0%,100%{transform:translateY(0) rotate(10deg)}50%{transform:translateY(-10px) rotate(4deg)}}
+.customer-store .admin-kicker{color:#bd5791}
+.customer-store-menu{background:linear-gradient(145deg,#fff,#fff5fb)!important}
+.customer-section-title{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.customer-section-title>span{width:54px;height:54px;display:grid;place-items:center;border-radius:18px;background:linear-gradient(145deg,#ffe1ef,#ffe8ae);font-size:27px;box-shadow:0 6px 0 #edc8dc,0 12px 20px #a35c8a20}
+.customer-section-title h2{margin:0;color:#563265;font-size:24px}
+.customer-section-title p{margin:5px 0 0;color:#927c99;font-size:12px}
+.customer-store .shop-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.customer-store .customer-product-card{border:1px solid #f1d9eb;border-radius:24px;background:linear-gradient(145deg,#fff,#fff6fb);box-shadow:0 8px 0 #ead3e7,0 16px 28px #76427b17;transition:transform .22s,box-shadow .22s}
+.customer-store .customer-product-card:hover{transform:translateY(-7px) rotateX(2deg);box-shadow:0 13px 0 #e5c6e1,0 25px 36px #76427b25}
+.customer-store .shop-banner{height:190px;object-fit:cover;background:linear-gradient(135deg,#ffd7e8,#ffedba)}
+.customer-store .shop-card-body{padding:19px}
+.customer-store .shop-card-body h3{font-size:19px;color:#59326a;margin:0 0 8px}
+.customer-store .shop-card-body p{color:#8a7691}
+.customer-store .shop-card-body strong{font-size:22px;color:#cf4d8a;text-shadow:0 2px 0 #ffe0ed}
+.customer-store .customer-add-button{display:block;width:100%;margin-top:12px;border-radius:14px;background:linear-gradient(110deg,#ed609d,#9b65df);box-shadow:0 5px 0 #854caa,0 10px 18px #9b65df30;transition:transform .18s}
+.customer-store .customer-add-button:active,.customer-store .customer-checkout-button:active{transform:translateY(3px);box-shadow:0 2px 0 #854caa}
+.customer-cart{background:linear-gradient(145deg,#fff4d8,#ffe8f2 60%,#eee6ff)!important}
+.customer-cart h2{color:#5a326a}
+.customer-cart .register-form{max-width:620px}
+.customer-cart .register-form input,.customer-cart .register-form select{border:1px solid #ead4eb;border-radius:14px;background:#fff}
+.customer-store .customer-checkout-button{width:100%;max-width:620px;padding:15px 20px;border-radius:15px;background:linear-gradient(110deg,#fa8b55,#e84f91,#9362df);box-shadow:0 6px 0 #a44f9c,0 13px 24px #b45a9d35;font-size:15px}
+.customer-store .admin-success{background:#e9faed;color:#286b42;border:1px solid #c9edcf}
+.customer-store .admin-muted{color:#8a7890}
+@media(max-width:850px){.customer-store .shop-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){
+ .customer-store{padding:12px 12px 36px}
+ .customer-store-header{padding:12px;border-radius:17px}
+ .customer-store-hero{min-height:230px;padding-right:18px!important}
+ .customer-store-orbit{font-size:72px;right:8%;top:26px;opacity:.82}
+ .customer-store-hero:after{width:150px;height:150px;right:2%;top:28px}
+ .customer-store-hero h1{font-size:39px;max-width:75%}
+ .customer-store .shop-grid{grid-template-columns:1fr;gap:18px}
+ .customer-store .shop-banner{height:210px}
+ .customer-section-title h2{font-size:21px}
+}
