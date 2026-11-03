@@ -1,3 +1,4 @@
+// MY ICE CREAM — Cloud Firestore security rules
 rules_version = '2';
 
 service cloud.firestore {
