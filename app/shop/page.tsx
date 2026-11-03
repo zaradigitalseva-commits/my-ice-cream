@@ -60,6 +60,7 @@ export default function ShopPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
   const [customerFound, setCustomerFound] = useState(false);
+  const [showShopDashboard, setShowShopDashboard] = useState(false);
 
   async function loadProducts(shopId: string) {
     if (!db) return;
@@ -243,6 +244,8 @@ export default function ShopPage() {
           </div>}
           {!customerLoading && customerPhone.length===10 && !customerFound && customerMessage.startsWith("यह ग्राहक") && <button type="button" className="admin-primary" disabled={customerBusy} onClick={()=>void registerCustomer()}>{customerBusy?"रजिस्टर हो रहा है…":"सिर्फ मोबाइल नंबर से ग्राहक रजिस्टर करें"}</button>}
         </section>
+        <div className="admin-panel" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}><div><p className="admin-kicker">SHOP MANAGEMENT</p><h2 style={{margin:0}}>दुकान का डैशबोर्ड</h2><p style={{margin:"6px 0 0"}}>प्रोडक्ट, ऑर्डर, दुकान की जानकारी और पेमेंट मैनेज करें।</p></div><button type="button" className="admin-primary" onClick={()=>setShowShopDashboard(v=>!v)}>{showShopDashboard?"डैशबोर्ड बंद करें":"दुकान का डैशबोर्ड खोलें"}</button></div>
+        {showShopDashboard && <>
         <section className="admin-panel"><h2>Business overview</h2><div className="admin-stats"><div><strong>{orders.length}</strong><span>Total orders</span></div><div><strong>₹{orders.filter(o=>o.paymentStatus==="paid").reduce((s,o)=>s+Number(o.total||0),0).toFixed(0)}</strong><span>Paid sales</span></div><div><strong>{orders.filter(o=>["placed","accepted","preparing","ready"].includes(o.status||"")).length}</strong><span>Open orders</span></div><div><strong>{products.filter(p=>Number(p.stock||0)<=5).length}</strong><span>Low stock</span></div></div></section><section className="admin-panel"><h2>Orders & customers</h2><p>View orders from customers who purchased from your shop.</p><Link href="/shop/orders" className="admin-primary role-link">Open orders</Link></section><section className="admin-panel"><h2>Shop profile</h2><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
           <label>Mobile number<input required value={phone} onChange={e=>setPhone(e.target.value)} /></label>
@@ -285,6 +288,7 @@ export default function ShopPage() {
             {products.length===0 && <tr><td colSpan={5}>No products added yet.</td></tr>}
           </tbody></table></div>
         </section> : <section className="admin-panel"><h2>Approval pending</h2><p>Your shop profile can be updated, but product management unlocks after Admin approves your shop and changes its status to LIVE.</p></section>}
+        </>}
       </>
     }
     {user && <p className="admin-muted">Signed in as {user.email}</p>}
