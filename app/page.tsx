@@ -7,14 +7,16 @@ import { collection, getDocs, query, where } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
-type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };\ntype MarketplaceProduct = { id: string; shopId: string; shopName: string; city?: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; stock?: number; imageUrl?: string };
+type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };
+type MarketplaceProduct = { id: string; shopId: string; shopName: string; city?: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; stock?: number; imageUrl?: string };
 const categories = ["All treats", "Ice cream", "Kulfi", "Cones", "Family packs", "Party orders"];
 
 export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [shopOwner, setShopOwner] = useState(false);
-  const [shops, setShops] = useState<Shop[]>([]);\n  const [marketProducts, setMarketProducts] = useState<MarketplaceProduct[]>([]);
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [marketProducts, setMarketProducts] = useState<MarketplaceProduct[]>([]);
   const [loadingShops, setLoadingShops] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
