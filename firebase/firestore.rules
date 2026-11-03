@@ -20,6 +20,30 @@ service cloud.firestore {
     allow update:if isAdmin()||(ownsShop(shopId)&&liveShop(shopId)&&resource.data.shopId==shopId&&request.resource.data.shopId==resource.data.shopId&&request.resource.data.ownerUid==resource.data.ownerUid&&request.resource.data.ownerUid==request.auth.uid)||(liveShop(shopId)&&customerStockReservation(shopId,productId));
     allow delete:if isAdmin()||(ownsShop(shopId)&&liveShop(shopId)&&resource.data.ownerUid==request.auth.uid);
    }
+   match /customers/{phoneNumber}{
+    allow read:if ownsShop(shopId);
+    allow create:if ownsShop(shopId)&&request.resource.data.phone==phoneNumber&&phoneNumber.matches('^[0-9]{10}
+   allow read: if signedIn() && request.auth.uid == ownerUid;
+   allow create: if signedIn() && request.auth.uid == ownerUid && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid)) && request.resource.data.ownerUid == request.auth.uid && request.resource.data.shopId is string;
+   allow update, delete: if false;
+  }
+  match /orders/{orderId}{
+   allow create:if signedIn()&&request.resource.data.customerUid==request.auth.uid&&request.resource.data.status=="placed"&&request.resource.data.paymentStatus=="unpaid"&&request.resource.data.shopId is string&&liveShop(request.resource.data.shopId)&&request.resource.data.total is number&&request.resource.data.total>=0;
+   allow read:if isAdmin()||(signedIn()&&resource.data.customerUid==request.auth.uid)||(signedIn()&&ownsShop(resource.data.shopId));
+   allow update:if isAdmin()||(signedIn()&&ownsShop(resource.data.shopId)&&request.resource.data.customerUid==resource.data.customerUid&&request.resource.data.shopId==resource.data.shopId&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","paymentStatus","updatedAt"]))||(signedIn()&&resource.data.customerUid==request.auth.uid&&resource.data.status=="placed"&&request.resource.data.status=="cancelled"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt"]));
+   allow delete:if isAdmin();
+  }
+  match /subscriptionPayments/{paymentId}{
+   allow read:if isAdmin()||(signedIn()&&resource.data.ownerUid==request.auth.uid);
+   allow create:if signedIn()&&request.resource.data.ownerUid==request.auth.uid&&request.resource.data.status=="pending"&&request.resource.data.amount==299;
+   allow update,delete:if isAdmin();
+  }
+  match /{document=**}{allow read,write:if false;}
+ }
+});
+    allow update:if ownsShop(shopId)&&request.resource.data.phone==resource.data.phone&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["updatedAt"]);
+    allow delete:if isAdmin();
+   }
   }
   match /shopOwnerLocks/{ownerUid}{
    allow read: if signedIn() && request.auth.uid == ownerUid;
