@@ -7,14 +7,16 @@ import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, up
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
-type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };
-type Product = { id: string; name?: string; description?: string; price?: number; stock?: number; imageUrl?: string; active?: boolean };
+type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number };
+type Order = { id: string; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
+type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; stock?: number; imageUrl?: string; active?: boolean };
 
 export default function ShopPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [shop, setShop] = useState<Shop | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -28,6 +30,12 @@ export default function ShopPage() {
   const [bannerUrl, setBannerUrl] = useState("");
   const [pickupAvailable, setPickupAvailable] = useState(true);
   const [deliveryAvailable, setDeliveryAvailable] = useState(false);
+  const [openingTime, setOpeningTime] = useState("10:00");
+  const [closingTime, setClosingTime] = useState("22:00");
+  const [closedDays, setClosedDays] = useState<string[]>([]);
+  const [manualClosed, setManualClosed] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState("0");
+  const [minimumOrder, setMinimumOrder] = useState("0");
   const [offerTitle, setOfferTitle] = useState("");
   const [offerDescription, setOfferDescription] = useState("");
   const [offerExpiresAt, setOfferExpiresAt] = useState("");
@@ -38,6 +46,8 @@ export default function ShopPage() {
   const [stock, setStock] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [productActive, setProductActive] = useState(true);
+  const [productCategory, setProductCategory] = useState("Ice cream");
+  const [originalPrice, setOriginalPrice] = useState("");
   const [imageBusy, setImageBusy] = useState(false);
   const [utr, setUtr] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
@@ -61,8 +71,8 @@ export default function ShopPage() {
         if (owned) {
           const data = { id: owned.id, ...owned.data() } as Shop;
           setShop(data); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
-          setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
-          if ((data.status || "").toLowerCase() === "live") await loadProducts(data.id);
+          setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
+          if ((data.status || "").toLowerCase() === "live") { await loadProducts(data.id); const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", data.id))); setOrders(orderResult.docs.map(item => ({ id: item.id, ...item.data() } as Order))); }
         }
       } catch (e) { setError(e instanceof Error ? e.message : "Could not load your shop."); }
       finally { setLoading(false); }
@@ -86,8 +96,8 @@ export default function ShopPage() {
     if (!db || !shop) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      await updateDoc(doc(db, "shops", shop.id), { name: name.trim(), shopName: name.trim(), phone: phone.trim(), city: city.trim(), address: address.trim(), description: description.trim(), logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt, updatedAt: serverTimestamp() });
-      setShop({ ...shop, name: name.trim(), shopName: name.trim(), phone, city, address, description, logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt });
+      await updateDoc(doc(db, "shops", shop.id), { name: name.trim(), shopName: name.trim(), phone: phone.trim(), city: city.trim(), address: address.trim(), description: description.trim(), logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt, updatedAt: serverTimestamp() });
+      setShop({ ...shop, name: name.trim(), shopName: name.trim(), phone, city, address, description, logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt });
       setNotice("Shop profile updated.");
     } catch (e) { setError(e instanceof Error ? e.message : "Profile update failed."); }
     finally { setBusy(false); }
@@ -139,13 +149,13 @@ export default function ShopPage() {
     finally { URL.revokeObjectURL(source); setImageBusy(false); }
   }
 
-  function resetProduct() { setProductId(""); setProductName(""); setProductDescription(""); setPrice(""); setStock(""); setImageUrl(""); setProductActive(true); }
+  function resetProduct() { setProductId(""); setProductName(""); setProductDescription(""); setPrice(""); setStock(""); setImageUrl(""); setProductActive(true); setProductCategory("Ice cream"); setOriginalPrice(""); }
 
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!db || !shop || !user || shop.status !== "live") return;
     setBusy(true); setError(""); setNotice("");
-    const data = { shopId: shop.id, ownerUid: user.uid, name: productName.trim(), description: productDescription.trim(), price: Number(price), stock: Number(stock), imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
+    const data = { shopId: shop.id, ownerUid: user.uid, name: productName.trim(), description: productDescription.trim(), price: Number(price), originalPrice: originalPrice.trim() ? Number(originalPrice) : null, category: productCategory, stock: Number(stock), imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
     try {
       if (productId) await updateDoc(doc(db, "shops", shop.id, "products", productId), data);
       else await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
@@ -168,7 +178,7 @@ export default function ShopPage() {
       <>
         <section className="admin-heading"><div><p className="admin-kicker">SHOPKEEPER AREA</p><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""} · Status: <span className={"admin-status " + (shop.status || "pending")}>{shop.status || "pending"}</span></p></div></section>
         {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
-        <section className="admin-panel"><h2>Orders & customers</h2><p>View orders from customers who purchased from your shop.</p><Link href="/shop/orders" className="admin-primary role-link">Open orders</Link></section><section className="admin-panel"><h2>Shop profile</h2><form className="register-form" onSubmit={saveProfile}>
+        <section className="admin-panel"><h2>Business overview</h2><div className="admin-stats"><div><strong>{orders.length}</strong><span>Total orders</span></div><div><strong>₹{orders.filter(o=>o.paymentStatus==="paid").reduce((s,o)=>s+Number(o.total||0),0).toFixed(0)}</strong><span>Paid sales</span></div><div><strong>{orders.filter(o=>["placed","accepted","preparing","ready"].includes(o.status||"")).length}</strong><span>Open orders</span></div><div><strong>{products.filter(p=>Number(p.stock||0)<=5).length}</strong><span>Low stock</span></div></div></section><section className="admin-panel"><h2>Orders & customers</h2><p>View orders from customers who purchased from your shop.</p><Link href="/shop/orders" className="admin-primary role-link">Open orders</Link></section><section className="admin-panel"><h2>Shop profile</h2><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
           <label>Mobile number<input required value={phone} onChange={e=>setPhone(e.target.value)} /></label>
           <label>City<input required value={city} onChange={e=>setCity(e.target.value)} /></label>
@@ -176,6 +186,14 @@ export default function ShopPage() {
           <label>About your shop<textarea rows={3} value={description} onChange={e=>setDescription(e.target.value)} /></label>
           <label><input type="checkbox" checked={pickupAvailable} onChange={e=>setPickupAvailable(e.target.checked)} /> Shop pickup available</label>
           <label><input type="checkbox" checked={deliveryAvailable} onChange={e=>setDeliveryAvailable(e.target.checked)} /> Home delivery available</label>
+          <h3>Shop hours & availability</h3>
+          <label>Opening time<input type="time" value={openingTime} onChange={e=>setOpeningTime(e.target.value)} /></label>
+          <label>Closing time<input type="time" value={closingTime} onChange={e=>setClosingTime(e.target.value)} /></label>
+          <label>Weekly closed day<select value={closedDays[0]||""} onChange={e=>setClosedDays(e.target.value?[e.target.value]:[])}><option value="">No weekly holiday</option>{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map(day=><option key={day}>{day}</option>)}</select></label>
+          <label><input type="checkbox" checked={manualClosed} onChange={e=>setManualClosed(e.target.checked)} /> Temporarily mark shop as closed</label>
+          <h3>Delivery settings</h3>
+          <label>Delivery charge (₹)<input type="number" min="0" step="1" value={deliveryFee} onChange={e=>setDeliveryFee(e.target.value)} /></label>
+          <label>Minimum order (₹)<input type="number" min="0" step="1" value={minimumOrder} onChange={e=>setMinimumOrder(e.target.value)} /></label>
           <h3>Customer offer / promotion</h3>
           <label>Offer title<input maxLength={60} value={offerTitle} onChange={e=>setOfferTitle(e.target.value)} placeholder="e.g. Buy 2 get 1 free" /></label>
           <label>Offer details<textarea rows={2} maxLength={240} value={offerDescription} onChange={e=>setOfferDescription(e.target.value)} placeholder="Add offer terms or eligible products" /></label>
@@ -189,14 +207,16 @@ export default function ShopPage() {
           <form className="register-form" onSubmit={saveProduct}>
             <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>
             <label>Description<input value={productDescription} onChange={e=>setProductDescription(e.target.value)} /></label>
-            <label>Price (₹)<input required type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} /></label>
+            <label>Category<select value={productCategory} onChange={e=>setProductCategory(e.target.value)}><option>Ice cream</option><option>Kulfi</option><option>Cones</option><option>Family packs</option><option>Shakes</option><option>Other</option></select></label>
+            <label>Selling price (₹)<input required type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} /></label>
+            <label>Original price (₹, optional)<input type="number" min="0" step="0.01" value={originalPrice} onChange={e=>setOriginalPrice(e.target.value)} /></label>
             <label>Stock quantity<input required type="number" min="0" step="1" value={stock} onChange={e=>setStock(e.target.value)} /></label>
             <label><input type="checkbox" checked={productActive} onChange={e=>setProductActive(e.target.checked)} /> Show this product to customers</label>
             <label>Product photo (auto-compressed to WebP)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProductImage(file);}} /></label>{imageUrl && <div><img src={imageUrl} alt="Product preview" style={{maxWidth:140,maxHeight:100,borderRadius:12}}/><button type="button" className="admin-secondary small" onClick={()=>setImageUrl("")}>Remove photo</button></div>}{imageBusy && <p className="admin-muted">Compressing image…</p>}
             <div><button className="admin-primary" disabled={busy||imageBusy}>{productId ? "Update product" : "Add product"}</button>{productId && <button type="button" className="admin-secondary" onClick={resetProduct}>Cancel edit</button>}</div>
           </form>
           <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Visibility</th><th>Actions</th></tr></thead><tbody>
-            {products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.description || ""}</small></td><td>₹{Number(p.price || 0).toFixed(2)}</td><td>{p.stock ?? 0}</td><td><span className={"admin-status "+(p.active===false?"inactive":"live")}>{p.active===false?"Hidden":"Visible"}</span></td><td className="admin-actions"><button className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setStock(String(p.stock??""));setImageUrl(p.imageUrl||"");setProductActive(p.active!==false);}}>Edit</button><button className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td></tr>)}
+            {products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.description || ""}</small></td><td>₹{Number(p.price || 0).toFixed(2)}{p.originalPrice && p.originalPrice>Number(p.price||0) ? <small><s>₹{Number(p.originalPrice).toFixed(2)}</s></small> : null}</td><td>{p.stock ?? 0}</td><td><span className={"admin-status "+(p.active===false?"inactive":"live")}>{p.active===false?"Hidden":"Visible"}</span></td><td className="admin-actions"><button className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setOriginalPrice(String(p.originalPrice??""));setProductCategory(p.category||"Ice cream");setStock(String(p.stock??""));setImageUrl(p.imageUrl||"");setProductActive(p.active!==false);}}>Edit</button><button className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td></tr>)}
             {products.length===0 && <tr><td colSpan={5}>No products added yet.</td></tr>}
           </tbody></table></div>
         </section> : <section className="admin-panel"><h2>Approval pending</h2><p>Your shop profile can be updated, but product management unlocks after Admin approves your shop and changes its status to LIVE.</p></section>}
