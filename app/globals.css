@@ -210,3 +210,6 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .marketplace-3d .brand-3d-logo{display:inline-flex;align-items:center;justify-content:flex-start;max-width:min(330px,42vw);height:auto;filter:drop-shadow(0 5px 5px #55217a35)}
 .marketplace-3d .brand-logo-image{display:block;width:100%;height:auto;max-height:76px;object-fit:contain;object-position:left center}
 @media(max-width:520px){.marketplace-3d .brand-3d-logo{max-width:190px}.marketplace-3d .brand-logo-image{max-height:52px}}
+
+
+.site-logo-editor{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0}.site-logo-editor>img{display:block;max-width:min(360px,100%);max-height:110px;object-fit:contain;border-radius:12px;background:#fff;padding:8px;border:1px solid #e5e7eb}.site-logo-empty{padding:18px 24px;border:1px dashed #b7a3d9;border-radius:12px;color:#7136a6;font-weight:900;background:#faf5ff}
