@@ -207,7 +207,7 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    match /{document=**} {
+    match /siteSettings/{settingId} {\n      allow read: if settingId == "branding";\n      allow write: if isAdmin() && settingId == "branding";\n    }\n\n    match /{document=**} {
       allow read, write: if false;
     }
   }
