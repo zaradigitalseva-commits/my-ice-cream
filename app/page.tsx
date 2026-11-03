@@ -50,13 +50,14 @@ export default function HomePage() {
     let active = true;
     async function loadLiveShops() {
       if (!db) { setLoadingShops(false); return; }
+      const firestore = db;
       try {
-        const result = await getDocs(query(collection(db, "shops"), where("status", "==", "live")));
+        const result = await getDocs(query(collection(firestore, "shops"), where("status", "==", "live")));
         if (active) {
           const liveShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
           setShops(liveShops);
           const groups = await Promise.all(liveShops.map(async (shop) => {
-            const snapshot = await getDocs(query(collection(db, "shops", shop.id, "products"), where("active", "==", true)));
+            const snapshot = await getDocs(query(collection(firestore, "shops", shop.id, "products"), where("active", "==", true)));
             return snapshot.docs.map((item) => ({ id: item.id, shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop", city: shop.city, ...item.data() } as MarketplaceProduct));
           }));
           if (active) setMarketProducts(groups.flat().filter((product) => Number(product.stock || 0) > 0));
