@@ -102,7 +102,7 @@ export default function HomePage() {
     </header>
     <section className="hero">
       <div><span className="eyebrow">A little happiness, near you</span>
-        <h1>Your next<br/>favourite scoop<br/>is waiting.</h1>
+        <h1 className="hero-scoop-title"><span className="scoop-line scoop-line-one">Your next</span><span className="scoop-line scoop-line-two">favourite scoop</span><span className="scoop-line scoop-line-three">is waiting.</span></h1>
         <p className="hero-copy">Discover neighbourhood ice-cream shops, explore delicious treats and find something sweet for every celebration.</p>
         <div className="pills"><span className="pill active">🍨 Discover treats</span><span className="pill">🎉 Party & bulk orders</span><span className="pill">🏪 Local ice-cream shops</span></div>
         <button className="primary-button" onClick={() => document.getElementById("discover")?.scrollIntoView({behavior:"smooth"})}>Explore the marketplace</button>
