@@ -204,3 +204,9 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .marketplace-3d .brand-ice{background:linear-gradient(180deg,#fff66d 0%,#ff9d19 55%,#ef4b19 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
 .marketplace-3d .brand-cream{background:linear-gradient(180deg,#ff9ce0 0%,#ed39a2 55%,#a51dd2 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
 @media(max-width:520px){.marketplace-3d .brand-logo-text{font-size:17px;letter-spacing:-.8px}.marketplace-3d .brand-3d-logo .brand-mark{width:36px;height:36px;font-size:23px}}
+
+
+/* Transparent logo image replaces the old text-only site name */
+.marketplace-3d .brand-3d-logo{display:inline-flex;align-items:center;justify-content:flex-start;max-width:min(330px,42vw);height:auto;filter:drop-shadow(0 5px 5px #55217a35)}
+.marketplace-3d .brand-logo-image{display:block;width:100%;height:auto;max-height:76px;object-fit:contain;object-position:left center}
+@media(max-width:520px){.marketplace-3d .brand-3d-logo{max-width:190px}.marketplace-3d .brand-logo-image{max-height:52px}}
