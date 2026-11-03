@@ -132,7 +132,7 @@ export default function HomePage() {
         </div></Link>)}</div>}
     </section>
     <section id="shops" className="bottom-live-shops">
-      <div className="section-head"><div><p className="eyebrow">Explore nearby favourites</p><h2>All LIVE Ice Cream Shops</h2><p>Browse every approved shop and search by shop name, city or address.</p></div></div>
+      
       <label className="marketplace-search"><span>Search all shops</span><input value={shopSearchText} onChange={(e) => setShopSearchText(e.target.value)} placeholder="Enter shop name, city or address" /></label>
       <div className="shop-list-heading"><h2>LIVE Ice Cream Shops</h2><span>{filteredBottomShops.length} shops</span></div>
       {loadingShops ? <div className="empty-panel"><p>Loading live shops…</p></div> : shops.length === 0 ? <div className="empty-panel"><div className="empty-icon">🏪</div><h3>No LIVE shops yet</h3><p>Approved shops will appear here automatically. You can browse this website without signing in.</p></div> : filteredBottomShops.length === 0 ? <div className="empty-panel"><h3>No matching shops</h3><p>Try a different shop name, city or address.</p><button className="admin-secondary" onClick={() => setShopSearchText("")}>Clear search</button></div> :
