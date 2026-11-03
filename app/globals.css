@@ -194,3 +194,13 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
  .marketplace-3d .shop-banner{height:220px}
  .marketplace-3d .shop-onboarding{margin:38px auto 45px;border-radius:24px}
 }
+
+
+/* Multicolour glossy 3D site wordmark */
+.marketplace-3d .brand-3d-logo{display:inline-flex;align-items:center;gap:9px;text-decoration:none;white-space:nowrap;filter:drop-shadow(0 5px 3px #6b318a30)}
+.marketplace-3d .brand-3d-logo .brand-mark{font-size:28px;width:43px;height:43px;display:grid;place-items:center;border-radius:15px;background:linear-gradient(145deg,#fff4a9,#ffb9df 55%,#b7d9ff);box-shadow:0 4px 0 #d7a8d6,0 8px 13px #81458c30}
+.marketplace-3d .brand-logo-text{font-weight:1000;letter-spacing:-1.1px;font-size:clamp(18px,2vw,25px);line-height:1;text-shadow:0 2px 0 #fff,0 4px 0 #d9c1ed,0 7px 10px #62316c40;-webkit-text-stroke:.45px #ffffff}
+.marketplace-3d .brand-my{background:linear-gradient(180deg,#54e8ff 0%,#1684f5 55%,#164ac8 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.marketplace-3d .brand-ice{background:linear-gradient(180deg,#fff66d 0%,#ff9d19 55%,#ef4b19 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.marketplace-3d .brand-cream{background:linear-gradient(180deg,#ff9ce0 0%,#ed39a2 55%,#a51dd2 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+@media(max-width:520px){.marketplace-3d .brand-logo-text{font-size:17px;letter-spacing:-.8px}.marketplace-3d .brand-3d-logo .brand-mark{width:36px;height:36px;font-size:23px}}
