@@ -1,66 +1,214 @@
 rules_version = '2';
+
 service cloud.firestore {
- match /databases/{database}/documents {
-  function signedIn(){return request.auth!=null;}
-  function isAdmin(){return signedIn() && request.auth.token.email_verified==true && request.auth.token.email in ["zaradigitalseva@gmail.com","ngogrant454@gmail.com"];}
-  function ownsShop(shopId){return signedIn() && get(/databases/$(database)/documents/shops/$(shopId)).data.ownerUid==request.auth.uid;}
-  function liveShop(shopId){return get(/databases/$(database)/documents/shops/$(shopId)).data.status=="live";}
-  function customerStockReservation(shopId,productId){
-   let orderPath=/databases/$(database)/documents/orders/$(request.resource.data.lastOrderId);
-   return signedIn() && request.resource.data.lastOrderId is string && !exists(orderPath) && getAfter(orderPath).data.customerUid==request.auth.uid && getAfter(orderPath).data.shopId==shopId && getAfter(orderPath).data.status=="placed" && getAfter(orderPath).data.stockChanges[productId]==resource.data.stock-request.resource.data.stock && request.resource.data.stock>=0 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["stock","lastOrderId","updatedAt"]);
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          "zaradigitalseva@gmail.com",
+          "ngogrant454@gmail.com"
+        ];
+    }
+
+    function ownsShop(shopId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/shops/$(shopId))
+          .data.ownerUid == request.auth.uid;
+    }
+
+    function liveShop(shopId) {
+      return get(/databases/$(database)/documents/shops/$(shopId))
+        .data.status == "live";
+    }
+
+    function customerStockReservation(shopId, productId) {
+      let orderPath =
+        /databases/$(database)/documents/orders/$(request.resource.data.lastOrderId);
+
+      return signedIn()
+        && request.resource.data.lastOrderId is string
+        && !exists(orderPath)
+        && getAfter(orderPath).data.customerUid == request.auth.uid
+        && getAfter(orderPath).data.shopId == shopId
+        && getAfter(orderPath).data.status == "placed"
+        && getAfter(orderPath).data.stockChanges[productId]
+          == resource.data.stock - request.resource.data.stock
+        && request.resource.data.stock >= 0
+        && request.resource.data.diff(resource.data)
+          .affectedKeys()
+          .hasOnly(["stock", "lastOrderId", "updatedAt"]);
+    }
+
+    match /shops/{shopId} {
+
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || resource.data.status == "live";
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == "pending"
+        && getAfter(
+          /databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)
+        ).data.shopId == shopId;
+
+      allow update: if isAdmin()
+        || (
+          signedIn()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "name", "shopName", "phone", "city", "address",
+            "description", "logoUrl", "bannerUrl", "category",
+            "pickupAvailable", "deliveryAvailable",
+            "openingTime", "closingTime", "closedDays",
+            "manualClosed", "deliveryFee", "minimumOrder",
+            "offerTitle", "offerDescription", "offerExpiresAt",
+            "updatedAt"
+          ])
+        );
+
+      allow delete: if isAdmin();
+
+      match /products/{productId} {
+
+        allow read: if isAdmin()
+          || ownsShop(shopId)
+          || (liveShop(shopId) && resource.data.active == true);
+
+        allow create: if isAdmin()
+          || (
+            ownsShop(shopId)
+            && liveShop(shopId)
+            && request.resource.data.shopId == shopId
+            && request.resource.data.ownerUid == request.auth.uid
+          );
+
+        allow update: if isAdmin()
+          || (
+            ownsShop(shopId)
+            && liveShop(shopId)
+            && resource.data.shopId == shopId
+            && request.resource.data.shopId == resource.data.shopId
+            && request.resource.data.ownerUid == resource.data.ownerUid
+            && request.resource.data.ownerUid == request.auth.uid
+          )
+          || (
+            liveShop(shopId)
+            && customerStockReservation(shopId, productId)
+          );
+
+        allow delete: if isAdmin()
+          || (
+            ownsShop(shopId)
+            && liveShop(shopId)
+            && resource.data.ownerUid == request.auth.uid
+          );
+      }
+
+      match /customers/{phoneNumber} {
+
+        allow read: if ownsShop(shopId);
+
+        allow create: if ownsShop(shopId)
+          && phoneNumber.matches('^[0-9]{10}$')
+          && request.resource.data.phone == phoneNumber;
+
+        allow update: if ownsShop(shopId)
+          && request.resource.data.phone == resource.data.phone
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(["updatedAt"]);
+
+        allow delete: if isAdmin();
+      }
+    }
+
+    match /shopOwnerLocks/{ownerUid} {
+
+      allow read: if signedIn()
+        && request.auth.uid == ownerUid;
+
+      allow create: if signedIn()
+        && request.auth.uid == ownerUid
+        && !exists(
+          /databases/$(database)/documents/shopOwnerLocks/$(ownerUid)
+        )
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.shopId is string;
+
+      allow update, delete: if false;
+    }
+
+    match /orders/{orderId} {
+
+      allow create: if signedIn()
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.status == "placed"
+        && request.resource.data.paymentStatus == "unpaid"
+        && request.resource.data.shopId is string
+        && liveShop(request.resource.data.shopId)
+        && request.resource.data.total is number
+        && request.resource.data.total >= 0;
+
+      allow read: if isAdmin()
+        || (
+          signedIn()
+          && resource.data.customerUid == request.auth.uid
+        )
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+        );
+
+      allow update: if isAdmin()
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.shopId == resource.data.shopId
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(["status", "paymentStatus", "updatedAt"])
+        )
+        || (
+          signedIn()
+          && resource.data.customerUid == request.auth.uid
+          && resource.data.status == "placed"
+          && request.resource.data.status == "cancelled"
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(["status", "updatedAt"])
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /subscriptionPayments/{paymentId} {
+
+      allow read: if isAdmin()
+        || (
+          signedIn()
+          && resource.data.ownerUid == request.auth.uid
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == "pending"
+        && request.resource.data.amount == 299;
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
-  match /shops/{shopId}{
-   allow read:if isAdmin() || (signedIn()&&resource.data.ownerUid==request.auth.uid) || resource.data.status=="live";
-   allow create:if signedIn()&&request.resource.data.ownerUid==request.auth.uid&&request.resource.data.status=="pending"&&getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId==shopId;
-   allow update:if isAdmin() || (signedIn()&&resource.data.ownerUid==request.auth.uid&&request.resource.data.ownerUid==resource.data.ownerUid&&request.resource.data.status==resource.data.status&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["name","shopName","phone","city","address","description","logoUrl","bannerUrl","category","pickupAvailable","deliveryAvailable","openingTime","closingTime","closedDays","manualClosed","deliveryFee","minimumOrder","offerTitle","offerDescription","offerExpiresAt","updatedAt"]));
-   allow delete:if isAdmin();
-   match /products/{productId}{
-    allow read:if isAdmin()||ownsShop(shopId)||(liveShop(shopId)&&resource.data.active==true);
-    allow create:if isAdmin()||(ownsShop(shopId)&&liveShop(shopId)&&request.resource.data.shopId==shopId&&request.resource.data.ownerUid==request.auth.uid);
-    allow update:if isAdmin()||(ownsShop(shopId)&&liveShop(shopId)&&resource.data.shopId==shopId&&request.resource.data.shopId==resource.data.shopId&&request.resource.data.ownerUid==resource.data.ownerUid&&request.resource.data.ownerUid==request.auth.uid)||(liveShop(shopId)&&customerStockReservation(shopId,productId));
-    allow delete:if isAdmin()||(ownsShop(shopId)&&liveShop(shopId)&&resource.data.ownerUid==request.auth.uid);
-   }
-   match /customers/{phoneNumber}{
-    allow read:if ownsShop(shopId);
-    allow create:if ownsShop(shopId)&&request.resource.data.phone==phoneNumber&&phoneNumber.matches('^[0-9]{10}
-   allow read: if signedIn() && request.auth.uid == ownerUid;
-   allow create: if signedIn() && request.auth.uid == ownerUid && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid)) && request.resource.data.ownerUid == request.auth.uid && request.resource.data.shopId is string;
-   allow update, delete: if false;
-  }
-  match /orders/{orderId}{
-   allow create:if signedIn()&&request.resource.data.customerUid==request.auth.uid&&request.resource.data.status=="placed"&&request.resource.data.paymentStatus=="unpaid"&&request.resource.data.shopId is string&&liveShop(request.resource.data.shopId)&&request.resource.data.total is number&&request.resource.data.total>=0;
-   allow read:if isAdmin()||(signedIn()&&resource.data.customerUid==request.auth.uid)||(signedIn()&&ownsShop(resource.data.shopId));
-   allow update:if isAdmin()||(signedIn()&&ownsShop(resource.data.shopId)&&request.resource.data.customerUid==resource.data.customerUid&&request.resource.data.shopId==resource.data.shopId&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","paymentStatus","updatedAt"]))||(signedIn()&&resource.data.customerUid==request.auth.uid&&resource.data.status=="placed"&&request.resource.data.status=="cancelled"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt"]));
-   allow delete:if isAdmin();
-  }
-  match /subscriptionPayments/{paymentId}{
-   allow read:if isAdmin()||(signedIn()&&resource.data.ownerUid==request.auth.uid);
-   allow create:if signedIn()&&request.resource.data.ownerUid==request.auth.uid&&request.resource.data.status=="pending"&&request.resource.data.amount==299;
-   allow update,delete:if isAdmin();
-  }
-  match /{document=**}{allow read,write:if false;}
- }
-});
-    allow update:if ownsShop(shopId)&&request.resource.data.phone==resource.data.phone&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["updatedAt"]);
-    allow delete:if isAdmin();
-   }
-  }
-  match /shopOwnerLocks/{ownerUid}{
-   allow read: if signedIn() && request.auth.uid == ownerUid;
-   allow create: if signedIn() && request.auth.uid == ownerUid && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid)) && request.resource.data.ownerUid == request.auth.uid && request.resource.data.shopId is string;
-   allow update, delete: if false;
-  }
-  match /orders/{orderId}{
-   allow create:if signedIn()&&request.resource.data.customerUid==request.auth.uid&&request.resource.data.status=="placed"&&request.resource.data.paymentStatus=="unpaid"&&request.resource.data.shopId is string&&liveShop(request.resource.data.shopId)&&request.resource.data.total is number&&request.resource.data.total>=0;
-   allow read:if isAdmin()||(signedIn()&&resource.data.customerUid==request.auth.uid)||(signedIn()&&ownsShop(resource.data.shopId));
-   allow update:if isAdmin()||(signedIn()&&ownsShop(resource.data.shopId)&&request.resource.data.customerUid==resource.data.customerUid&&request.resource.data.shopId==resource.data.shopId&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","paymentStatus","updatedAt"]))||(signedIn()&&resource.data.customerUid==request.auth.uid&&resource.data.status=="placed"&&request.resource.data.status=="cancelled"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt"]));
-   allow delete:if isAdmin();
-  }
-  match /subscriptionPayments/{paymentId}{
-   allow read:if isAdmin()||(signedIn()&&resource.data.ownerUid==request.auth.uid);
-   allow create:if signedIn()&&request.resource.data.ownerUid==request.auth.uid&&request.resource.data.status=="pending"&&request.resource.data.amount==299;
-   allow update,delete:if isAdmin();
-  }
-  match /{document=**}{allow read,write:if false;}
- }
 }
