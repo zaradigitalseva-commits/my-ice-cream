@@ -58,3 +58,19 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .register-approval-note{text-align:center;color:#8d7a91;font-size:11px;margin:0}.register-signin{text-align:center;padding:20px 0 8px}.register-signin p{font-size:13px;color:#806d85;margin:0 0 18px}.register-signin .register-submit{min-width:240px}.register-signin .register-submit span{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:white;color:#4285f4;margin-right:8px}
 .register-message{margin-top:18px}.register-footer{max-width:1040px;margin:25px auto 0;text-align:center;color:#9a8298;font-size:11px}.register-footer span{color:#e45e91}.register-footer b{margin-left:7px}
 @media(max-width:700px){.register-page{padding:16px 15px 22px}.register-top-tag{display:none}.register-hero{grid-template-columns:1fr;margin:30px auto 22px;gap:18px}.register-hero h1{font-size:40px}.register-hero-art{height:185px}.register-scoop{font-size:88px}.register-card{border-radius:22px}.register-card-heading h2{font-size:25px}.register-fields{grid-template-columns:1fr}.register-field-wide{grid-column:auto}.register-benefits{gap:7px}.register-benefits span{font-size:10px;padding:8px 10px}}
+
+
+/* Admin dashboard usability improvements */
+.admin-stats{grid-template-columns:repeat(5,minmax(0,1fr))}
+.admin-filters{display:grid;grid-template-columns:minmax(220px,1.6fr) minmax(170px,.7fr);gap:12px;margin:20px 0 8px}
+.admin-filters label{display:grid;gap:7px;color:var(--muted);font-size:11px;font-weight:800}
+.admin-filters input,.admin-filters select{width:100%;min-width:0;border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:#fff;color:var(--ink);font:inherit;font-size:13px;outline-offset:2px}
+.admin-filters input:focus,.admin-filters select:focus{border-color:#d69b75;box-shadow:0 0 0 3px #f8e9df}
+.admin-status.rejected{background:#ffe9e7;color:#a22b1c}
+.admin-table td{vertical-align:top;line-height:1.5}
+.admin-table td strong{overflow-wrap:anywhere}
+.admin-table td small{overflow-wrap:anywhere;line-height:1.45}
+.admin-actions .admin-primary.small{background:#237847}
+.admin-actions .admin-secondary.small{white-space:nowrap}
+@media(max-width:850px){.admin-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:560px){.admin-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.admin-stats article{padding:15px}.admin-stats article strong{font-size:26px}.admin-filters{grid-template-columns:1fr}.admin-panel-head{align-items:flex-start}.admin-table{min-width:760px}}
