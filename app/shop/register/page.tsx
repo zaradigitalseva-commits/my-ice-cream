@@ -41,22 +41,38 @@ export default function ShopRegisterPage() {
     } finally { setBusy(false); }
   }
 
-  return <main className="admin-wrap">
-    <Link href="/" className="admin-back">← Back to marketplace</Link>
-    <section className="admin-panel register-panel">
-      <p className="admin-kicker">SHOP ONBOARDING</p><h1>Register your ice cream shop</h1>
-      <p>Sign in with Google and submit your shop details. Your shop will become visible to customers only after Admin approval.</p>
-      {!user ? <button className="admin-primary" onClick={() => auth && signInWithPopup(auth, googleProvider).catch((e) => setMessage(e.message))}>Continue with Google</button> :
-      <form className="register-form" onSubmit={submit}>
-        <p className="admin-muted">Signed in as {user.email}</p>
-        <label>Shop name<input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Your shop name" /></label>
-        <label>Mobile number<input required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Shop contact number" /></label>
-        <label>City<input required value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" /></label>
-        <label>Full address<input required value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Shop address" /></label>
-        <label>About your shop<textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description (optional)" rows={3} /></label>
-        <button className="admin-primary" disabled={busy}>{busy ? "Submitting…" : "Submit for Admin Approval"}</button>
-      </form>}
-      {message && <p className="admin-success" role="status">{message}</p>}
+  return <main className="register-page">
+    <div className="register-topbar">
+      <Link href="/" className="register-back">← Back to marketplace</Link>
+      <span className="register-brand"><span>🍦</span> MY ICE CREAM</span>
+      <span className="register-top-tag">PARTNER WITH US</span>
+    </div>
+    <section className="register-hero">
+      <div className="register-hero-copy">
+        <span className="register-badge">🍨 SHOP PARTNER PROGRAM</span>
+        <h1>Apni ice cream shop ko <em>online</em> laayein!</h1>
+        <p>Apni shop register karein aur aas-paas ke customers tak pahunch banayein. Details submit karne ke baad Admin approval zaroori hai.</p>
+        <div className="register-benefits"><span>✨ Free shop listing</span><span>📍 Local customers</span><span>💛 Easy order access</span></div>
+      </div>
+      <div className="register-hero-art" aria-hidden="true"><span className="register-spark spark-one">✦</span><span className="register-spark spark-two">✧</span><div className="register-scoop">🍦</div><div className="register-art-caption">Your shop, more visible!</div></div>
     </section>
+    <section className="register-card">
+      <div className="register-card-heading"><div><span className="register-step">01 / SHOP DETAILS</span><h2>Register your ice cream shop</h2><p>Bas kuch details bhariye — baaki hum sambhal lenge!</p></div><span className="register-card-icon">🏪</span></div>
+      {!user ? <div className="register-signin"><p>Registration shuru karne ke liye apne Google account se sign in karein.</p><button className="register-submit" onClick={() => auth && signInWithPopup(auth, googleProvider).catch((e) => setMessage(e.message))}> <span>G</span> Continue with Google</button></div> :
+      <form className="register-form register-form-color" onSubmit={submit}>
+        <div className="register-signed-in"> <span>✓</span><div><small>Signed in as</small><strong>{user.email}</strong></div></div>
+        <div className="register-fields">
+          <label><span>🏷️ Shop name</span><input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sweet Scoops Ice Cream" /></label>
+          <label><span>📱 Mobile number</span><input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your shop contact number" /></label>
+          <label><span>📍 City</span><input required value={city} onChange={(e) => setCity(e.target.value)} placeholder="Your city" /></label>
+          <label className="register-field-wide"><span>🗺️ Full address</span><input required value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Shop number, area, landmark..." /></label>
+          <label className="register-field-wide"><span>💬 About your shop <small>(optional)</small></span><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell customers what makes your ice cream special..." rows={3} /></label>
+        </div>
+        <button className="register-submit" disabled={busy}>{busy ? "Submitting…" : "Submit for Admin Approval  →"}</button>
+        <p className="register-approval-note">🔒 Your shop will be visible to customers only after Admin approval.</p>
+      </form>}
+      {message && <p className="admin-success register-message" role="status">{message}</p>}
+    </section>
+    <footer className="register-footer">Made with <span>♥</span> for ice cream lovers <b>🍦</b></footer>
   </main>;
 }
