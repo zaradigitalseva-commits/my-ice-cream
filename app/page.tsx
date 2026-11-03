@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, getDocs, query, where } from "firebase/firestore/lite";
+import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
@@ -23,6 +23,7 @@ export default function HomePage() {
   const [searchText, setSearchText] = useState("");
   const [shopSearchText, setShopSearchText] = useState("");
   const [activeCategory, setActiveCategory] = useState("All treats");
+  const [siteLogo, setSiteLogo] = useState("");
 
   useEffect(() => {
     if (!auth) return;
@@ -91,7 +92,7 @@ export default function HomePage() {
   const filteredBottomShops = shops.filter((shop) => [shop.name, shop.shopName, shop.city, shop.address, shop.description, shop.category].filter(Boolean).join(" ").toLowerCase().includes(shopSearchText.trim().toLowerCase()));
   return <main className="site-shell marketplace-3d">
     <header className="topbar">
-      <Link className="brand brand-3d-logo" href="/" aria-label="MY ICE CREAM home"><img className="brand-logo-image" src="/my-ice-cream-logo.svg" alt="MY ICE CREAM" /></Link>
+      <Link className="brand brand-3d-logo" href="/" aria-label="MY ICE CREAM home"><img className="brand-logo-image" src={siteLogo || "/my-ice-cream-logo.svg"} alt="MY ICE CREAM" /></Link>
       <nav className="navlinks" aria-label="Main navigation"><a href="#discover">Discover</a><a href="#shops">For shops</a><a href="#about">About</a></nav>
       <div className="top-actions">
         {user && (adminAccount ? <Link className="account-link" href="/admin">Admin Dashboard</Link> : shopOwner ? <Link className="account-link" href="/shop">Shop Dashboard</Link> : <Link className="account-link" href="/customer">My Account</Link>)}
