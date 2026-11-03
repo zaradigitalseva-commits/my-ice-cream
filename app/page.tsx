@@ -11,6 +11,7 @@ const categories = ["All treats", "Ice cream", "Kulfi", "Cones", "Family packs",
 
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
+  const [shopOwner, setShopOwner] = useState(false);
   const [shops, setShops] = useState<Shop[]>([]);
   const [loadingShops, setLoadingShops] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -20,7 +21,17 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!auth) return;
-    return onAuthStateChanged(auth, setUser);
+    return onAuthStateChanged(auth, async (nextUser) => {
+      setUser(nextUser);
+      setShopOwner(false);
+      if (!nextUser || !db || isAdminEmail(nextUser.email)) return;
+      try {
+        const owned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
+        setShopOwner(!owned.empty);
+      } catch {
+        setShopOwner(false);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -60,7 +71,7 @@ export default function HomePage() {
       <Link className="brand" href="/" aria-label="MY ICE CREAM home"><span className="brand-mark">🍦</span><span>MY ICE CREAM</span></Link>
       <nav className="navlinks" aria-label="Main navigation"><a href="#discover">Discover</a><a href="#shops">For shops</a><a href="#about">About</a></nav>
       <div className="top-actions">
-        {user && (adminAccount ? <Link className="account-link" href="/admin">Admin Dashboard</Link> : <Link className="account-link" href="/customer">My Account</Link>)}
+        {user && (adminAccount ? <Link className="account-link" href="/admin">Admin Dashboard</Link> : shopOwner ? <Link className="account-link" href="/shop">Shop Dashboard</Link> : <Link className="account-link" href="/customer">My Account</Link>)}
         <button className="login-button" onClick={handleAuth} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
       </div>
     </header>
