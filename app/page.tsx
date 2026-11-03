@@ -110,7 +110,7 @@ export default function HomePage() {
       <div className="section-head"><div><h2>Find your kind of sweet</h2><p>Browse all approved LIVE shops freely. Login is needed only for account features.</p></div></div>
       <div className="marketplace-tools"><label className="marketplace-search"><span>Search shops</span><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Shop name, city or category" /></label><div className="pills" aria-label="Shop categories">{categories.map((category)=><button type="button" className={activeCategory===category?"pill active":"pill"} key={category} aria-pressed={activeCategory===category} onClick={()=>setActiveCategory(category)}>{category}</button>)}</div></div>
 
-      <div className="shop-list-heading"><h2>🍨 सभी दुकानों के प्रोडक्ट</h2><span>{marketProducts.filter((product) => {
+      <div className="shop-list-heading"><h2>All Products</h2><span>{marketProducts.filter((product) => {
         const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
       }).length} products</span></div>
