@@ -21,6 +21,7 @@ export default function HomePage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [searchText, setSearchText] = useState("");
+  const [shopSearchText, setShopSearchText] = useState("");
   const [activeCategory, setActiveCategory] = useState("All treats");
 
   useEffect(() => {
@@ -87,6 +88,7 @@ export default function HomePage() {
     const matchesCategory = activeCategory === "All treats" || (shop.category || "").toLowerCase().includes(activeCategory.toLowerCase());
     return matchesSearch && matchesCategory;
   });
+  const filteredBottomShops = shops.filter((shop) => [shop.name, shop.shopName, shop.city, shop.address, shop.description, shop.category].filter(Boolean).join(" ").toLowerCase().includes(shopSearchText.trim().toLowerCase()));
   return <main className="site-shell">
     <header className="topbar">
       <Link className="brand" href="/" aria-label="MY ICE CREAM home"><span className="brand-mark">🍦</span><span>MY ICE CREAM</span></Link>
@@ -128,9 +130,13 @@ export default function HomePage() {
           {product.originalPrice && product.originalPrice > Number(product.price || 0) && <del className="admin-muted"> ₹{Number(product.originalPrice).toFixed(2)}</del>}
           <p>🏪 {product.shopName} · {product.city || "Local shop"}</p><span className="admin-secondary">इस दुकान के सभी प्रोडक्ट देखें →</span>
         </div></Link>)}</div>}
-      <div id="shops" className="shop-list-heading"><h2>LIVE Ice Cream Shops</h2><span>{visibleShops.length} shops</span></div>
-      {loadingShops ? <div className="empty-panel"><p>Loading live shops…</p></div> : shops.length === 0 ? <div className="empty-panel"><div className="empty-icon">🏪</div><h3>No LIVE shops yet</h3><p>Approved shops will appear here automatically. You can browse this website without signing in.</p></div> :
-        <div className="shop-grid">{visibleShops.map((shop) => <Link href={"/shop/" + shop.id} className="shop-card" key={shop.id}>
+    </section>
+    <section id="shops" className="bottom-live-shops">
+      <div className="section-head"><div><p className="eyebrow">Explore nearby favourites</p><h2>All LIVE Ice Cream Shops</h2><p>Browse every approved shop and search by shop name, city or address.</p></div></div>
+      <label className="marketplace-search"><span>Search all shops</span><input value={shopSearchText} onChange={(e) => setShopSearchText(e.target.value)} placeholder="Enter shop name, city or address" /></label>
+      <div className="shop-list-heading"><h2>LIVE Ice Cream Shops</h2><span>{filteredBottomShops.length} shops</span></div>
+      {loadingShops ? <div className="empty-panel"><p>Loading live shops…</p></div> : shops.length === 0 ? <div className="empty-panel"><div className="empty-icon">🏪</div><h3>No LIVE shops yet</h3><p>Approved shops will appear here automatically. You can browse this website without signing in.</p></div> : filteredBottomShops.length === 0 ? <div className="empty-panel"><h3>No matching shops</h3><p>Try a different shop name, city or address.</p><button className="admin-secondary" onClick={() => setShopSearchText("")}>Clear search</button></div> :
+        <div className="shop-grid">{filteredBottomShops.map((shop) => <Link href={"/shop/" + shop.id} className="shop-card" key={shop.id}>
           {shop.bannerUrl ? <img className="shop-banner" src={shop.bannerUrl} alt="" /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
           <div className="shop-card-body"><div className="shop-card-title">{shop.logoUrl ? <img src={shop.logoUrl} alt="" /> : <span>🏪</span>}<h3>{shop.name || shop.shopName || "Ice Cream Shop"}</h3></div>
             <p>{[shop.city, shop.address].filter(Boolean).join(" · ") || "Location not added"}</p>
@@ -138,7 +144,6 @@ export default function HomePage() {
             {shop.category && <span className="pill">{shop.category}</span>}{shop.offerTitle && (!shop.offerExpiresAt || new Date(shop.offerExpiresAt + "T23:59:59").getTime() >= Date.now()) && <div className="shop-offer"><strong>🎉 {shop.offerTitle}</strong>{shop.offerDescription && <p>{shop.offerDescription}</p>}{shop.offerExpiresAt && <small>Offer valid until {shop.offerExpiresAt}</small>}</div>}
           </div>
         </Link>)}</div>}
-      {!loadingShops && shops.length > 0 && visibleShops.length === 0 && <div className="empty-panel"><h3>No matching shops</h3><p>Try another search or choose All treats.</p><button className="admin-secondary" onClick={() => {setSearchText("");setActiveCategory("All treats");}}>Clear filters</button></div>}
     </section>
     <section id="for-shops" className="shop-onboarding"><div><p className="eyebrow">For ice cream businesses</p><h2>Bring your shop to MY ICE CREAM</h2><p>Register your shop for free review. Your shop becomes public only after Admin approval.</p></div><Link href="/shop/register" className="primary-button">Register your shop</Link></section>
     <footer className="footer" id="about"><span>© {new Date().getFullYear()} MY ICE CREAM</span><span>Unlimited shops · Sweet moments · Easy ordering</span></footer>
