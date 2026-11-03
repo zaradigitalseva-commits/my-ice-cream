@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { collection, getDocs, query, where } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
@@ -10,6 +11,7 @@ type Shop = { id: string; name?: string; shopName?: string; city?: string; addre
 const categories = ["All treats", "Ice cream", "Kulfi", "Cones", "Family packs", "Party orders"];
 
 export default function HomePage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [shopOwner, setShopOwner] = useState(false);
   const [shops, setShops] = useState<Shop[]>([]);
@@ -24,15 +26,23 @@ export default function HomePage() {
     return onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       setShopOwner(false);
-      if (!nextUser || !db || isAdminEmail(nextUser.email)) return;
+      if (!nextUser) return;
+      if (isAdminEmail(nextUser.email) && nextUser.emailVerified) {
+        router.replace("/admin");
+        return;
+      }
+      if (!db) return;
       try {
         const owned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
-        setShopOwner(!owned.empty);
+        if (!owned.empty) {
+          setShopOwner(true);
+          router.replace("/shop");
+        }
       } catch {
         setShopOwner(false);
       }
     });
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     let active = true;
