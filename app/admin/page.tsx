@@ -20,6 +20,7 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [siteLogo, setSiteLogo] = useState("");
   const [logoBusy, setLogoBusy] = useState(false);
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!auth) { setAuthReady(true); setError("Firebase configuration is missing."); return; }
@@ -105,9 +106,11 @@ export default function AdminPage() {
     <div className="admin-actions"><Link href="/admin/payments" className="admin-primary">Subscription payments</Link></div>
     <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Website logo</h2><p>यह लोगो वेबसाइट के नाम की जगह सभी ग्राहकों को दिखेगा।</p></div></div>
       <div className="site-logo-editor">{siteLogo ? <img src={siteLogo} alt="Current website logo" /> : <div className="site-logo-empty">🍦 MY ICE CREAM</div>}
-        <label className="admin-primary small">{logoBusy ? "सेव हो रहा है…" : "नया लोगो चुनें"}<input type="file" accept="image/*" disabled={logoBusy} hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void saveSiteLogo(file); event.currentTarget.value = ""; }} /></label>
-        {siteLogo && <button className="admin-secondary small" disabled={logoBusy} onClick={() => void saveSiteLogo()}>लोगो हटाएँ</button>}
-      </div><small className="admin-muted">PNG, JPG या WebP image चुनें। लोगो अपने-आप छोटा करके सेव होगा।</small>
+        <label className="admin-primary small">{pendingLogoFile ? "दूसरा लोगो चुनें" : "नया लोगो चुनें"}<input type="file" accept="image/*" disabled={logoBusy} hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) { setPendingLogoFile(file); setNotice(""); setError(""); } event.currentTarget.value = ""; }} /></label>
+        {pendingLogoFile && <button className="admin-primary small" disabled={logoBusy} onClick={() => { void saveSiteLogo(pendingLogoFile).then(() => setPendingLogoFile(null)); }}>{logoBusy ? "सेव हो रहा है…" : "लोगो सेव करें"}</button>}
+        {pendingLogoFile && <button className="admin-secondary small" disabled={logoBusy} onClick={() => setPendingLogoFile(null)}>रद्द करें</button>}
+        {siteLogo && <button className="admin-secondary small" disabled={logoBusy} onClick={() => { void saveSiteLogo().then(() => setPendingLogoFile(null)); }}>लोगो हटाएँ</button>}
+      </div><small className="admin-muted">PNG, JPG या WebP image चुनें, फिर “लोगो सेव करें” दबाएँ। लोगो अपने-आप छोटा करके सेव होगा।</small>
     </section><section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>
