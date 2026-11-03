@@ -213,3 +213,12 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 
 
 .site-logo-editor{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0}.site-logo-editor>img{display:block;max-width:min(360px,100%);max-height:110px;object-fit:contain;border-radius:12px;background:#fff;padding:8px;border:1px solid #e5e7eb}.site-logo-empty{padding:18px 24px;border:1px dashed #b7a3d9;border-radius:12px;color:#7136a6;font-weight:900;background:#faf5ff}
+
+
+/* Colorful dimensional 3D hero headline */
+.marketplace-3d .hero .hero-scoop-title{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:22px 0 24px;letter-spacing:-2.8px;line-height:1.02;font-weight:900}
+.marketplace-3d .hero-scoop-title .scoop-line{display:block;padding:0 5px 8px 0;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:1px #ffffff;text-shadow:0 2px 0 #fff,0 5px 0 #d9b5e4,0 8px 0 #c69acb,0 12px 0 #a978b7,0 17px 20px #67347755;filter:drop-shadow(0 5px 3px #9a5a9c30)}
+.marketplace-3d .hero-scoop-title .scoop-line-one{background-image:linear-gradient(180deg,#72f2ff 0%,#2698f5 48%,#2854c9 100%)}
+.marketplace-3d .hero-scoop-title .scoop-line-two{background-image:linear-gradient(180deg,#fff47a 0%,#ffad37 48%,#f05a46 100%)}
+.marketplace-3d .hero-scoop-title .scoop-line-three{background-image:linear-gradient(180deg,#ffb0e4 0%,#ef62b0 48%,#a34cce 100%)}
+@media(max-width:720px){.marketplace-3d .hero .hero-scoop-title{font-size:clamp(43px,12vw,60px);letter-spacing:-2px;gap:4px}.marketplace-3d .hero-scoop-title .scoop-line{text-shadow:0 2px 0 #fff,0 4px 0 #d9b5e4,0 7px 0 #b985c2,0 11px 15px #67347755}}
