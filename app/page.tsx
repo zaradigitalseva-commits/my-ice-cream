@@ -7,14 +7,14 @@ import { collection, getDocs, query, where } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
-type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };
+type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };\ntype MarketplaceProduct = { id: string; shopId: string; shopName: string; city?: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; stock?: number; imageUrl?: string };
 const categories = ["All treats", "Ice cream", "Kulfi", "Cones", "Family packs", "Party orders"];
 
 export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [shopOwner, setShopOwner] = useState(false);
-  const [shops, setShops] = useState<Shop[]>([]);
+  const [shops, setShops] = useState<Shop[]>([]);\n  const [marketProducts, setMarketProducts] = useState<MarketplaceProduct[]>([]);
   const [loadingShops, setLoadingShops] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -50,7 +50,15 @@ export default function HomePage() {
       if (!db) { setLoadingShops(false); return; }
       try {
         const result = await getDocs(query(collection(db, "shops"), where("status", "==", "live")));
-        if (active) setShops(result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop)));
+        if (active) {
+          const liveShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
+          setShops(liveShops);
+          const groups = await Promise.all(liveShops.map(async (shop) => {
+            const snapshot = await getDocs(query(collection(db, "shops", shop.id, "products"), where("active", "==", true)));
+            return snapshot.docs.map((item) => ({ id: item.id, shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop", city: shop.city, ...item.data() } as MarketplaceProduct));
+          }));
+          if (active) setMarketProducts(groups.flat().filter((product) => Number(product.stock || 0) > 0));
+        }
       } catch (error) {
         if (active) setMessage(error instanceof Error ? error.message : "Shops could not be loaded.");
       } finally {
@@ -98,6 +106,25 @@ export default function HomePage() {
     <section id="discover">
       <div className="section-head"><div><h2>Find your kind of sweet</h2><p>Browse all approved LIVE shops freely. Login is needed only for account features.</p></div></div>
       <div className="marketplace-tools"><label className="marketplace-search"><span>Search shops</span><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Shop name, city or category" /></label><div className="pills" aria-label="Shop categories">{categories.map((category)=><button type="button" className={activeCategory===category?"pill active":"pill"} key={category} aria-pressed={activeCategory===category} onClick={()=>setActiveCategory(category)}>{category}</button>)}</div></div>
+
+      <div className="shop-list-heading"><h2>🍨 सभी दुकानों के प्रोडक्ट</h2><span>{marketProducts.filter((product) => {
+        const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
+        return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
+      }).length} products</span></div>
+      {loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : marketProducts.filter((product) => {
+        const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
+        return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
+      }).length === 0 ? <div className="empty-panel"><h3>अभी कोई प्रोडक्ट उपलब्ध नहीं है</h3><p>LIVE दुकानों के उपलब्ध प्रोडक्ट यहाँ दिखाई देंगे।</p></div> :
+      <div className="shop-grid">{marketProducts.filter((product) => {
+        const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
+        return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
+      }).map((product) => <Link href={"/shop/" + product.shopId} className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
+        {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
+        <div className="shop-card-body"><span className="pill">{product.category || "Ice cream"}</span><h3>{product.name || "Ice cream treat"}</h3>
+          {product.description && <p>{product.description}</p>}<strong>₹{Number(product.price || 0).toFixed(2)}</strong>
+          {product.originalPrice && product.originalPrice > Number(product.price || 0) && <del className="admin-muted"> ₹{Number(product.originalPrice).toFixed(2)}</del>}
+          <p>🏪 {product.shopName} · {product.city || "Local shop"}</p><span className="admin-secondary">इस दुकान के सभी प्रोडक्ट देखें →</span>
+        </div></Link>)}</div>}
       <div id="shops" className="shop-list-heading"><h2>LIVE Ice Cream Shops</h2><span>{visibleShops.length} shops</span></div>
       {loadingShops ? <div className="empty-panel"><p>Loading live shops…</p></div> : shops.length === 0 ? <div className="empty-panel"><div className="empty-icon">🏪</div><h3>No LIVE shops yet</h3><p>Approved shops will appear here automatically. You can browse this website without signing in.</p></div> :
         <div className="shop-grid">{visibleShops.map((shop) => <Link href={"/shop/" + shop.id} className="shop-card" key={shop.id}>
