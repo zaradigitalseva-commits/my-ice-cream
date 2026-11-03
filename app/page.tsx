@@ -50,6 +50,7 @@ export default function HomePage() {
 
   useEffect(() => {
     let active = true;
+    if (db) getDoc(doc(db, "siteSettings", "branding")).then((snapshot) => { if (active && snapshot.exists()) setSiteLogo(String(snapshot.data().logoDataUrl || "")); }).catch(() => {});
     async function loadLiveShops() {
       if (!db) { setLoadingShops(false); return; }
       const firestore = db;
