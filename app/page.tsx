@@ -89,7 +89,7 @@ export default function HomePage() {
     return matchesSearch && matchesCategory;
   });
   const filteredBottomShops = shops.filter((shop) => [shop.name, shop.shopName, shop.city, shop.address, shop.description, shop.category].filter(Boolean).join(" ").toLowerCase().includes(shopSearchText.trim().toLowerCase()));
-  return <main className="site-shell">
+  return <main className="site-shell marketplace-3d">
     <header className="topbar">
       <Link className="brand" href="/" aria-label="MY ICE CREAM home"><span className="brand-mark">🍦</span><span>MY ICE CREAM</span></Link>
       <nav className="navlinks" aria-label="Main navigation"><a href="#discover">Discover</a><a href="#shops">For shops</a><a href="#about">About</a></nav>
