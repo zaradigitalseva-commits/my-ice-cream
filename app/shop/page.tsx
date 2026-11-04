@@ -53,13 +53,18 @@ export default function ShopPage() {
   const [imageBusy, setImageBusy] = useState(false);
   const [utr, setUtr] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");\n  const [newCustomerName, setNewCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [newCustomerName, setNewCustomerName] = useState("");
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customerBusy, setCustomerBusy] = useState(false);
   const [customerMessage, setCustomerMessage] = useState("");
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
-  const [customerFound, setCustomerFound] = useState(false);\n  const [saleQty, setSaleQty] = useState<Record<string, number>>({});\n  const [discountValue, setDiscountValue] = useState("0");\n  const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");\n  const [salePayment, setSalePayment] = useState<"paid" | "unpaid">("paid");
+  const [customerFound, setCustomerFound] = useState(false);
+  const [saleQty, setSaleQty] = useState<Record<string, number>>({});
+  const [discountValue, setDiscountValue] = useState("0");
+  const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
+  const [salePayment, setSalePayment] = useState<"paid" | "unpaid">("paid");
   const [showShopDashboard, setShowShopDashboard] = useState(false);
 
   async function loadProducts(shopId: string) {
@@ -309,7 +314,8 @@ export default function ShopPage() {
               <label>Discount type<select value={discountType} onChange={e=>setDiscountType(e.target.value as "amount"|"percent")}><option value="amount">₹ Amount</option><option value="percent">Percent (%)</option></select></label>
               <label>Discount<input type="number" min="0" step="0.01" value={discountValue} onChange={e=>setDiscountValue(e.target.value)}/></label>
               <label>Payment status<select value={salePayment} onChange={e=>setSalePayment(e.target.value as "paid"|"unpaid")}><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select></label>
-              <button type="button" className="admin-primary" disabled={customerBusy||products.length===0} onClick={()=>void createWalkInSale()}>{customerBusy?"बिल सेव हो रहा है…":"बिल सेव करें"}</button>\n              {whatsAppUrl && <a className="admin-primary role-link" href={whatsAppUrl} target="_blank" rel="noopener noreferrer">WhatsApp पर बिल भेजें</a>}
+              <button type="button" className="admin-primary" disabled={customerBusy||products.length===0} onClick={()=>void createWalkInSale()}>{customerBusy?"बिल सेव हो रहा है…":"बिल सेव करें"}</button>
+              {whatsAppUrl && <a className="admin-primary role-link" href={whatsAppUrl} target="_blank" rel="noopener noreferrer">WhatsApp पर बिल भेजें</a>}
             </div>
           </>}
         </section>
