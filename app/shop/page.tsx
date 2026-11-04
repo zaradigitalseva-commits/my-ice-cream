@@ -11,7 +11,7 @@ type Shop = { id: string; subscriptionStatus?: string; subscriptionExpiresAt?: {
 type Order = { id: string; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
 type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
-type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; stock?: number; imageUrl?: string; active?: boolean };
+type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
 
 export default function ShopPage() {
   const router = useRouter();
@@ -45,7 +45,6 @@ export default function ShopPage() {
   const [productName, setProductName] = useState("");
   const [productDescription, setProductDescription] = useState("");
   const [price, setPrice] = useState("");
-  const [stock, setStock] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [productActive, setProductActive] = useState(true);
   const [productCategory, setProductCategory] = useState("Ice cream");
@@ -163,32 +162,7 @@ export default function ShopPage() {
     setCustomerBusy(true); setCustomerMessage("");
     try {
       const saleRef = doc(collection(firestore, "sales"));
-      const productRefs = items.map((item) => ({
-        item,
-        ref: doc(firestore, "shops", shop.id, "products", item.productId),
-      }));
-
-      await runTransaction(firestore, async (transaction) => {
-        const snapshots = await Promise.all(productRefs.map(({ ref }) => transaction.get(ref)));
-        snapshots.forEach((snapshot, index) => {
-          if (!snapshot.exists()) {
-            throw new Error(`प्रोडक्ट "${items[index].name}" अब उपलब्ध नहीं है।`);
-          }
-          const currentStock = Number(snapshot.data().stock);
-          const requestedQty = items[index].quantity;
-          if (!Number.isInteger(currentStock) || currentStock < requestedQty) {
-            throw new Error(`"${items[index].name}" का पर्याप्त स्टॉक नहीं है। उपलब्ध: ${Number.isFinite(currentStock) ? currentStock : 0}`);
-          }
-        });
-
-        snapshots.forEach((snapshot, index) => {
-          transaction.update(productRefs[index].ref, {
-            stock: Number(snapshot.data()?.stock ?? 0) - items[index].quantity,
-            updatedAt: serverTimestamp(),
-          });
-        });
-
-        transaction.set(saleRef, {
+      await setDoc(saleRef, {
           shopId: shop.id,
           shopName: shop.name || shop.shopName || "",
           ownerUid: user.uid,
@@ -203,14 +177,7 @@ export default function ShopPage() {
           paymentStatus: salePayment,
           createdAt: serverTimestamp(),
         });
-      });
 
-      setProducts((current) => current.map((product) => {
-        const soldItem = items.find((item) => item.productId === product.id);
-        return soldItem
-          ? { ...product, stock: Math.max(0, Number(product.stock || 0) - soldItem.quantity) }
-          : product;
-      }));
       const lines = items.map(i=>i.name+" x "+i.quantity+" = ₹"+(i.price*i.quantity).toFixed(2)).join("\n");
       const message = "MY ICE CREAM BILL\n"+(shop.name||shop.shopName||"Shop")+"\nCustomer: "+(customer.name||customer.phone)+"\n"+lines+"\nSubtotal: ₹"+subtotal.toFixed(2)+"\nDiscount: ₹"+discount.toFixed(2)+"\nTotal: ₹"+total.toFixed(2)+"\nPayment: "+salePayment+"\nBill: "+saleRef.id;
       const billWhatsAppUrl = "https://wa.me/91"+customer.phone+"?text="+encodeURIComponent(message);
@@ -319,13 +286,13 @@ export default function ShopPage() {
     finally { URL.revokeObjectURL(source); setImageBusy(false); }
   }
 
-  function resetProduct() { setProductId(""); setProductName(""); setProductDescription(""); setPrice(""); setStock(""); setImageUrl(""); setProductActive(true); setProductCategory("Ice cream"); setOriginalPrice(""); }
+  function resetProduct() { setProductId(""); setProductName(""); setProductDescription(""); setPrice(""); setImageUrl(""); setProductActive(true); setProductCategory("Ice cream"); setOriginalPrice(""); }
 
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!db || !shop || !user || shop.status !== "live") return;
     setBusy(true); setError(""); setNotice("");
-    const data = { shopId: shop.id, ownerUid: user.uid, name: productName.trim(), description: productDescription.trim(), price: Number(price), originalPrice: originalPrice.trim() ? Number(originalPrice) : null, category: productCategory, stock: Number(stock), imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
+    const data = { shopId: shop.id, ownerUid: user.uid, name: productName.trim(), description: productDescription.trim(), price: Number(price), originalPrice: originalPrice.trim() ? Number(originalPrice) : null, category: productCategory, imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
     try {
       if (productId) await updateDoc(doc(db, "shops", shop.id, "products", productId), data);
       else await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
@@ -363,7 +330,7 @@ export default function ShopPage() {
             {customerOrders.length===0?<p className="admin-muted">इस दुकान से अभी कोई खरीदारी नहीं हुई।</p>:customerOrders.map(o=><p key={o.id}>{(o.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")} · ₹{Number(o.total||0).toFixed(2)} · {o.paymentStatus||"unpaid"}</p>)}
             <h3>नया बिल</h3>
             <div className="register-form">
-              {products.filter(p=>p.active!==false).map(p=><label key={p.id}>{p.name} · ₹{Number(p.price||0).toFixed(2)} (Stock: {p.stock??0})<input type="number" min="0" max={Number(p.stock||0)} step="1" value={saleQty[p.id]||0} onChange={e=>setSaleQty(v=>({...v,[p.id]:Math.min(Number(p.stock||0),Math.max(0,Number(e.target.value)||0))}))}/></label>)}
+              {products.filter(p=>p.active!==false).map(p=><label key={p.id}>{p.name} · ₹{Number(p.price||0).toFixed(2)}<input type="number" min="0" max={Number(p.stock||0)} step="1" value={saleQty[p.id]||0} onChange={e=>setSaleQty(v=>({...v,[p.id]:Math.max(0,Number(e.target.value)||0)}))}/></label>)}
               <label>Discount type<select value={discountType} onChange={e=>setDiscountType(e.target.value as "amount"|"percent")}><option value="amount">₹ Amount</option><option value="percent">Percent (%)</option></select></label>
               <label>Discount<input type="number" min="0" step="0.01" value={discountValue} onChange={e=>setDiscountValue(e.target.value)}/></label>
               <label>Payment status<select value={salePayment} onChange={e=>setSalePayment(e.target.value as "paid"|"unpaid")}><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select></label>
@@ -374,7 +341,7 @@ export default function ShopPage() {
         </section>
         <div className="admin-panel" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}><div><p className="admin-kicker">SHOP MANAGEMENT</p><h2 style={{margin:0}}>दुकान का डैशबोर्ड</h2><p style={{margin:"6px 0 0"}}>प्रोडक्ट, ऑर्डर, दुकान की जानकारी और पेमेंट मैनेज करें।</p></div><button type="button" className="admin-primary" onClick={()=>setShowShopDashboard(v=>!v)}>{showShopDashboard?"डैशबोर्ड बंद करें":"दुकान का डैशबोर्ड खोलें"}</button></div>
         {showShopDashboard && <>
-        <section className="admin-panel"><h2>Business overview</h2><div className="admin-stats"><div><strong>{orders.length}</strong><span>Total orders</span></div><div><strong>₹{orders.filter(o=>o.paymentStatus==="paid").reduce((s,o)=>s+Number(o.total||0),0).toFixed(0)}</strong><span>Paid sales</span></div><div><strong>{orders.filter(o=>["placed","accepted","preparing","ready"].includes(o.status||"")).length}</strong><span>Open orders</span></div><div><strong>{products.filter(p=>Number(p.stock||0)<=5).length}</strong><span>Low stock</span></div></div></section><section className="admin-panel"><h2>Orders & customers</h2><p>View orders from customers who purchased from your shop.</p><Link href="/shop/orders" className="admin-primary role-link">Open orders</Link></section><section className="admin-panel"><h2>Shop profile</h2><form className="register-form" onSubmit={saveProfile}>
+        <section className="admin-panel"><h2>Business overview</h2><div className="admin-stats"><div><strong>{orders.length}</strong><span>Total orders</span></div><div><strong>₹{orders.filter(o=>o.paymentStatus==="paid").reduce((s,o)=>s+Number(o.total||0),0).toFixed(0)}</strong><span>Paid sales</span></div><div><strong>{orders.filter(o=>["placed","accepted","preparing","ready"].includes(o.status||"")).length}</strong><span>Open orders</span></div><div></div></div></section><section className="admin-panel"><h2>Orders & customers</h2><p>View orders from customers who purchased from your shop.</p><Link href="/shop/orders" className="admin-primary role-link">Open orders</Link></section><section className="admin-panel"><h2>Shop profile</h2><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
           <label>Mobile number<input required value={phone} onChange={e=>setPhone(e.target.value)} /></label>
           <label>City<input required value={city} onChange={e=>setCity(e.target.value)} /></label>
@@ -399,21 +366,20 @@ export default function ShopPage() {
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
         </form></section>
         <section className="admin-panel"><h2>Monthly subscription</h2><p>Plan amount: ₹299 per month. Pay by UPI and submit the UTR number for Admin verification. Your subscription activates only after Admin confirms payment.</p><p><strong>Subscription:</strong> {live ? "Active until " + subscriptionExpiry?.toLocaleDateString("en-IN") : "Not active — shop is hidden from customers until payment is verified."}</p><form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()}>Submit ₹299 payment for verification</button></form>{paymentNotice&&<p className="admin-success">{paymentNotice}</p>}</section>
-        {live ? <section className="admin-panel"><h2>Products & stock</h2><p>Add products with price and available stock. Only active LIVE shops are visible to customers.</p>
+        {live ? <section className="admin-panel"><h2>Products</h2><p>Add products with price and details. Only active LIVE shops are visible to customers.</p>
           <form className="register-form" onSubmit={saveProduct}>
             <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>
             <label>Description<input value={productDescription} onChange={e=>setProductDescription(e.target.value)} /></label>
             <label>Category<select value={productCategory} onChange={e=>setProductCategory(e.target.value)}><option>Ice cream</option><option>Kulfi</option><option>Cones</option><option>Family packs</option><option>Shakes</option><option>Other</option></select></label>
             <label>Selling price (₹)<input required type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} /></label>
             <label>Original price (₹, optional)<input type="number" min="0" step="0.01" value={originalPrice} onChange={e=>setOriginalPrice(e.target.value)} /></label>
-            <label>Stock quantity<input required type="number" min="0" step="1" value={stock} onChange={e=>setStock(e.target.value)} /></label>
             <label><input type="checkbox" checked={productActive} onChange={e=>setProductActive(e.target.checked)} /> Show this product to customers</label>
             <label>Product photo (auto-compressed to WebP)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProductImage(file);}} /></label>{imageUrl && <div><img src={imageUrl} alt="Product preview" style={{maxWidth:140,maxHeight:100,borderRadius:12}}/><button type="button" className="admin-secondary small" onClick={()=>setImageUrl("")}>Remove photo</button></div>}{imageBusy && <p className="admin-muted">Compressing image…</p>}
             <div><button className="admin-primary" disabled={busy||imageBusy}>{productId ? "Update product" : "Add product"}</button>{productId && <button type="button" className="admin-secondary" onClick={resetProduct}>Cancel edit</button>}</div>
           </form>
-          <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Visibility</th><th>Actions</th></tr></thead><tbody>
-            {products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.description || ""}</small></td><td>₹{Number(p.price || 0).toFixed(2)}{p.originalPrice && p.originalPrice>Number(p.price||0) ? <small><s>₹{Number(p.originalPrice).toFixed(2)}</s></small> : null}</td><td>{p.stock ?? 0}</td><td><span className={"admin-status "+(p.active===false?"inactive":"live")}>{p.active===false?"Hidden":"Visible"}</span></td><td className="admin-actions"><button className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setOriginalPrice(String(p.originalPrice??""));setProductCategory(p.category||"Ice cream");setStock(String(p.stock??""));setImageUrl(p.imageUrl||"");setProductActive(p.active!==false);}}>Edit</button><button className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td></tr>)}
-            {products.length===0 && <tr><td colSpan={5}>No products added yet.</td></tr>}
+          <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Price</th><th>Visibility</th><th>Actions</th></tr></thead><tbody>
+            {products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.description || ""}</small></td><td>₹{Number(p.price || 0).toFixed(2)}{p.originalPrice && p.originalPrice>Number(p.price||0) ? <small><s>₹{Number(p.originalPrice).toFixed(2)}</s></small> : null}</td><td><span className={"admin-status "+(p.active===false?"inactive":"live")}>{p.active===false?"Hidden":"Visible"}</span></td><td className="admin-actions"><button className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setOriginalPrice(String(p.originalPrice??""));setProductCategory(p.category||"Ice cream");setImageUrl(p.imageUrl||"");setProductActive(p.active!==false);}}>Edit</button><button className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td></tr>)}
+            {products.length===0 && <tr><td colSpan={4}>No products added yet.</td></tr>}
           </tbody></table></div>
         </section> : <section className="admin-panel"><h2>Approval pending</h2><p>Your shop profile can be updated, but product management unlocks after Admin approves your shop and changes its status to LIVE.</p></section>}
         </>}
