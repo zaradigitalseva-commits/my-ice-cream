@@ -235,9 +235,7 @@ service cloud.firestore {
     }
 
     match /subscriptionPayments/{paymentId} {
-      allow read: if isAdmin()
-        || (signedIn() && resource.data.ownerUid == request.auth.uid);
-
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.status == "pending"
@@ -248,56 +246,14 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.ownerUid == request.auth.uid
         && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.shopId == request.resource.data.shopId
         && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.paymentId == paymentId;
-
       allow update, delete: if isAdmin();
     }
 
     match /utrReservations/{utr} {
-      allow read: if isAdmin()
-        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create: if signedIn()
         && !exists(/databases/$(database)/documents/utrReservations/$(utr))
         && utr.matches('^[A-Z0-9]{6,40}$')
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.shopId is string
-        && request.resource.data.paymentId is string
-        && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "paymentId", "createdAt"]);
-      allow update, delete: if false;
-    }
-
-    match /siteSettings/{settingId} {
-      allow read: if settingId == "branding";
-      allow write: if isAdmin() && settingId == "branding";
-    }
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-})
-        && existsAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr))
-        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.ownerUid == request.auth.uid
-        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.shopId == request.resource.data.shopId
-        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.paymentId == paymentId;
-
-      allow update, delete: if isAdmin();
-    }
-
-    match /utrReservations/{utr} {
-      allow read: if isAdmin()
-        || (signedIn() && resource.data.ownerUid == request.auth.uid);
-      allow create: if signedIn()
-        && !exists(/databases/$(database)/documents/utrReservations/$(utr))
-        && utr.matches('^[A-Z0-9]{6,40} {
-      allow read: if settingId == "branding";
-      allow write: if isAdmin() && settingId == "branding";
-    }
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-})
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.shopId is string
         && request.resource.data.paymentId is string
