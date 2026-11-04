@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore/lite";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
@@ -133,7 +133,33 @@ export default function ShopPage() {
     if (!db || !shop || !user) return;
     setBusy(true); setError(""); setPaymentNotice("");
     try {
-      await addDoc(collection(db, "subscriptionPayments"), { ownerUid: user.uid, shopId: shop.id, shopName: shop.name || shop.shopName || "", amount: 299, utr: utr.trim(), status: "pending", createdAt: serverTimestamp() });
+      const normalizedUtr = utr.trim().toUpperCase().replace(/\s+/g, "");
+      if (!/^[A-Z0-9]{6,40}$/.test(normalizedUtr)) {
+        throw new Error("Please enter a valid UTR (6–40 letters or numbers).");
+      }
+      const paymentRef = doc(collection(db, "subscriptionPayments"));
+      const reservationRef = doc(db, "utrReservations", normalizedUtr);
+      await runTransaction(db, async (transaction) => {
+        const reservation = await transaction.get(reservationRef);
+        if (reservation.exists()) {
+          throw new Error("This UTR has already been submitted. Please check the number or contact admin.");
+        }
+        transaction.set(reservationRef, {
+          ownerUid: user.uid,
+          shopId: shop.id,
+          paymentId: paymentRef.id,
+          createdAt: serverTimestamp()
+        });
+        transaction.set(paymentRef, {
+          ownerUid: user.uid,
+          shopId: shop.id,
+          shopName: shop.name || shop.shopName || "",
+          amount: 299,
+          utr: normalizedUtr,
+          status: "pending",
+          createdAt: serverTimestamp()
+        });
+      });
       setPaymentNotice("₹299 payment details submitted. Admin verification is pending.");
       setUtr("");
     } catch (e) { setError(e instanceof Error ? e.message : "Payment details could not be submitted."); }
