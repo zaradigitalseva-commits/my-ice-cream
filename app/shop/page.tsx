@@ -161,7 +161,55 @@ export default function ShopPage() {
     const total = Math.max(0,subtotal-discount);
     setCustomerBusy(true); setCustomerMessage("");
     try {
-      const saleRef = await addDoc(collection(db,"sales"),{shopId:shop.id,shopName:shop.name||shop.shopName||"",ownerUid:user.uid,customerUid:customer.uid,customerPhone:customer.phone,customerName:customer.name||"",items,subtotal,discount,discountType,total,paymentStatus:salePayment,createdAt:serverTimestamp()});
+      const saleRef = doc(collection(db, "sales"));
+      const productRefs = items.map((item) => ({
+        item,
+        ref: doc(db, "shops", shop.id, "products", item.productId),
+      }));
+
+      await runTransaction(db, async (transaction) => {
+        const snapshots = await Promise.all(productRefs.map(({ ref }) => transaction.get(ref)));
+        snapshots.forEach((snapshot, index) => {
+          if (!snapshot.exists()) {
+            throw new Error(`प्रोडक्ट "${items[index].name}" अब उपलब्ध नहीं है।`);
+          }
+          const currentStock = Number(snapshot.data().stock);
+          const requestedQty = items[index].quantity;
+          if (!Number.isInteger(currentStock) || currentStock < requestedQty) {
+            throw new Error(`"${items[index].name}" का पर्याप्त स्टॉक नहीं है। उपलब्ध: ${Number.isFinite(currentStock) ? currentStock : 0}`);
+          }
+        });
+
+        snapshots.forEach((snapshot, index) => {
+          transaction.update(productRefs[index].ref, {
+            stock: Number(snapshot.data().stock) - items[index].quantity,
+            updatedAt: serverTimestamp(),
+          });
+        });
+
+        transaction.set(saleRef, {
+          shopId: shop.id,
+          shopName: shop.name || shop.shopName || "",
+          ownerUid: user.uid,
+          customerUid: customer.uid,
+          customerPhone: customer.phone,
+          customerName: customer.name || "",
+          items,
+          subtotal,
+          discount,
+          discountType,
+          total,
+          paymentStatus: salePayment,
+          createdAt: serverTimestamp(),
+        });
+      });
+
+      setProducts((current) => current.map((product) => {
+        const soldItem = items.find((item) => item.productId === product.id);
+        return soldItem
+          ? { ...product, stock: Math.max(0, Number(product.stock || 0) - soldItem.quantity) }
+          : product;
+      }));
       const lines = items.map(i=>i.name+" x "+i.quantity+" = ₹"+(i.price*i.quantity).toFixed(2)).join("\n");
       const message = "MY ICE CREAM BILL\n"+(shop.name||shop.shopName||"Shop")+"\nCustomer: "+(customer.name||customer.phone)+"\n"+lines+"\nSubtotal: ₹"+subtotal.toFixed(2)+"\nDiscount: ₹"+discount.toFixed(2)+"\nTotal: ₹"+total.toFixed(2)+"\nPayment: "+salePayment+"\nBill: "+saleRef.id;
       const billWhatsAppUrl = "https://wa.me/91"+customer.phone+"?text="+encodeURIComponent(message);
