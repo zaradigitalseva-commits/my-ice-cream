@@ -107,8 +107,7 @@ service cloud.firestore {
               "name", "description", "price", "originalPrice", "category",
               "imageUrl", "active", "updatedAt"
             ])
-          )
-;
+          );
 
         allow delete: if isAdmin()
           || (
@@ -166,18 +165,413 @@ service cloud.firestore {
         || (signedIn() && resource.data.ownerUid == request.auth.uid
           && ownsShop(resource.data.shopId));
       allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          "shopId", "shopName", "ownerUid", "customerUid", "customerPhone",
+          "customerName", "items", "subtotal", "discount", "discountType",
+          "total", "paymentStatus", "createdAt"
+        ])
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.shopId is string
         && ownsShop(request.resource.data.shopId)
+        && liveShop(request.resource.data.shopId)
         && request.resource.data.customerPhone is string
+        && request.resource.data.customerPhone.matches('^[0-9]{10}
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid
+          && ownsShop(resource.data.shopId)
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.paymentStatus == "paid"
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["paymentStatus", "updatedAt"]));
+      allow delete: if isAdmin();
+    }
+
+    match /shopOwnerLocks/{ownerUid} {
+      allow read: if signedIn() && request.auth.uid == ownerUid;
+      allow create: if signedIn()
+        && request.auth.uid == ownerUid
+        && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid))
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.shopId is string;
+      allow update, delete: if false;
+    }
+
+    match /orders/{orderId} {
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          "shopId", "shopName", "deliveryFee", "subtotal", "customerUid",
+          "customerName", "customerEmail", "customerPhone", "fulfillmentType",
+          "deliveryAddress", "items", "total", "status", "paymentStatus", "createdAt"
+        ])
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.customerName is string
+        && request.resource.data.customerEmail is string
+        && request.resource.data.customerPhone is string
+        && request.resource.data.customerPhone.matches('^[0-9]{10}
+
+      allow read: if isAdmin()
+        || (
+          signedIn()
+          && resource.data.customerUid == request.auth.uid
+        )
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+        );
+
+      allow update: if isAdmin()
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.shopId == resource.data.shopId
+          && (
+            (resource.data.status == "placed" && request.resource.data.status == "accepted")
+            || (resource.data.status == "accepted" && request.resource.data.status == "preparing")
+            || (resource.data.status == "preparing" && request.resource.data.status == "ready")
+            || (resource.data.status == "ready" && request.resource.data.status == "completed")
+          )
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(["status", "updatedAt"])
+        )
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+          && resource.data.status != "cancelled"
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.paymentStatus == "paid"
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.shopId == resource.data.shopId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["paymentStatus", "updatedAt"])
+        )
+        || (
+          signedIn()
+          && resource.data.customerUid == request.auth.uid
+          && resource.data.status == "placed"
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.status == "cancelled"
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(["status", "updatedAt"])
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /subscriptionPayments/{paymentId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.shopId is string
+        && ownsShop(request.resource.data.shopId)
+        && request.resource.data.status == "pending"
+        && request.resource.data.amount == 299
+        && request.resource.data.utr is string
+        && request.resource.data.utr.matches('^[A-Z0-9]{6,40}$')
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.shopId == request.resource.data.shopId
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.paymentId == paymentId;
+      allow update, delete: if isAdmin();
+    }
+
+    match /utrReservations/{utr} {
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/utrReservations/$(utr))
+        && utr.matches('^[A-Z0-9]{6,40}$')
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.shopId is string
+        && ownsShop(request.resource.data.shopId)
+        && request.resource.data.paymentId is string
+        && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "paymentId", "createdAt"]);
+      allow update, delete: if false;
+    }
+
+    match /siteSettings/{settingId} {
+      allow read: if settingId == "branding";
+      allow write: if isAdmin() && settingId == "branding";
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+)
         && request.resource.data.customerUid
           == get(/databases/$(database)/documents/customers/$(request.resource.data.customerPhone)).data.uid
         && request.resource.data.shopName is string
+        && request.resource.data.customerName is string
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
+        && request.resource.data.items.size() <= 100
+        && request.resource.data.subtotal is number
+        && request.resource.data.subtotal >= 0
+        && request.resource.data.discount is number
+        && request.resource.data.discount >= 0
+        && request.resource.data.discount <= request.resource.data.subtotal
+        && request.resource.data.discountType in ["amount", "percent"]
+        && request.resource.data.total is number
+        && request.resource.data.total == request.resource.data.subtotal - request.resource.data.discount
+        && request.resource.data.paymentStatus in ["paid", "unpaid"];
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid
+          && ownsShop(resource.data.shopId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["paymentStatus", "updatedAt"])
+          && request.resource.data.paymentStatus in ["paid", "unpaid"]);
+      allow delete: if isAdmin();
+    }
+
+    match /shopOwnerLocks/{ownerUid} {
+      allow read: if signedIn() && request.auth.uid == ownerUid;
+      allow create: if signedIn()
+        && request.auth.uid == ownerUid
+        && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid))
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.shopId is string;
+      allow update, delete: if false;
+    }
+
+    match /orders/{orderId} {
+
+      allow create: if signedIn()
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.status == "placed"
+        && request.resource.data.paymentStatus == "unpaid"
+        && request.resource.data.shopId is string
+        && liveShop(request.resource.data.shopId)
         && request.resource.data.total is number
         && request.resource.data.total >= 0
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.items.size() <= 100;
+
+      allow read: if isAdmin()
+        || (
+          signedIn()
+          && resource.data.customerUid == request.auth.uid
+        )
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+        );
+
+      allow update: if isAdmin()
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.shopId == resource.data.shopId
+          && (
+            (resource.data.status == "placed" && request.resource.data.status == "accepted")
+            || (resource.data.status == "accepted" && request.resource.data.status == "preparing")
+            || (resource.data.status == "preparing" && request.resource.data.status == "ready")
+            || (resource.data.status == "ready" && request.resource.data.status == "completed")
+          )
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(["status", "updatedAt"])
+        )
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+          && resource.data.status != "cancelled"
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.paymentStatus == "paid"
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.shopId == resource.data.shopId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["paymentStatus", "updatedAt"])
+        )
+        || (
+          signedIn()
+          && resource.data.customerUid == request.auth.uid
+          && resource.data.status == "placed"
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.status == "cancelled"
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(["status", "updatedAt"])
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /subscriptionPayments/{paymentId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.shopId is string
+        && ownsShop(request.resource.data.shopId)
+        && request.resource.data.status == "pending"
+        && request.resource.data.amount == 299
+        && request.resource.data.utr is string
+        && request.resource.data.utr.matches('^[A-Z0-9]{6,40}$')
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.shopId == request.resource.data.shopId
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.paymentId == paymentId;
+      allow update, delete: if isAdmin();
+    }
+
+    match /utrReservations/{utr} {
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/utrReservations/$(utr))
+        && utr.matches('^[A-Z0-9]{6,40}$')
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.shopId is string
+        && ownsShop(request.resource.data.shopId)
+        && request.resource.data.paymentId is string
+        && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "paymentId", "createdAt"]);
+      allow update, delete: if false;
+    }
+
+    match /siteSettings/{settingId} {
+      allow read: if settingId == "branding";
+      allow write: if isAdmin() && settingId == "branding";
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+)
+        && request.resource.data.status == "placed"
+        && request.resource.data.paymentStatus == "unpaid"
+        && request.resource.data.shopId is string
+        && liveShop(request.resource.data.shopId)
+        && request.resource.data.fulfillmentType in ["pickup", "delivery"]
+        && request.resource.data.subtotal is number
+        && request.resource.data.subtotal >= 0
+        && request.resource.data.deliveryFee is number
+        && request.resource.data.deliveryFee >= 0
+        && request.resource.data.total is number
+        && request.resource.data.total == request.resource.data.subtotal + request.resource.data.deliveryFee
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.items.size() <= 100
+        && (
+          (request.resource.data.fulfillmentType == "pickup"
+            && request.resource.data.deliveryFee == 0)
+          || (request.resource.data.fulfillmentType == "delivery"
+            && request.resource.data.deliveryAddress is string
+            && request.resource.data.deliveryAddress.size() > 0)
+        );
+
+      allow read: if isAdmin()
+        || (
+          signedIn()
+          && resource.data.customerUid == request.auth.uid
+        )
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+        );
+
+      allow update: if isAdmin()
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.shopId == resource.data.shopId
+          && (
+            (resource.data.status == "placed" && request.resource.data.status == "accepted")
+            || (resource.data.status == "accepted" && request.resource.data.status == "preparing")
+            || (resource.data.status == "preparing" && request.resource.data.status == "ready")
+            || (resource.data.status == "ready" && request.resource.data.status == "completed")
+          )
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(["status", "updatedAt"])
+        )
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+          && resource.data.status != "cancelled"
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.paymentStatus == "paid"
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.shopId == resource.data.shopId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["paymentStatus", "updatedAt"])
+        )
+        || (
+          signedIn()
+          && resource.data.customerUid == request.auth.uid
+          && resource.data.status == "placed"
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.status == "cancelled"
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(["status", "updatedAt"])
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /subscriptionPayments/{paymentId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.shopId is string
+        && ownsShop(request.resource.data.shopId)
+        && request.resource.data.status == "pending"
+        && request.resource.data.amount == 299
+        && request.resource.data.utr is string
+        && request.resource.data.utr.matches('^[A-Z0-9]{6,40}$')
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.shopId == request.resource.data.shopId
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.paymentId == paymentId;
+      allow update, delete: if isAdmin();
+    }
+
+    match /utrReservations/{utr} {
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/utrReservations/$(utr))
+        && utr.matches('^[A-Z0-9]{6,40}$')
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.shopId is string
+        && ownsShop(request.resource.data.shopId)
+        && request.resource.data.paymentId is string
+        && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "paymentId", "createdAt"]);
+      allow update, delete: if false;
+    }
+
+    match /siteSettings/{settingId} {
+      allow read: if settingId == "branding";
+      allow write: if isAdmin() && settingId == "branding";
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+)
+        && request.resource.data.customerUid
+          == get(/databases/$(database)/documents/customers/$(request.resource.data.customerPhone)).data.uid
+        && request.resource.data.shopName is string
+        && request.resource.data.customerName is string
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.items.size() <= 100
+        && request.resource.data.subtotal is number
+        && request.resource.data.subtotal >= 0
         && request.resource.data.discount is number
+        && request.resource.data.discount >= 0
+        && request.resource.data.discount <= request.resource.data.subtotal
+        && request.resource.data.discountType in ["amount", "percent"]
+        && request.resource.data.total is number
+        && request.resource.data.total == request.resource.data.subtotal - request.resource.data.discount
         && request.resource.data.paymentStatus in ["paid", "unpaid"];
       allow update: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid
