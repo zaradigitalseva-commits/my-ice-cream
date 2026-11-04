@@ -23,9 +23,15 @@ service cloud.firestore {
           .data.ownerUid == request.auth.uid;
     }
 
+    function validSubscription(shopData) {
+      return shopData.subscriptionStatus == "active"
+        && shopData.subscriptionExpiresAt is timestamp
+        && request.time < shopData.subscriptionExpiresAt;
+    }
+
     function liveShop(shopId) {
-      return get(/databases/$(database)/documents/shops/$(shopId))
-        .data.status == "live";
+      let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
+      return shop.status == "live" && validSubscription(shop);
     }
 
     function validProduct(data, shopId) {
@@ -84,7 +90,7 @@ service cloud.firestore {
 
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || resource.data.status == "live";
+        || (resource.data.status == "live" && validSubscription(resource.data));
 
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
@@ -93,7 +99,8 @@ service cloud.firestore {
           /databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)
         ).data.shopId == shopId;
 
-      allow update: if isAdmin()
+      allow update: if (isAdmin()
+          && (request.resource.data.status != "live" || validSubscription(request.resource.data)))
         || (
           signedIn()
           && resource.data.ownerUid == request.auth.uid
@@ -266,6 +273,17 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data)
             .affectedKeys()
             .hasOnly(["status", "updatedAt"])
+        )
+        || (
+          signedIn()
+          && ownsShop(resource.data.shopId)
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.paymentStatus == "paid"
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.shopId == resource.data.shopId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["paymentStatus", "updatedAt"])
         )
         || (
           signedIn()
