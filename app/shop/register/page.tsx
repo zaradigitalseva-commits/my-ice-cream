@@ -34,7 +34,7 @@ export default function ShopRegisterPage() {
       });
       batch.set(lockRef, { ownerUid: user.uid, shopId: shopRef.id, createdAt: serverTimestamp() });
       await batch.commit();
-      setMessage("Registration submitted. Your shop is PENDING until Admin reviews and approves it.");
+      setMessage("Registration submitted. Submit the ₹299 subscription payment from your Shop Dashboard. Your shop becomes LIVE after Admin verifies the payment.");
       setName(""); setPhone(""); setCity(""); setAddress(""); setDescription("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Registration could not be submitted.");
