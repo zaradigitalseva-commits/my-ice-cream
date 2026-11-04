@@ -23,9 +23,15 @@ service cloud.firestore {
           .data.ownerUid == request.auth.uid;
     }
 
+    function validSubscription(shopData) {
+      return shopData.subscriptionStatus == "active"
+        && shopData.subscriptionExpiresAt is timestamp
+        && request.time < shopData.subscriptionExpiresAt;
+    }
+
     function liveShop(shopId) {
-      return get(/databases/$(database)/documents/shops/$(shopId))
-        .data.status == "live";
+      let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
+      return shop.status == "live" && validSubscription(shop);
     }
 
     function validProduct(data, shopId) {
@@ -36,8 +42,6 @@ service cloud.firestore {
         && data.name.size() <= 120
         && data.price is number
         && data.price >= 0
-        && data.stock is int
-        && data.stock >= 0
         && data.active is bool
         && data.category is string
         && data.description is string
@@ -47,44 +51,11 @@ service cloud.firestore {
           || (data.originalPrice is number && data.originalPrice >= data.price));
     }
 
-    function customerStockReservation(shopId, productId) {
-      let orderPath =
-        /databases/$(database)/documents/orders/$(request.resource.data.lastOrderId);
-
-      return signedIn()
-        && request.resource.data.lastOrderId is string
-        && !exists(orderPath)
-        && getAfter(orderPath).data.customerUid == request.auth.uid
-        && getAfter(orderPath).data.shopId == shopId
-        && getAfter(orderPath).data.status == "placed"
-        && getAfter(orderPath).data.stockChanges[productId]
-          == resource.data.stock - request.resource.data.stock
-        && request.resource.data.stock >= 0
-        && request.resource.data.diff(resource.data)
-          .affectedKeys()
-          .hasOnly(["stock", "lastOrderId", "updatedAt"]);
-    }
-
-    function customerStockRestore(shopId, productId) {
-      let orderPath = /databases/$(database)/documents/orders/$(request.resource.data.lastCancelledOrderId);
-      return signedIn()
-        && request.resource.data.lastCancelledOrderId is string
-        && exists(orderPath)
-        && getAfter(orderPath).data.customerUid == request.auth.uid
-        && getAfter(orderPath).data.shopId == shopId
-        && getAfter(orderPath).data.status == "cancelled"
-        && getAfter(orderPath).data.stockChanges[productId] is number
-        && request.resource.data.stock
-          == resource.data.stock + getAfter(orderPath).data.stockChanges[productId]
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["stock", "lastCancelledOrderId", "updatedAt"]);
-    }
-
     match /shops/{shopId} {
 
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || resource.data.status == "live";
+        || (resource.data.status == "live" && validSubscription(resource.data));
 
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
@@ -93,7 +64,8 @@ service cloud.firestore {
           /databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)
         ).data.shopId == shopId;
 
-      allow update: if isAdmin()
+      allow update: if (isAdmin()
+          && (request.resource.data.status != "live" || validSubscription(request.resource.data)))
         || (
           signedIn()
           && resource.data.ownerUid == request.auth.uid
@@ -133,14 +105,10 @@ service cloud.firestore {
             && validProduct(request.resource.data, shopId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "name", "description", "price", "originalPrice", "category",
-              "stock", "imageUrl", "active", "updatedAt"
+              "imageUrl", "active", "updatedAt"
             ])
           )
-          || (
-            liveShop(shopId)
-            && customerStockReservation(shopId, productId)
-          )
-          || customerStockRestore(shopId, productId);
+        );
 
         allow delete: if isAdmin()
           || (
@@ -239,7 +207,10 @@ service cloud.firestore {
         && request.resource.data.shopId is string
         && liveShop(request.resource.data.shopId)
         && request.resource.data.total is number
-        && request.resource.data.total >= 0;
+        && request.resource.data.total >= 0
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.items.size() <= 100;
 
       allow read: if isAdmin()
         || (
@@ -269,8 +240,21 @@ service cloud.firestore {
         )
         || (
           signedIn()
+          && ownsShop(resource.data.shopId)
+          && resource.data.status != "cancelled"
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.paymentStatus == "paid"
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.shopId == resource.data.shopId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["paymentStatus", "updatedAt"])
+        )
+        || (
+          signedIn()
           && resource.data.customerUid == request.auth.uid
           && resource.data.status == "placed"
+          && resource.data.paymentStatus == "unpaid"
           && request.resource.data.status == "cancelled"
           && request.resource.data.diff(resource.data)
             .affectedKeys()
@@ -284,6 +268,8 @@ service cloud.firestore {
       allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.shopId is string
+        && ownsShop(request.resource.data.shopId)
         && request.resource.data.status == "pending"
         && request.resource.data.amount == 299
         && request.resource.data.utr is string
@@ -301,6 +287,7 @@ service cloud.firestore {
         && utr.matches('^[A-Z0-9]{6,40}$')
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.shopId is string
+        && ownsShop(request.resource.data.shopId)
         && request.resource.data.paymentId is string
         && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "paymentId", "createdAt"]);
       allow update, delete: if false;
