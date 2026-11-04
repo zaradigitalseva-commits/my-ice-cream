@@ -149,8 +149,9 @@ service cloud.firestore {
             && resource.data.ownerUid == request.auth.uid
           );
       }
+    }
 
-      match /customers/{phoneNumber} {
+    match /customers/{phoneNumber} {
       allow get: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid)
         || (signedIn() && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)));
