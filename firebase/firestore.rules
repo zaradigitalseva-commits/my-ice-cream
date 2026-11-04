@@ -28,6 +28,25 @@ service cloud.firestore {
         .data.status == "live";
     }
 
+    function validProduct(data, shopId) {
+      return data.shopId == shopId
+        && data.ownerUid == request.auth.uid
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 120
+        && data.price is number
+        && data.price >= 0
+        && data.stock is int
+        && data.stock >= 0
+        && data.active is bool
+        && data.category is string
+        && data.description is string
+        && data.imageUrl is string
+        && (!("originalPrice" in data)
+          || data.originalPrice == null
+          || (data.originalPrice is number && data.originalPrice >= data.price));
+    }
+
     function customerStockReservation(shopId, productId) {
       let orderPath =
         /databases/$(database)/documents/orders/$(request.resource.data.lastOrderId);
@@ -103,8 +122,7 @@ service cloud.firestore {
           || (
             ownsShop(shopId)
             && liveShop(shopId)
-            && request.resource.data.shopId == shopId
-            && request.resource.data.ownerUid == request.auth.uid
+            && validProduct(request.resource.data, shopId)
           );
 
         allow update: if isAdmin()
@@ -112,9 +130,11 @@ service cloud.firestore {
             ownsShop(shopId)
             && liveShop(shopId)
             && resource.data.shopId == shopId
-            && request.resource.data.shopId == resource.data.shopId
-            && request.resource.data.ownerUid == resource.data.ownerUid
-            && request.resource.data.ownerUid == request.auth.uid
+            && validProduct(request.resource.data, shopId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              "name", "description", "price", "originalPrice", "category",
+              "stock", "imageUrl", "active", "updatedAt"
+            ])
           )
           || (
             liveShop(shopId)
