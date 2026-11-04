@@ -9,7 +9,7 @@ import { isAdminEmail } from "@/lib/admin";
 
 type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number };
 type Order = { id: string; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
-type Customer = { id: string; phone: string; createdAt?: { toDate?: () => Date } };
+type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date } };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; stock?: number; imageUrl?: string; active?: boolean };
 
@@ -59,7 +59,7 @@ export default function ShopPage() {
   const [customerMessage, setCustomerMessage] = useState("");
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
-  const [customerFound, setCustomerFound] = useState(false);
+  const [customerFound, setCustomerFound] = useState(false);\n  const [saleQty, setSaleQty] = useState<Record<string, number>>({});\n  const [discountValue, setDiscountValue] = useState("0");\n  const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");\n  const [salePayment, setSalePayment] = useState<"paid" | "unpaid">("paid");
   const [showShopDashboard, setShowShopDashboard] = useState(false);
 
   async function loadProducts(shopId: string) {
@@ -94,37 +94,38 @@ export default function ShopPage() {
     if (!db || !shop) return;
     const digits = customerPhone.replace(/\D/g, "");
     if (!/^\d{10}$/.test(digits)) { setCustomerMessage("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।"); return; }
-    setCustomerLoading(true); setCustomerMessage(""); setCustomer(null); setCustomerOrders([]); setCustomerFound(false);
+    setCustomerLoading(true); setCustomerMessage(""); setCustomer(null); setCustomerOrders([]); setCustomerFound(false); setSaleQty({});
     try {
-      const customerRef = doc(db, "shops", shop.id, "customers", digits);
-      const [customerSnap, orderResult] = await Promise.all([
-        getDoc(customerRef),
-        getDocs(query(collection(db, "orders"), where("shopId", "==", shop.id), where("customerPhone", "==", digits)))
-      ]);
-      const foundOrders = orderResult.docs.map(d => ({ id: d.id, ...d.data() } as CustomerOrder))
-        .sort((a,b)=>(b.createdAt?.toDate?.().getTime()||0)-(a.createdAt?.toDate?.().getTime()||0));
-      setCustomerOrders(foundOrders);
-      if (customerSnap.exists() || foundOrders.length) {
-        setCustomerFound(true);
-        setCustomer(customerSnap.exists() ? ({ id: customerSnap.id, ...customerSnap.data() } as Customer) : { id: digits, phone: digits });
-        setCustomerMessage("ग्राहक मिल गया। उपलब्ध जानकारी नीचे दिखाई गई है।");
-      } else {
-        setCustomerMessage("यह ग्राहक अभी रजिस्टर नहीं है। सिर्फ मोबाइल नंबर से रजिस्टर कर सकते हैं।");
-      }
+      const customerSnap = await getDoc(doc(db, "customers", digits));
+      if (!customerSnap.exists()) { setCustomerMessage("यह मोबाइल नंबर ग्राहक Google खाते में रजिस्टर नहीं है। ग्राहक से पहले अपने खाते में नाम और मोबाइल सेव करवाएँ।"); return; }
+      const data = customerSnap.data();
+      setCustomer({ id: customerSnap.id, phone: digits, uid: String(data.uid), name: String(data.name || "") });
+      setCustomerFound(true);
+      const salesResult = await getDocs(query(collection(db, "sales"), where("shopId", "==", shop.id), where("customerPhone", "==", digits)));
+      setCustomerOrders(salesResult.docs.map(d => ({ id:d.id, ...d.data() } as CustomerOrder)).sort((x,y)=>(y.createdAt?.toDate?.().getTime()||0)-(x.createdAt?.toDate?.().getTime()||0)));
+      setCustomerMessage("ग्राहक मिल गया। अब बिल बना सकते हैं।");
     } catch (e) { setCustomerMessage(e instanceof Error ? e.message : "ग्राहक की जानकारी नहीं मिल सकी।"); }
     finally { setCustomerLoading(false); }
   }
 
-  async function registerCustomer() {
-    if (!db || !shop) return;
-    const digits = customerPhone.replace(/\D/g, "");
-    if (!/^\d{10}$/.test(digits)) { setCustomerMessage("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।"); return; }
+  async function createWalkInSale() {
+    if (!db || !shop || !user || !customer) return;
+    const items = products.filter(p => Number(saleQty[p.id] || 0) > 0).map(p => ({ productId:p.id, name:p.name || "Product", quantity:Number(saleQty[p.id]), price:Number(p.price || 0) }));
+    if (!items.length) { setCustomerMessage("बिल में कम-से-कम एक प्रोडक्ट जोड़ें।"); return; }
+    const subtotal = items.reduce((sum,item)=>sum+item.price*item.quantity,0);
+    const rawDiscount = Math.max(0,Number(discountValue)||0);
+    const discount = Math.min(subtotal, discountType === "percent" ? subtotal*Math.min(rawDiscount,100)/100 : rawDiscount);
+    const total = Math.max(0,subtotal-discount);
     setCustomerBusy(true); setCustomerMessage("");
     try {
-      await setDoc(doc(db, "shops", shop.id, "customers", digits), { phone: digits, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-      setCustomer({ id: digits, phone: digits }); setCustomerFound(true);
-      setCustomerMessage("ग्राहक सिर्फ मोबाइल नंबर से रजिस्टर हो गया।");
-    } catch (e) { setCustomerMessage(e instanceof Error ? e.message : "ग्राहक रजिस्टर नहीं हो सका।"); }
+      const saleRef = await addDoc(collection(db,"sales"),{shopId:shop.id,shopName:shop.name||shop.shopName||"",ownerUid:user.uid,customerUid:customer.uid,customerPhone:customer.phone,customerName:customer.name||"",items,subtotal,discount,discountType,total,paymentStatus:salePayment,createdAt:serverTimestamp()});
+      const lines = items.map(i=>i.name+" x "+i.quantity+" = ₹"+(i.price*i.quantity).toFixed(2)).join("\n");
+      const message = "MY ICE CREAM BILL\n"+(shop.name||shop.shopName||"Shop")+"\nCustomer: "+(customer.name||customer.phone)+"\n"+lines+"\nSubtotal: ₹"+subtotal.toFixed(2)+"\nDiscount: ₹"+discount.toFixed(2)+"\nTotal: ₹"+total.toFixed(2)+"\nPayment: "+salePayment+"\nBill: "+saleRef.id;
+      window.open("https://wa.me/91"+customer.phone+"?text="+encodeURIComponent(message),"_blank","noopener,noreferrer");
+      setCustomerMessage("बिल सेव हो गया। WhatsApp share window खुल गई है।");
+      setCustomerOrders(current=>[{id:saleRef.id,customerName:customer.name,customerPhone:customer.phone,total,items,paymentStatus:salePayment},...current]);
+      setSaleQty({});setDiscountValue("0");
+    } catch(e) { setCustomerMessage(e instanceof Error?e.message:"बिल सेव नहीं हो सका।"); }
     finally { setCustomerBusy(false); }
   }
 
@@ -254,21 +255,26 @@ export default function ShopPage() {
         <section className="admin-heading"><div><p className="admin-kicker">SHOPKEEPER AREA</p><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""} · Status: <span className={"admin-status " + (shop.status || "pending")}>{shop.status || "pending"}</span></p></div></section>
         {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
         <section className="admin-panel">
-          <p className="admin-kicker">CUSTOMER DESK</p><h2>सबसे पहले ग्राहक खोजें</h2>
-          <p>मोबाइल नंबर डालकर ग्राहक की जानकारी और पुराने ऑर्डर देखें। नया ग्राहक सिर्फ नंबर से रजिस्टर होगा।</p>
+          <p className="admin-kicker">CUSTOMER DESK</p><h2>ग्राहक खोजें और बिल बनाएँ</h2>
+          <p>ग्राहक का वही मोबाइल नंबर डालें जो उसने अपने Google ग्राहक खाते में सेव किया है।</p>
           <form className="register-form" onSubmit={searchCustomer}>
-            <label>ग्राहक का मोबाइल नंबर<input required inputMode="numeric" autoComplete="tel" maxLength={10} value={customerPhone} onChange={e=>setCustomerPhone(e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="10 अंकों का मोबाइल नंबर" /></label>
+            <label>ग्राहक मोबाइल नंबर<input required inputMode="numeric" autoComplete="tel" maxLength={10} value={customerPhone} onChange={e=>setCustomerPhone(e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="10 अंकों का मोबाइल नंबर" /></label>
             <button className="admin-primary" disabled={customerLoading || customerPhone.length!==10}>{customerLoading?"खोज रहे हैं…":"ग्राहक खोजें"}</button>
           </form>
           {customerMessage && <p className={customerFound?"admin-success":"admin-muted"} role="status">{customerMessage}</p>}
-          {customerFound && customer && <div className="admin-panel">
-            <h3>ग्राहक की जानकारी</h3><p><strong>मोबाइल:</strong> {customer.phone}</p>
-            {customerOrders.length>0 ? <>
-              <p><strong>पुराने ऑर्डर:</strong> {customerOrders.length}</p>
-              {customerOrders.map(o=><article key={o.id} className="admin-panel"><strong>ऑर्डर #{o.id}</strong><p>नाम: {o.customerName||"उपलब्ध नहीं"} · ईमेल: {o.customerEmail||"उपलब्ध नहीं"}</p><p>पता: {o.deliveryAddress||"उपलब्ध नहीं"}</p><p>ऑर्डर: {(o.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")||"—"}</p><p>कुल: ₹{Number(o.total||0).toFixed(2)} · स्थिति: {o.status||"—"}</p></article>)}
-            </> : <p className="admin-muted">इस ग्राहक का अभी कोई पुराना ऑर्डर नहीं है।</p>}
-          </div>}
-          {!customerLoading && customerPhone.length===10 && !customerFound && customerMessage.startsWith("यह ग्राहक") && <button type="button" className="admin-primary" disabled={customerBusy} onClick={()=>void registerCustomer()}>{customerBusy?"रजिस्टर हो रहा है…":"सिर्फ मोबाइल नंबर से ग्राहक रजिस्टर करें"}</button>}
+          {customerFound && customer && <>
+            <h3>{customer.name || "ग्राहक"} · {customer.phone}</h3>
+            <h3>इस दुकान की पुरानी खरीदारी</h3>
+            {customerOrders.length===0?<p className="admin-muted">इस दुकान से अभी कोई खरीदारी नहीं हुई।</p>:customerOrders.map(o=><p key={o.id}>{(o.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")} · ₹{Number(o.total||0).toFixed(2)} · {o.paymentStatus||"unpaid"}</p>)}
+            <h3>नया बिल</h3>
+            <div className="register-form">
+              {products.filter(p=>p.active!==false).map(p=><label key={p.id}>{p.name} · ₹{Number(p.price||0).toFixed(2)} (Stock: {p.stock??0})<input type="number" min="0" max={Number(p.stock||0)} step="1" value={saleQty[p.id]||0} onChange={e=>setSaleQty(v=>({...v,[p.id]:Math.min(Number(p.stock||0),Math.max(0,Number(e.target.value)||0))}))}/></label>)}
+              <label>Discount type<select value={discountType} onChange={e=>setDiscountType(e.target.value as "amount"|"percent")}><option value="amount">₹ Amount</option><option value="percent">Percent (%)</option></select></label>
+              <label>Discount<input type="number" min="0" step="0.01" value={discountValue} onChange={e=>setDiscountValue(e.target.value)}/></label>
+              <label>Payment status<select value={salePayment} onChange={e=>setSalePayment(e.target.value as "paid"|"unpaid")}><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select></label>
+              <button type="button" className="admin-primary" disabled={customerBusy||products.length===0} onClick={()=>void createWalkInSale()}>{customerBusy?"बिल सेव हो रहा है…":"बिल सेव करें और WhatsApp पर भेजें"}</button>
+            </div>
+          </>}
         </section>
         <div className="admin-panel" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}><div><p className="admin-kicker">SHOP MANAGEMENT</p><h2 style={{margin:0}}>दुकान का डैशबोर्ड</h2><p style={{margin:"6px 0 0"}}>प्रोडक्ट, ऑर्डर, दुकान की जानकारी और पेमेंट मैनेज करें।</p></div><button type="button" className="admin-primary" onClick={()=>setShowShopDashboard(v=>!v)}>{showShopDashboard?"डैशबोर्ड बंद करें":"दुकान का डैशबोर्ड खोलें"}</button></div>
         {showShopDashboard && <>
