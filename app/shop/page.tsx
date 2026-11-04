@@ -117,8 +117,8 @@ export default function ShopPage() {
   async function createCustomerRecord(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!db || !shop || !user) return;
-    const digits = customerPhone.replace(/\\D/g, "");
-    if (!/^\\d{10}$/.test(digits) || !newCustomerName.trim()) {
+    const digits = customerPhone.replace(/\D/g, "");
+    if (!/^\d{10}$/.test(digits) || !newCustomerName.trim()) {
       setCustomerMessage("ग्राहक का नाम और 10 अंकों का मोबाइल नंबर भरें।");
       return;
     }
