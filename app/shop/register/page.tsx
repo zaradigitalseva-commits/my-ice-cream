@@ -52,7 +52,7 @@ export default function ShopRegisterPage() {
         <span className="register-badge">🍨 SHOP PARTNER PROGRAM</span>
         <h1>Apni ice cream shop ko <em>online</em> laayein!</h1>
         <p>Apni shop register karein aur aas-paas ke customers tak pahunch banayein. Details submit karne ke baad Admin approval zaroori hai.</p>
-        <div className="register-benefits"><span>✨ Free shop listing</span><span>📍 Local customers</span><span>💛 Easy order access</span></div>
+        <div className="register-benefits"><span>✨ ₹299/month subscription</span><span>📍 Local customers</span><span>💛 Easy order access</span></div>
       </div>
       <div className="register-hero-art" aria-hidden="true"><span className="register-spark spark-one">✦</span><span className="register-spark spark-two">✧</span><div className="register-scoop">🍦</div><div className="register-art-caption">Your shop, more visible!</div></div>
     </section>
