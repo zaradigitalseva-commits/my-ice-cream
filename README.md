@@ -9,7 +9,7 @@ The repository now contains a Next.js App Router + TypeScript starter, a respons
 ## Product roles
 
 - **Customer:** Browse public shops and products as a guest; sign in when needed for orders, saved items, and personal history.
-- **Shopkeeper:** Manage one or more shops, products, stock, orders, billing, offers, and shop settings.
+- **Shopkeeper:** Manage shop details, product listings, customer orders, billing, offers, and shop settings. Inventory and stock tracking are intentionally not part of this app.
 - **Admin:** Approve shop registrations and subscription payments, manage shop status, and view platform-level reports.
 
 ## Important product decisions
@@ -20,7 +20,7 @@ The repository now contains a Next.js App Router + TypeScript starter, a respons
 - Home delivery is optional per shop. A customer is asked for a delivery address only after choosing Home Delivery.
 - Customer private details and transaction history must not be visible to unrelated shops.
 - Public party/bulk requests expose only the details the customer chooses to share.
-- Product types are flexible: cups, cones, kulfi, sticks, family packs, scoops, and shop-defined products.
+- Product types are flexible: cups, cones, kulfi, sticks, family packs, scoops, and shop-defined products. Product listings contain a name, photo, price, category, and description; shopkeepers can edit or delete listings. There is no stock or inventory management.
 
 ## Run locally
 
