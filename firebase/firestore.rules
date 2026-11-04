@@ -242,7 +242,6 @@ service cloud.firestore {
         && request.resource.data.amount == 299
         && request.resource.data.utr is string
         && request.resource.data.utr.matches('^[A-Z0-9]{6,40}$')
-        && existsAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr))
         && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.ownerUid == request.auth.uid
         && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.shopId == request.resource.data.shopId
         && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.paymentId == paymentId;
