@@ -153,6 +153,7 @@ export default function ShopPage() {
 
   async function createWalkInSale() {
     if (!db || !shop || !user || !customer) return;
+    const firestore = db;
     const items = products.filter(p => Number(saleQty[p.id] || 0) > 0).map(p => ({ productId:p.id, name:p.name || "Product", quantity:Number(saleQty[p.id]), price:Number(p.price || 0) }));
     if (!items.length) { setCustomerMessage("बिल में कम-से-कम एक प्रोडक्ट जोड़ें।"); return; }
     const subtotal = items.reduce((sum,item)=>sum+item.price*item.quantity,0);
@@ -161,13 +162,13 @@ export default function ShopPage() {
     const total = Math.max(0,subtotal-discount);
     setCustomerBusy(true); setCustomerMessage("");
     try {
-      const saleRef = doc(collection(db, "sales"));
+      const saleRef = doc(collection(firestore, "sales"));
       const productRefs = items.map((item) => ({
         item,
-        ref: doc(db, "shops", shop.id, "products", item.productId),
+        ref: doc(firestore, "shops", shop.id, "products", item.productId),
       }));
 
-      await runTransaction(db, async (transaction) => {
+      await runTransaction(firestore, async (transaction) => {
         const snapshots = await Promise.all(productRefs.map(({ ref }) => transaction.get(ref)));
         snapshots.forEach((snapshot, index) => {
           if (!snapshot.exists()) {
