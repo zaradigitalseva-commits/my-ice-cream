@@ -117,8 +117,8 @@ export default function ShopPage() {
   async function createCustomerRecord(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!db || !shop || !user) return;
-    const digits = customerPhone.replace(/\\D/g, "");
-    if (!/^\\d{10}$/.test(digits) || !newCustomerName.trim()) {
+    const digits = customerPhone.replace(/\D/g, "");
+    if (!/^\d{10}$/.test(digits) || !newCustomerName.trim()) {
       setCustomerMessage("ग्राहक का नाम और 10 अंकों का मोबाइल नंबर भरें।");
       return;
     }
@@ -142,17 +142,18 @@ export default function ShopPage() {
       return;
     }
     const message = "🎉 SPECIAL OFFER – " + (shop.name || shop.shopName || "My Ice Cream") +
-      "\\nनमस्ते " + (customer.name || "जी") + "!" +
-      "\\n" + offerTitle.trim() +
-      (offerDescription.trim() ? "\\n" + offerDescription.trim() : "") +
-      (offerExpiresAt ? "\\nValid till: " + offerExpiresAt : "") +
-      "\\nदुकान पर आइए और इस ऑफर का लाभ उठाइए!";
+      "\nनमस्ते " + (customer.name || "जी") + "!" +
+      "\n" + offerTitle.trim() +
+      (offerDescription.trim() ? "\n" + offerDescription.trim() : "") +
+      (offerExpiresAt ? "\nValid till: " + offerExpiresAt : "") +
+      "\nदुकान पर आइए और इस ऑफर का लाभ उठाइए!";
     const url = "https://wa.me/91" + customer.phone + "?text=" + encodeURIComponent(message);
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
   async function createWalkInSale() {
     if (!db || !shop || !user || !customer) return;
+    const firestore = db;
     const items = products.filter(p => Number(saleQty[p.id] || 0) > 0).map(p => ({ productId:p.id, name:p.name || "Product", quantity:Number(saleQty[p.id]), price:Number(p.price || 0) }));
     if (!items.length) { setCustomerMessage("बिल में कम-से-कम एक प्रोडक्ट जोड़ें।"); return; }
     const subtotal = items.reduce((sum,item)=>sum+item.price*item.quantity,0);
@@ -161,7 +162,55 @@ export default function ShopPage() {
     const total = Math.max(0,subtotal-discount);
     setCustomerBusy(true); setCustomerMessage("");
     try {
-      const saleRef = await addDoc(collection(db,"sales"),{shopId:shop.id,shopName:shop.name||shop.shopName||"",ownerUid:user.uid,customerUid:customer.uid,customerPhone:customer.phone,customerName:customer.name||"",items,subtotal,discount,discountType,total,paymentStatus:salePayment,createdAt:serverTimestamp()});
+      const saleRef = doc(collection(firestore, "sales"));
+      const productRefs = items.map((item) => ({
+        item,
+        ref: doc(firestore, "shops", shop.id, "products", item.productId),
+      }));
+
+      await runTransaction(firestore, async (transaction) => {
+        const snapshots = await Promise.all(productRefs.map(({ ref }) => transaction.get(ref)));
+        snapshots.forEach((snapshot, index) => {
+          if (!snapshot.exists()) {
+            throw new Error(`प्रोडक्ट "${items[index].name}" अब उपलब्ध नहीं है।`);
+          }
+          const currentStock = Number(snapshot.data().stock);
+          const requestedQty = items[index].quantity;
+          if (!Number.isInteger(currentStock) || currentStock < requestedQty) {
+            throw new Error(`"${items[index].name}" का पर्याप्त स्टॉक नहीं है। उपलब्ध: ${Number.isFinite(currentStock) ? currentStock : 0}`);
+          }
+        });
+
+        snapshots.forEach((snapshot, index) => {
+          transaction.update(productRefs[index].ref, {
+            stock: Number(snapshot.data()?.stock ?? 0) - items[index].quantity,
+            updatedAt: serverTimestamp(),
+          });
+        });
+
+        transaction.set(saleRef, {
+          shopId: shop.id,
+          shopName: shop.name || shop.shopName || "",
+          ownerUid: user.uid,
+          customerUid: customer.uid,
+          customerPhone: customer.phone,
+          customerName: customer.name || "",
+          items,
+          subtotal,
+          discount,
+          discountType,
+          total,
+          paymentStatus: salePayment,
+          createdAt: serverTimestamp(),
+        });
+      });
+
+      setProducts((current) => current.map((product) => {
+        const soldItem = items.find((item) => item.productId === product.id);
+        return soldItem
+          ? { ...product, stock: Math.max(0, Number(product.stock || 0) - soldItem.quantity) }
+          : product;
+      }));
       const lines = items.map(i=>i.name+" x "+i.quantity+" = ₹"+(i.price*i.quantity).toFixed(2)).join("\n");
       const message = "MY ICE CREAM BILL\n"+(shop.name||shop.shopName||"Shop")+"\nCustomer: "+(customer.name||customer.phone)+"\n"+lines+"\nSubtotal: ₹"+subtotal.toFixed(2)+"\nDiscount: ₹"+discount.toFixed(2)+"\nTotal: ₹"+total.toFixed(2)+"\nPayment: "+salePayment+"\nBill: "+saleRef.id;
       const billWhatsAppUrl = "https://wa.me/91"+customer.phone+"?text="+encodeURIComponent(message);

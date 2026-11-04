@@ -149,11 +149,17 @@ service cloud.firestore {
             && resource.data.ownerUid == request.auth.uid
           );
       }
+    }
 
-      match /customers/{phoneNumber} {
+    match /customers/{phoneNumber} {
       allow get: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid)
-        || (signedIn() && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)));
+        || (signedIn()
+          && !exists(/databases/$(database)/documents/customers/$(phoneNumber))
+          && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)))
+        || (signedIn()
+          && resource.data.createdByShopId is string
+          && ownsShop(resource.data.createdByShopId));
       allow list: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid);
       allow create: if signedIn()
@@ -166,6 +172,8 @@ service cloud.firestore {
             && !exists(/databases/$(database)/documents/customers/$(phoneNumber)))
           || (request.resource.data.uid == ""
             && request.resource.data.registered == false
+            && request.resource.data.createdByShopId is string
+            && ownsShop(request.resource.data.createdByShopId)
             && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)))
         );
       allow update: if signedIn()
