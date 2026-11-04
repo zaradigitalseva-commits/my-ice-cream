@@ -42,8 +42,6 @@ service cloud.firestore {
         && data.name.size() <= 120
         && data.price is number
         && data.price >= 0
-        && data.stock is int
-        && data.stock >= 0
         && data.active is bool
         && data.category is string
         && data.description is string
@@ -51,39 +49,6 @@ service cloud.firestore {
         && (!("originalPrice" in data)
           || data.originalPrice == null
           || (data.originalPrice is number && data.originalPrice >= data.price));
-    }
-
-    function customerStockReservation(shopId, productId) {
-      let orderPath =
-        /databases/$(database)/documents/orders/$(request.resource.data.lastOrderId);
-
-      return signedIn()
-        && request.resource.data.lastOrderId is string
-        && !exists(orderPath)
-        && getAfter(orderPath).data.customerUid == request.auth.uid
-        && getAfter(orderPath).data.shopId == shopId
-        && getAfter(orderPath).data.status == "placed"
-        && getAfter(orderPath).data.stockChanges[productId]
-          == resource.data.stock - request.resource.data.stock
-        && request.resource.data.stock >= 0
-        && request.resource.data.diff(resource.data)
-          .affectedKeys()
-          .hasOnly(["stock", "lastOrderId", "updatedAt"]);
-    }
-
-    function customerStockRestore(shopId, productId) {
-      let orderPath = /databases/$(database)/documents/orders/$(request.resource.data.lastCancelledOrderId);
-      return signedIn()
-        && request.resource.data.lastCancelledOrderId is string
-        && exists(orderPath)
-        && getAfter(orderPath).data.customerUid == request.auth.uid
-        && getAfter(orderPath).data.shopId == shopId
-        && getAfter(orderPath).data.status == "cancelled"
-        && getAfter(orderPath).data.stockChanges[productId] is number
-        && request.resource.data.stock
-          == resource.data.stock + getAfter(orderPath).data.stockChanges[productId]
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["stock", "lastCancelledOrderId", "updatedAt"]);
     }
 
     match /shops/{shopId} {
@@ -140,14 +105,10 @@ service cloud.firestore {
             && validProduct(request.resource.data, shopId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "name", "description", "price", "originalPrice", "category",
-              "stock", "imageUrl", "active", "updatedAt"
+              "imageUrl", "active", "updatedAt"
             ])
           )
-          || (
-            liveShop(shopId)
-            && customerStockReservation(shopId, productId)
-          )
-          || customerStockRestore(shopId, productId);
+;
 
         allow delete: if isAdmin()
           || (
@@ -237,59 +198,6 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    function reservedOrderItem(orderData, index, orderId) {
-      let item = orderData.items[index];
-      let productPath = /databases/$(database)/documents/shops/$(orderData.shopId)/products/$(item.productId);
-      return item.productId is string
-        && item.quantity is int
-        && item.quantity > 0
-        && orderData.stockChanges[item.productId] == item.quantity
-        && exists(productPath)
-        && getAfter(productPath).data.lastOrderId == orderId;
-    }
-
-    function allOrderItemsReserved(orderData, orderId) {
-      return orderData.items is list
-        && orderData.items.size() > 0
-        && orderData.items.size() <= 10
-        && reservedOrderItem(orderData, 0, orderId)
-        && (orderData.items.size() < 2 || reservedOrderItem(orderData, 1, orderId))
-        && (orderData.items.size() < 3 || reservedOrderItem(orderData, 2, orderId))
-        && (orderData.items.size() < 4 || reservedOrderItem(orderData, 3, orderId))
-        && (orderData.items.size() < 5 || reservedOrderItem(orderData, 4, orderId))
-        && (orderData.items.size() < 6 || reservedOrderItem(orderData, 5, orderId))
-        && (orderData.items.size() < 7 || reservedOrderItem(orderData, 6, orderId))
-        && (orderData.items.size() < 8 || reservedOrderItem(orderData, 7, orderId))
-        && (orderData.items.size() < 9 || reservedOrderItem(orderData, 8, orderId))
-        && (orderData.items.size() < 10 || reservedOrderItem(orderData, 9, orderId));
-    }
-    function restoredOrderItem(orderData, index, orderId) {
-      let item = orderData.items[index];
-      let productPath = /databases/$(database)/documents/shops/$(orderData.shopId)/products/$(item.productId);
-      return item.productId is string
-        && item.quantity is int
-        && item.quantity > 0
-        && orderData.stockChanges[item.productId] == item.quantity
-        && exists(productPath)
-        && getAfter(productPath).data.lastCancelledOrderId == orderId;
-    }
-
-    function allOrderItemsRestored(orderData, orderId) {
-      return orderData.items is list
-        && orderData.items.size() > 0
-        && orderData.items.size() <= 10
-        && restoredOrderItem(orderData, 0, orderId)
-        && (orderData.items.size() < 2 || restoredOrderItem(orderData, 1, orderId))
-        && (orderData.items.size() < 3 || restoredOrderItem(orderData, 2, orderId))
-        && (orderData.items.size() < 4 || restoredOrderItem(orderData, 3, orderId))
-        && (orderData.items.size() < 5 || restoredOrderItem(orderData, 4, orderId))
-        && (orderData.items.size() < 6 || restoredOrderItem(orderData, 5, orderId))
-        && (orderData.items.size() < 7 || restoredOrderItem(orderData, 6, orderId))
-        && (orderData.items.size() < 8 || restoredOrderItem(orderData, 7, orderId))
-        && (orderData.items.size() < 9 || restoredOrderItem(orderData, 8, orderId))
-        && (orderData.items.size() < 10 || restoredOrderItem(orderData, 9, orderId));
-    }
-
     match /orders/{orderId} {
 
       allow create: if signedIn()
@@ -302,10 +210,7 @@ service cloud.firestore {
         && request.resource.data.total >= 0
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
-        && request.resource.data.items.size() <= 10
-        && request.resource.data.stockChanges is map
-        && request.resource.data.stockChanges.keys().size() == request.resource.data.items.size()
-        && allOrderItemsReserved(request.resource.data, orderId);
+        && request.resource.data.items.size() <= 100;
 
       allow read: if isAdmin()
         || (
@@ -354,7 +259,6 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data)
             .affectedKeys()
             .hasOnly(["status", "updatedAt"])
-          && allOrderItemsRestored(resource.data, orderId)
         );
 
       allow delete: if isAdmin();
