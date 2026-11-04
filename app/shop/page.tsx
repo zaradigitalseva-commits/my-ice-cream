@@ -108,6 +108,22 @@ export default function ShopPage() {
     finally { setCustomerLoading(false); }
   }
 
+  function sendOfferOnWhatsApp() {
+    if (!customer || !shop) return;
+    if (!offerTitle.trim() && !offerDescription.trim()) {
+      setCustomerMessage("पहले दुकान के डैशबोर्ड में Offer title या Offer description सेव करें।");
+      return;
+    }
+    const message = "🎉 SPECIAL OFFER – " + (shop.name || shop.shopName || "My Ice Cream") +
+      "\\nनमस्ते " + (customer.name || "जी") + "!" +
+      "\\n" + offerTitle.trim() +
+      (offerDescription.trim() ? "\\n" + offerDescription.trim() : "") +
+      (offerExpiresAt ? "\\nValid till: " + offerExpiresAt : "") +
+      "\\nदुकान पर आइए और इस ऑफर का लाभ उठाइए!";
+    const url = "https://wa.me/91" + customer.phone + "?text=" + encodeURIComponent(message);
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   async function createWalkInSale() {
     if (!db || !shop || !user || !customer) return;
     const items = products.filter(p => Number(saleQty[p.id] || 0) > 0).map(p => ({ productId:p.id, name:p.name || "Product", quantity:Number(saleQty[p.id]), price:Number(p.price || 0) }));
@@ -263,7 +279,7 @@ export default function ShopPage() {
           </form>
           {customerMessage && <p className={customerFound?"admin-success":"admin-muted"} role="status">{customerMessage}</p>}
           {customerFound && customer && <>
-            <h3>{customer.name || "ग्राहक"} · {customer.phone}</h3>
+            <h3>{customer.name || "ग्राहक"} · {customer.phone}</h3>\n            <button type="button" className="admin-primary" onClick={sendOfferOnWhatsApp}>WhatsApp पर ऑफर भेजें</button>
             <h3>इस दुकान की पुरानी खरीदारी</h3>
             {customerOrders.length===0?<p className="admin-muted">इस दुकान से अभी कोई खरीदारी नहीं हुई।</p>:customerOrders.map(o=><p key={o.id}>{(o.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")} · ₹{Number(o.total||0).toFixed(2)} · {o.paymentStatus||"unpaid"}</p>)}
             <h3>नया बिल</h3>
