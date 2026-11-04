@@ -237,6 +237,33 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    function reservedOrderItem(orderData, index, orderId) {
+      let item = orderData.items[index];
+      let productPath = /databases/$(database)/documents/shops/$(orderData.shopId)/products/$(item.productId);
+      return item.productId is string
+        && item.quantity is int
+        && item.quantity > 0
+        && orderData.stockChanges[item.productId] == item.quantity
+        && exists(productPath)
+        && getAfter(productPath).data.lastOrderId == orderId
+        && get(productPath).data.stock - getAfter(productPath).data.stock == item.quantity;
+    }
+
+    function allOrderItemsReserved(orderData, orderId) {
+      return orderData.items is list
+        && orderData.items.size() > 0
+        && orderData.items.size() <= 10
+        && reservedOrderItem(orderData, 0, orderId)
+        && (orderData.items.size() < 2 || reservedOrderItem(orderData, 1, orderId))
+        && (orderData.items.size() < 3 || reservedOrderItem(orderData, 2, orderId))
+        && (orderData.items.size() < 4 || reservedOrderItem(orderData, 3, orderId))
+        && (orderData.items.size() < 5 || reservedOrderItem(orderData, 4, orderId))
+        && (orderData.items.size() < 6 || reservedOrderItem(orderData, 5, orderId))
+        && (orderData.items.size() < 7 || reservedOrderItem(orderData, 6, orderId))
+        && (orderData.items.size() < 8 || reservedOrderItem(orderData, 7, orderId))
+        && (orderData.items.size() < 9 || reservedOrderItem(orderData, 8, orderId))
+        && (orderData.items.size() < 10 || reservedOrderItem(orderData, 9, orderId));
+    }
     function restoredOrderItem(orderData, index, orderId) {
       let item = orderData.items[index];
       let productPath = /databases/$(database)/documents/shops/$(orderData.shopId)/products/$(item.productId);
@@ -279,6 +306,7 @@ service cloud.firestore {
         && request.resource.data.items.size() > 0
         && request.resource.data.items.size() <= 10
         && request.resource.data.stockChanges is map;
+        && allOrderItemsReserved(request.resource.data, orderId);
 
       allow read: if isAdmin()
         || (
