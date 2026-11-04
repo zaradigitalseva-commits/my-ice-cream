@@ -79,6 +79,12 @@ export default function AdminPage() {
     if (!db) return;
     setNotice(""); setError("");
     try {
+      if (status === "live") {
+        const expiry = shop.subscriptionExpiresAt?.toDate?.() as Date | undefined;
+        if (shop.subscriptionStatus !== "active" || !expiry || expiry.getTime() <= Date.now()) {
+          throw new Error("₹299 subscription verify नहीं है या expire हो चुका है। पहले Subscription Payments में payment verify करें।");
+        }
+      }
       await updateDoc(doc(db, "shops", shop.id), { status, updatedAt: new Date() });
       setShops((current) => current.map((item) => item.id === shop.id ? { ...item, status } : item));
       setNotice(`${shop.name || shop.shopName || "Shop"} status changed to ${status.toUpperCase()}.`);
