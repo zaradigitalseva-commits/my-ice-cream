@@ -177,7 +177,7 @@ service cloud.firestore {
           && request.resource.data.shopId == resource.data.shopId
           && request.resource.data.diff(resource.data)
             .affectedKeys()
-            .hasOnly(["status", "paymentStatus", "updatedAt"])
+            .hasOnly(["status", "updatedAt"])
         )
         || (
           signedIn()
