@@ -94,7 +94,7 @@ export default function ShopPage() {
     if (!db || !shop) return;
     const digits = customerPhone.replace(/\D/g, "");
     if (!/^\d{10}$/.test(digits)) { setCustomerMessage("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।"); return; }
-    setCustomerLoading(true); setCustomerMessage(""); setCustomer(null); setCustomerOrders([]); setCustomerFound(false); setSaleQty({});
+    setCustomerLoading(true); setCustomerMessage(""); setCustomer(null); setCustomerOrders([]); setCustomerFound(false); setSaleQty({}); setWhatsAppUrl("");
     try {
       const customerSnap = await getDoc(doc(db, "customers", digits));
       if (!customerSnap.exists()) { setCustomerMessage("यह मोबाइल नंबर ग्राहक Google खाते में रजिस्टर नहीं है। ग्राहक से पहले अपने खाते में नाम और मोबाइल सेव करवाएँ।"); return; }
@@ -272,7 +272,7 @@ export default function ShopPage() {
               <label>Discount type<select value={discountType} onChange={e=>setDiscountType(e.target.value as "amount"|"percent")}><option value="amount">₹ Amount</option><option value="percent">Percent (%)</option></select></label>
               <label>Discount<input type="number" min="0" step="0.01" value={discountValue} onChange={e=>setDiscountValue(e.target.value)}/></label>
               <label>Payment status<select value={salePayment} onChange={e=>setSalePayment(e.target.value as "paid"|"unpaid")}><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select></label>
-              <button type="button" className="admin-primary" disabled={customerBusy||products.length===0} onClick={()=>void createWalkInSale()}>{customerBusy?"बिल सेव हो रहा है…":"बिल सेव करें और WhatsApp पर भेजें"}</button>
+              <button type="button" className="admin-primary" disabled={customerBusy||products.length===0} onClick={()=>void createWalkInSale()}>{customerBusy?"बिल सेव हो रहा है…":"बिल सेव करें"}</button>\n              {whatsAppUrl && <a className="admin-primary role-link" href={whatsAppUrl} target="_blank" rel="noopener noreferrer">WhatsApp पर बिल भेजें</a>}
             </div>
           </>}
         </section>
