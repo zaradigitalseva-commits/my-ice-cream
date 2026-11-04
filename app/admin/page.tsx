@@ -7,7 +7,7 @@ import { collection, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc,
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
-type Shop = { id: string; name?: string; shopName?: string; ownerName?: string; ownerEmail?: string; ownerUid?: string; status?: string; phone?: string; mobile?: string; mobileNumber?: string; city?: string; address?: string; fullAddress?: string; shopAddress?: string; location?: string; landmark?: string; description?: string; about?: string; subscriptionStatus?: string; subscriptionExpiresAt?: Timestamp | Date | { toDate?: () => Date }; createdAt?: Timestamp | Date | string };
+type Shop = { id: string; name?: string; shopName?: string; ownerName?: string; ownerEmail?: string; ownerUid?: string; status?: string; phone?: string; mobile?: string; mobileNumber?: string; city?: string; address?: string; fullAddress?: string; shopAddress?: string; location?: string; landmark?: string; description?: string; about?: string; subscriptionStatus?: string; subscriptionExpiresAt?: Timestamp; createdAt?: Timestamp | Date | string };
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
