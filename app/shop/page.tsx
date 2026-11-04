@@ -101,7 +101,7 @@ export default function ShopPage() {
       const data = customerSnap.data();
       setCustomer({ id: customerSnap.id, phone: digits, uid: String(data.uid), name: String(data.name || "") });
       setCustomerFound(true);
-      const salesResult = await getDocs(query(collection(db, "sales"), where("shopId", "==", shop.id), where("customerPhone", "==", digits)));
+      const salesResult = await getDocs(query(collection(db, "sales"), where("shopId", "==", shop.id), where("ownerUid", "==", user?.uid || ""), where("customerPhone", "==", digits)));
       setCustomerOrders(salesResult.docs.map(d => ({ id:d.id, ...d.data() } as CustomerOrder)).sort((x,y)=>(y.createdAt?.toDate?.().getTime()||0)-(x.createdAt?.toDate?.().getTime()||0)));
       setCustomerMessage("ग्राहक मिल गया। अब बिल बना सकते हैं।");
     } catch (e) { setCustomerMessage(e instanceof Error ? e.message : "ग्राहक की जानकारी नहीं मिल सकी।"); }
