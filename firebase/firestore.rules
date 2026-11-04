@@ -137,7 +137,8 @@ service cloud.firestore {
         && (
           (request.resource.data.uid == request.auth.uid
             && request.auth.token.phone_number is string
-            && request.auth.token.phone_number.matches('.*' + phoneNumber + '
+            && request.auth.token.phone_number.matches('.*' + phoneNumber + '$')
+            && !exists(/databases/$(database)/documents/customers/$(phoneNumber)))
           || (request.resource.data.uid == ""
             && request.resource.data.registered == false
             && request.resource.data.createdByShopId is string
@@ -150,15 +151,19 @@ service cloud.firestore {
           (resource.data.uid == request.auth.uid
             && request.resource.data.uid == request.auth.uid
             && request.auth.token.phone_number is string
-            && request.auth.token.phone_number.matches('.*' + phoneNumber + '
+            && request.auth.token.phone_number.matches('.*' + phoneNumber + '$')
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(["name", "email", "updatedAt", "registered"]))
           || (resource.data.uid == ""
             && request.resource.data.uid == request.auth.uid
             && request.auth.token.phone_number is string
-            && request.auth.token.phone_number.matches('.*' + phoneNumber + '
+            && request.auth.token.phone_number.matches('.*' + phoneNumber + '$')
+            && request.resource.data.registered == true
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(["uid", "name", "email", "registered", "updatedAt"]))
         );
       allow delete: if isAdmin();
     }
-
     match /sales/{saleId} {
       allow read: if isAdmin()
         || (signedIn() && resource.data.customerUid == request.auth.uid)
