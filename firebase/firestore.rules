@@ -46,6 +46,21 @@ service cloud.firestore {
           .hasOnly(["stock", "lastOrderId", "updatedAt"]);
     }
 
+    function customerStockRestore(shopId, productId) {
+      let orderPath = /databases/$(database)/documents/orders/$(resource.data.lastOrderId);
+      return signedIn()
+        && resource.data.lastOrderId is string
+        && exists(orderPath)
+        && getAfter(orderPath).data.customerUid == request.auth.uid
+        && getAfter(orderPath).data.shopId == shopId
+        && getAfter(orderPath).data.status == "cancelled"
+        && getAfter(orderPath).data.stockChanges[productId] is number
+        && request.resource.data.stock
+          == resource.data.stock + getAfter(orderPath).data.stockChanges[productId]
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["stock", "updatedAt"]);
+    }
+
     match /shops/{shopId} {
 
       allow read: if isAdmin()
@@ -104,7 +119,8 @@ service cloud.firestore {
           || (
             liveShop(shopId)
             && customerStockReservation(shopId, productId)
-          );
+          )
+          || customerStockRestore(shopId, productId);
 
         allow delete: if isAdmin()
           || (
