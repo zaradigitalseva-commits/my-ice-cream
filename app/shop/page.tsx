@@ -142,11 +142,11 @@ export default function ShopPage() {
       return;
     }
     const message = "🎉 SPECIAL OFFER – " + (shop.name || shop.shopName || "My Ice Cream") +
-      "\\nनमस्ते " + (customer.name || "जी") + "!" +
-      "\\n" + offerTitle.trim() +
-      (offerDescription.trim() ? "\\n" + offerDescription.trim() : "") +
-      (offerExpiresAt ? "\\nValid till: " + offerExpiresAt : "") +
-      "\\nदुकान पर आइए और इस ऑफर का लाभ उठाइए!";
+      "\nनमस्ते " + (customer.name || "जी") + "!" +
+      "\n" + offerTitle.trim() +
+      (offerDescription.trim() ? "\n" + offerDescription.trim() : "") +
+      (offerExpiresAt ? "\nValid till: " + offerExpiresAt : "") +
+      "\nदुकान पर आइए और इस ऑफर का लाभ उठाइए!";
     const url = "https://wa.me/91" + customer.phone + "?text=" + encodeURIComponent(message);
     window.open(url, "_blank", "noopener,noreferrer");
   }
