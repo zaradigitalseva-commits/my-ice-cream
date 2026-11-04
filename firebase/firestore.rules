@@ -245,8 +245,7 @@ service cloud.firestore {
         && item.quantity > 0
         && orderData.stockChanges[item.productId] == item.quantity
         && exists(productPath)
-        && getAfter(productPath).data.lastOrderId == orderId
-        && get(productPath).data.stock - getAfter(productPath).data.stock == item.quantity;
+        && getAfter(productPath).data.lastOrderId == orderId;
     }
 
     function allOrderItemsReserved(orderData, orderId) {
@@ -272,8 +271,7 @@ service cloud.firestore {
         && item.quantity > 0
         && orderData.stockChanges[item.productId] == item.quantity
         && exists(productPath)
-        && getAfter(productPath).data.lastCancelledOrderId == orderId
-        && getAfter(productPath).data.stock == get(productPath).data.stock + item.quantity;
+        && getAfter(productPath).data.lastCancelledOrderId == orderId;
     }
 
     function allOrderItemsRestored(orderData, orderId) {
@@ -305,7 +303,8 @@ service cloud.firestore {
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
         && request.resource.data.items.size() <= 10
-        && request.resource.data.stockChanges is map;
+        && request.resource.data.stockChanges is map
+        && request.resource.data.stockChanges.keys().size() == request.resource.data.items.size()
         && allOrderItemsReserved(request.resource.data, orderId);
 
       allow read: if isAdmin()
