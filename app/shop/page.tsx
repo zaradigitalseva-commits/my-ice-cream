@@ -183,7 +183,7 @@ export default function ShopPage() {
 
         snapshots.forEach((snapshot, index) => {
           transaction.update(productRefs[index].ref, {
-            stock: Number(snapshot.data().stock) - items[index].quantity,
+            stock: Number(snapshot.data()?.stock ?? 0) - items[index].quantity,
             updatedAt: serverTimestamp(),
           });
         });
