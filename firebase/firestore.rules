@@ -106,9 +106,7 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "name", "description", "price", "originalPrice", "category",
               "imageUrl", "active", "updatedAt"
-            ])
-          )
-        );
+            ]);
 
         allow delete: if isAdmin()
           || (
