@@ -100,18 +100,7 @@ export default function HomePage() {
         <button className="login-button" onClick={handleAuth} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
       </div>
     </header>
-    <section className="hero">
-      <div><span className="eyebrow">A little happiness, near you</span>
-        <h1 className="hero-scoop-title"><span className="scoop-line scoop-line-one">Your next</span><span className="scoop-line scoop-line-two">favourite scoop</span><span className="scoop-line scoop-line-three">is waiting.</span></h1>
-        <p className="hero-copy">Discover neighbourhood ice-cream shops, explore delicious treats and find something sweet for every celebration.</p>
-        <div className="pills"><span className="pill active">🍨 Discover treats</span><span className="pill">🎉 Party & bulk orders</span><span className="pill">🏪 Local ice-cream shops</span></div>
-        <button className="primary-button" onClick={() => document.getElementById("discover")?.scrollIntoView({behavior:"smooth"})}>Explore the marketplace</button>
-        <div className="status" aria-live="polite">{user ? <>Signed in as {user.displayName || user.email}{adminAccount ? " · Admin account recognized" : " · Customer account"}</> : message}</div>
-      </div>
-      <div className="hero-art" aria-label="Ice cream illustration"><div className="icecream-emoji">🍦</div><div className="art-note">Made for every sweet moment ✨</div></div>
-    </section>
     <section id="discover">
-      <div className="section-head"><div><h2>Find your kind of sweet</h2><p>Browse all approved LIVE shops freely. Login is needed only for account features.</p></div></div>
       <div className="marketplace-tools"><label className="marketplace-search"><span>Search shops</span><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Shop name, city or category" /></label><div className="pills" aria-label="Shop categories">{categories.map((category)=><button type="button" className={activeCategory===category?"pill active":"pill"} key={category} aria-pressed={activeCategory===category} onClick={()=>setActiveCategory(category)}>{category}</button>)}</div></div>
 
       <div className="shop-list-heading"><h2>All Products</h2><span>{marketProducts.filter((product) => {
