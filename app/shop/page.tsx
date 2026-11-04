@@ -330,7 +330,7 @@ export default function ShopPage() {
             {customerOrders.length===0?<p className="admin-muted">इस दुकान से अभी कोई खरीदारी नहीं हुई।</p>:customerOrders.map(o=><p key={o.id}>{(o.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")} · ₹{Number(o.total||0).toFixed(2)} · {o.paymentStatus||"unpaid"}</p>)}
             <h3>नया बिल</h3>
             <div className="register-form">
-              {products.filter(p=>p.active!==false).map(p=><label key={p.id}>{p.name} · ₹{Number(p.price||0).toFixed(2)}<input type="number" min="0" max={Number(p.stock||0)} step="1" value={saleQty[p.id]||0} onChange={e=>setSaleQty(v=>({...v,[p.id]:Math.max(0,Number(e.target.value)||0)}))}/></label>)}
+              {products.filter(p=>p.active!==false).map(p=><label key={p.id}>{p.name} · ₹{Number(p.price||0).toFixed(2)}<input type="number" min="0" step="1" value={saleQty[p.id]||0} onChange={e=>setSaleQty(v=>({...v,[p.id]:Math.max(0,Number(e.target.value)||0)}))}/></label>)}
               <label>Discount type<select value={discountType} onChange={e=>setDiscountType(e.target.value as "amount"|"percent")}><option value="amount">₹ Amount</option><option value="percent">Percent (%)</option></select></label>
               <label>Discount<input type="number" min="0" step="0.01" value={discountValue} onChange={e=>setDiscountValue(e.target.value)}/></label>
               <label>Payment status<select value={salePayment} onChange={e=>setSalePayment(e.target.value as "paid"|"unpaid")}><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select></label>
