@@ -191,6 +191,12 @@ service cloud.firestore {
           && ownsShop(resource.data.shopId)
           && request.resource.data.customerUid == resource.data.customerUid
           && request.resource.data.shopId == resource.data.shopId
+          && (
+            (resource.data.status == "placed" && request.resource.data.status == "accepted")
+            || (resource.data.status == "accepted" && request.resource.data.status == "preparing")
+            || (resource.data.status == "preparing" && request.resource.data.status == "ready")
+            || (resource.data.status == "ready" && request.resource.data.status == "completed")
+          )
           && request.resource.data.diff(resource.data)
             .affectedKeys()
             .hasOnly(["status", "updatedAt"])
