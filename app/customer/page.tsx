@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { collection, doc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore/lite";
+import { collection, doc, getDocs, query, runTransaction, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
