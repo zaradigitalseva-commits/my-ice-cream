@@ -66,6 +66,7 @@ export default function ShopPage() {
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
   const [salePayment, setSalePayment] = useState<"paid" | "unpaid">("paid");
   const [showShopDashboard, setShowShopDashboard] = useState(false);
+  const [whatsAppUrl, setWhatsAppUrl] = useState("");
 
   async function loadProducts(shopId: string) {
     if (!db) return;
@@ -163,7 +164,9 @@ export default function ShopPage() {
       const saleRef = await addDoc(collection(db,"sales"),{shopId:shop.id,shopName:shop.name||shop.shopName||"",ownerUid:user.uid,customerUid:customer.uid,customerPhone:customer.phone,customerName:customer.name||"",items,subtotal,discount,discountType,total,paymentStatus:salePayment,createdAt:serverTimestamp()});
       const lines = items.map(i=>i.name+" x "+i.quantity+" = ₹"+(i.price*i.quantity).toFixed(2)).join("\n");
       const message = "MY ICE CREAM BILL\n"+(shop.name||shop.shopName||"Shop")+"\nCustomer: "+(customer.name||customer.phone)+"\n"+lines+"\nSubtotal: ₹"+subtotal.toFixed(2)+"\nDiscount: ₹"+discount.toFixed(2)+"\nTotal: ₹"+total.toFixed(2)+"\nPayment: "+salePayment+"\nBill: "+saleRef.id;
-      window.open("https://wa.me/91"+customer.phone+"?text="+encodeURIComponent(message),"_blank","noopener,noreferrer");
+      const billWhatsAppUrl = "https://wa.me/91"+customer.phone+"?text="+encodeURIComponent(message);
+      setWhatsAppUrl(billWhatsAppUrl);
+      window.open(billWhatsAppUrl,"_blank","noopener,noreferrer");
       setCustomerMessage("बिल सेव हो गया। WhatsApp share window खुल गई है।");
       setCustomerOrders(current=>[{id:saleRef.id,customerName:customer.name,customerPhone:customer.phone,total,items,paymentStatus:salePayment},...current]);
       setSaleQty({});setDiscountValue("0");
