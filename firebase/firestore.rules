@@ -47,9 +47,9 @@ service cloud.firestore {
     }
 
     function customerStockRestore(shopId, productId) {
-      let orderPath = /databases/$(database)/documents/orders/$(resource.data.lastOrderId);
+      let orderPath = /databases/$(database)/documents/orders/$(request.resource.data.lastCancelledOrderId);
       return signedIn()
-        && resource.data.lastOrderId is string
+        && request.resource.data.lastCancelledOrderId is string
         && exists(orderPath)
         && getAfter(orderPath).data.customerUid == request.auth.uid
         && getAfter(orderPath).data.shopId == shopId
@@ -58,7 +58,7 @@ service cloud.firestore {
         && request.resource.data.stock
           == resource.data.stock + getAfter(orderPath).data.stockChanges[productId]
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["stock", "updatedAt"]);
+          .hasOnly(["stock", "lastCancelledOrderId", "updatedAt"]);
     }
 
     match /shops/{shopId} {
