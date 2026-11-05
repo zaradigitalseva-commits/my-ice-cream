@@ -35,13 +35,20 @@ service cloud.firestore {
     }
 
     function validProduct(data, shopId) {
-      return data.shopId == shopId
+      return data.keys().hasOnly([
+          "shopId", "ownerUid", "name", "description", "price",
+          "originalPrice", "category", "stock", "imageUrl", "active",
+          "updatedAt", "createdAt"
+        ])
+        && data.shopId == shopId
         && data.ownerUid == request.auth.uid
         && data.name is string
         && data.name.size() > 0
         && data.name.size() <= 120
         && data.price is number
         && data.price >= 0
+        && data.stock is int
+        && data.stock >= 0
         && data.active is bool
         && data.category is string
         && data.description is string
@@ -139,7 +146,7 @@ service cloud.firestore {
             && validProduct(request.resource.data, shopId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "name", "description", "price", "originalPrice", "category",
-              "imageUrl", "active", "updatedAt"
+              "stock", "imageUrl", "active", "updatedAt"
             ])
           );
 
