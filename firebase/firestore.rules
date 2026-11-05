@@ -31,7 +31,7 @@ service cloud.firestore {
 
     function liveShop(shopId) {
       let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
-      return shop.status == "live" && (validSubscription(shop) || shop.adminActivated == true);
+      return shop.status in ["live", "LIVE", "Live"] && (validSubscription(shop) || shop.adminActivated == true);
     }
 
     function validProduct(data, shopId) {
