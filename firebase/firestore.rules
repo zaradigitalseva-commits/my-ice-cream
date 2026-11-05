@@ -31,7 +31,7 @@ service cloud.firestore {
 
     function liveShop(shopId) {
       let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
-      return shop.status == "live" && validSubscription(shop);
+      return shop.status == "live" && (validSubscription(shop) || shop.adminActivated == true);
     }
 
     function validProduct(data, shopId) {
@@ -55,17 +55,51 @@ service cloud.firestore {
 
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || (resource.data.status == "live" && validSubscription(resource.data));
+        || (resource.data.status == "live" && (validSubscription(resource.data) || resource.data.adminActivated == true));
 
+      // A shop owner may register only a pending shop.
+      // Subscription and admin-activation fields cannot be self-granted.
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.status == "pending"
+        && (
+          !("subscriptionStatus" in request.resource.data)
+          || request.resource.data.subscriptionStatus in ["inactive", "expired"]
+        )
+        && (
+          !("subscriptionExpiresAt" in request.resource.data)
+          || request.resource.data.subscriptionExpiresAt == null
+        )
+        && (
+          !("adminActivated" in request.resource.data)
+          || request.resource.data.adminActivated == false
+        )
+        && !("adminActivatedBy" in request.resource.data)
+        && !("adminActivatedAt" in request.resource.data)
         && getAfter(
           /databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)
         ).data.shopId == shopId;
 
-      allow update: if (isAdmin()
-          && (request.resource.data.status != "live" || validSubscription(request.resource.data)))
+      allow update: if (
+          isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "status", "subscriptionStatus", "subscriptionExpiresAt", "adminActivated", "adminActivatedBy", "adminActivatedAt", "updatedAt"
+          ])
+          && request.resource.data.status in ["pending", "live", "inactive", "rejected"]
+          && (
+            request.resource.data.status != "live"
+            || validSubscription(request.resource.data)
+            || (
+              request.resource.data.adminActivated == true
+              && request.resource.data.adminActivatedBy == request.auth.token.email
+              && request.resource.data.adminActivatedAt is timestamp
+            )
+          )
+          && (
+            !("subscriptionStatus" in request.resource.data)
+            || request.resource.data.subscriptionStatus in ["active", "inactive", "expired"]
+          )
+        )
         || (
           signedIn()
           && resource.data.ownerUid == request.auth.uid
@@ -119,16 +153,18 @@ service cloud.firestore {
     }
 
     match /customers/{phoneNumber} {
-      allow get: if isAdmin()
+      // Admins can read the complete customer collection for the dashboard.
+      // Customers and shop owners remain limited to their own related records.
+      allow read: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid)
-        || (signedIn()
-          && !exists(/databases/$(database)/documents/customers/$(phoneNumber))
-          && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)))
         || (signedIn()
           && resource.data.createdByShopId is string
           && ownsShop(resource.data.createdByShopId));
-      allow list: if isAdmin()
-        || (signedIn() && resource.data.uid == request.auth.uid);
+
+      // Shop owners may check a not-yet-created phone record during customer creation.
+      allow get: if signedIn()
+        && !exists(/databases/$(database)/documents/customers/$(phoneNumber))
+        && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid));
       allow create: if signedIn()
         && phoneNumber.matches('^[0-9]{10}$')
         && request.resource.data.phone == phoneNumber
@@ -136,6 +172,8 @@ service cloud.firestore {
         && request.resource.data.name.size() > 0
         && (
           (request.resource.data.uid == request.auth.uid
+            && request.auth.token.phone_number is string
+            && request.auth.token.phone_number.matches('.*' + phoneNumber + '$')
             && !exists(/databases/$(database)/documents/customers/$(phoneNumber)))
           || (request.resource.data.uid == ""
             && request.resource.data.registered == false
@@ -148,78 +186,123 @@ service cloud.firestore {
         && (
           (resource.data.uid == request.auth.uid
             && request.resource.data.uid == request.auth.uid
+            && request.auth.token.phone_number is string
+            && request.auth.token.phone_number.matches('.*' + phoneNumber + '$')
             && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(["name", "email", "updatedAt", "registered"]))
           || (resource.data.uid == ""
             && request.resource.data.uid == request.auth.uid
+            && request.auth.token.phone_number is string
+            && request.auth.token.phone_number.matches('.*' + phoneNumber + '$')
             && request.resource.data.registered == true
             && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(["uid", "name", "email", "registered", "updatedAt"]))
         );
       allow delete: if isAdmin();
     }
-
     match /sales/{saleId} {
       allow read: if isAdmin()
         || (signedIn() && resource.data.customerUid == request.auth.uid)
         || (signedIn() && resource.data.ownerUid == request.auth.uid
           && ownsShop(resource.data.shopId));
+
       allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          "shopId", "shopName", "ownerUid", "customerUid", "customerPhone",
+          "customerName", "items", "subtotal", "discount", "discountType",
+          "total", "paymentStatus", "createdAt"
+        ])
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.shopId is string
         && ownsShop(request.resource.data.shopId)
+        && liveShop(request.resource.data.shopId)
         && request.resource.data.customerPhone is string
+        && request.resource.data.customerPhone.matches('^[0-9]{10}$')
         && request.resource.data.customerUid
           == get(/databases/$(database)/documents/customers/$(request.resource.data.customerPhone)).data.uid
         && request.resource.data.shopName is string
+        && request.resource.data.customerName is string
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
-        && request.resource.data.total is number
-        && request.resource.data.total >= 0
+        && request.resource.data.items.size() <= 100
+        && request.resource.data.subtotal is number
+        && request.resource.data.subtotal >= 0
         && request.resource.data.discount is number
+        && request.resource.data.discount >= 0
+        && request.resource.data.discount <= request.resource.data.subtotal
+        && request.resource.data.discountType in ["amount", "percent"]
+        && request.resource.data.total is number
+        && request.resource.data.total == request.resource.data.subtotal - request.resource.data.discount
         && request.resource.data.paymentStatus in ["paid", "unpaid"];
+
       allow update: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid
           && ownsShop(resource.data.shopId)
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.paymentStatus == "paid"
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["paymentStatus", "updatedAt"])
-          && request.resource.data.paymentStatus in ["paid", "unpaid"]);
+            .hasOnly(["paymentStatus", "updatedAt"]));
+
       allow delete: if isAdmin();
     }
-
     match /shopOwnerLocks/{ownerUid} {
       allow read: if signedIn() && request.auth.uid == ownerUid;
       allow create: if signedIn()
         && request.auth.uid == ownerUid
         && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid))
+        && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "createdAt"])
         && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.shopId is string;
+        && request.resource.data.shopId is string
+        && request.resource.data.shopId.size() > 0;
       allow update, delete: if false;
     }
 
     match /orders/{orderId} {
-
+      // For online payments, verify product prices and cart totals in a trusted
+      // backend before accepting payment. Client-submitted totals are not proof
+      // of the correct product prices.
       allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          "shopId", "shopName", "deliveryFee", "subtotal", "customerUid",
+          "customerName", "customerEmail", "customerPhone", "fulfillmentType",
+          "deliveryAddress", "items", "total", "status", "paymentStatus", "createdAt"
+        ])
         && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.shopName is string
+        && request.resource.data.customerName is string
+        && request.resource.data.customerName.size() > 0
+        && request.resource.data.customerName.size() <= 120
+        && request.resource.data.customerEmail is string
+        && request.resource.data.customerEmail.size() <= 254
+        && request.resource.data.customerPhone is string
+        && request.resource.data.customerPhone.matches('^[0-9]{10}$')
         && request.resource.data.status == "placed"
         && request.resource.data.paymentStatus == "unpaid"
         && request.resource.data.shopId is string
         && liveShop(request.resource.data.shopId)
+        && request.resource.data.fulfillmentType in ["pickup", "delivery"]
+        && request.resource.data.subtotal is number
+        && request.resource.data.subtotal >= 0
+        && request.resource.data.deliveryFee is number
+        && request.resource.data.deliveryFee >= 0
         && request.resource.data.total is number
-        && request.resource.data.total >= 0
+        && request.resource.data.total == request.resource.data.subtotal + request.resource.data.deliveryFee
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
-        && request.resource.data.items.size() <= 100;
+        && request.resource.data.items.size() <= 100
+        && (
+          (request.resource.data.fulfillmentType == "pickup"
+            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.pickupAvailable != false
+            && request.resource.data.deliveryFee == 0)
+          || (request.resource.data.fulfillmentType == "delivery"
+            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.deliveryAvailable == true
+            && request.resource.data.deliveryAddress is string
+            && request.resource.data.deliveryAddress.size() > 0)
+        );
 
       allow read: if isAdmin()
-        || (
-          signedIn()
-          && resource.data.customerUid == request.auth.uid
-        )
-        || (
-          signedIn()
-          && ownsShop(resource.data.shopId)
-        );
+        || (signedIn() && resource.data.customerUid == request.auth.uid)
+        || (signedIn() && ownsShop(resource.data.shopId));
 
       allow update: if isAdmin()
         || (
@@ -233,8 +316,7 @@ service cloud.firestore {
             || (resource.data.status == "preparing" && request.resource.data.status == "ready")
             || (resource.data.status == "ready" && request.resource.data.status == "completed")
           )
-          && request.resource.data.diff(resource.data)
-            .affectedKeys()
+          && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(["status", "updatedAt"])
         )
         || (
@@ -255,14 +337,12 @@ service cloud.firestore {
           && resource.data.status == "placed"
           && resource.data.paymentStatus == "unpaid"
           && request.resource.data.status == "cancelled"
-          && request.resource.data.diff(resource.data)
-            .affectedKeys()
+          && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(["status", "updatedAt"])
         );
 
       allow delete: if isAdmin();
     }
-
     match /subscriptionPayments/{paymentId} {
       allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create: if signedIn()
