@@ -282,15 +282,40 @@ export default function ShopPage() {
 
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!db || !shop || !user || shop.status !== "live") return;
-    setBusy(true); setError(""); setNotice("");
-    const data = { shopId: shop.id, ownerUid: user.uid, name: productName.trim(), description: productDescription.trim(), price: Number(price), originalPrice: originalPrice.trim() ? Number(originalPrice) : null, category: productCategory, imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
+    setError(""); setNotice("");
+    if (!db || !shop || !user) {
+      setError("Shop login/session nahi mila. Please sign in karke dobara try karein.");
+      return;
+    }
+    if ((shop.status || "").toLowerCase() !== "live") {
+      setError("Product add karne ke liye shop ka status LIVE hona zaroori hai.");
+      return;
+    }
+    const cleanName = productName.trim();
+    const sellingPrice = Number(price);
+    const comparePrice = originalPrice.trim() ? Number(originalPrice) : null;
+    if (!cleanName || !price.trim() || !Number.isFinite(sellingPrice) || sellingPrice < 0) {
+      setError("Product name aur valid selling price zaroor bharein.");
+      return;
+    }
+    if (comparePrice !== null && (!Number.isFinite(comparePrice) || comparePrice < sellingPrice)) {
+      setError("Original price, selling price ke barabar ya usse zyada hona chahiye.");
+      return;
+    }
+    setBusy(true);
+    setNotice("Product save ho raha hai…");
+    const data = { shopId: shop.id, ownerUid: user.uid, name: cleanName, description: productDescription.trim(), price: sellingPrice, originalPrice: comparePrice, category: productCategory, imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
     try {
       if (productId) await updateDoc(doc(db, "shops", shop.id, "products", productId), data);
       else await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
-      await loadProducts(shop.id); resetProduct(); setNotice(productId ? "Product updated." : "Product added.");
-    } catch (e) { setError(e instanceof Error ? e.message : "Product could not be saved."); }
-    finally { setBusy(false); }
+      await loadProducts(shop.id); resetProduct(); setNotice(productId ? "Product updated." : "Product added successfully.");
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : "Unknown error";
+      setError(detail.includes("permission") || detail.includes("Permission")
+        ? "Firebase permission denied. Shop LIVE/subscription status aur published Firestore Rules check karni hongi."
+        : "Product save nahi hua: " + detail);
+      setNotice("");
+    } finally { setBusy(false); }
   }
 
   async function removeProduct(id: string) {
@@ -366,7 +391,7 @@ export default function ShopPage() {
             <label>Original price (₹, optional)<input type="number" min="0" step="0.01" value={originalPrice} onChange={e=>setOriginalPrice(e.target.value)} /></label>
             <label><input type="checkbox" checked={productActive} onChange={e=>setProductActive(e.target.checked)} /> Show this product to customers</label>
             <label>Product photo (auto-compressed to WebP)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProductImage(file);}} /></label>{imageUrl && <div><img src={imageUrl} alt="Product preview" style={{maxWidth:140,maxHeight:100,borderRadius:12}}/><button type="button" className="admin-secondary small" onClick={()=>setImageUrl("")}>Remove photo</button></div>}{imageBusy && <p className="admin-muted">Compressing image…</p>}
-            <div><button className="admin-primary" disabled={busy||imageBusy}>{productId ? "Update product" : "Add product"}</button>{productId && <button type="button" className="admin-secondary" onClick={resetProduct}>Cancel edit</button>}</div>
+            <div><button type="submit" className="admin-primary" disabled={busy||imageBusy}>{busy ? "Saving product…" : productId ? "Update product" : "Add product"}</button>{productId && <button type="button" className="admin-secondary" onClick={resetProduct}>Cancel edit</button>}</div>
           </form>
           <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Price</th><th>Visibility</th><th>Actions</th></tr></thead><tbody>
             {products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.description || ""}</small></td><td>₹{Number(p.price || 0).toFixed(2)}{p.originalPrice && p.originalPrice>Number(p.price||0) ? <small><s>₹{Number(p.originalPrice).toFixed(2)}</s></small> : null}</td><td><span className={"admin-status "+(p.active===false?"inactive":"live")}>{p.active===false?"Hidden":"Visible"}</span></td><td className="admin-actions"><button className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setOriginalPrice(String(p.originalPrice??""));setProductCategory(p.category||"Ice cream");setImageUrl(p.imageUrl||"");setProductActive(p.active!==false);}}>Edit</button><button className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td></tr>)}
