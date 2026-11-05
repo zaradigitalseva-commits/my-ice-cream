@@ -5,6 +5,31 @@ import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
+async function compressImage(file: File, maxWidth: number, maxHeight: number, maxBytes: number): Promise<string> {
+  const source = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image could not be opened.")); };
+    image.src = url;
+  });
+  const scale = Math.min(1, maxWidth / source.width, maxHeight / source.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(source.width * scale));
+  canvas.height = Math.max(1, Math.round(source.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Image compression is not supported in this browser.");
+  context.drawImage(source, 0, 0, canvas.width, canvas.height);
+  let quality = 0.82;
+  let result = canvas.toDataURL("image/webp", quality);
+  while (result.length * 0.75 > maxBytes && quality > 0.35) {
+    quality -= 0.08;
+    result = canvas.toDataURL("image/webp", quality);
+  }
+  if (result.length * 0.75 > maxBytes) throw new Error("Image is too large. Please choose a smaller image.");
+  return result;
+}
+
 export default function ShopRegisterPage() {
   const [user, setUser] = useState<User | null>(null);
   const [name, setName] = useState("");
@@ -12,9 +37,24 @@ export default function ShopRegisterPage() {
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
+  const [imageBusy, setImageBusy] = useState<"logo" | "banner" | "">("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   useEffect(() => { if (!auth) return; return onAuthStateChanged(auth, setUser); }, []);
+
+  async function chooseImage(file: File | undefined, kind: "logo" | "banner") {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setMessage("कृपया PNG, JPG या WebP image चुनें।"); return; }
+    setImageBusy(kind); setMessage("");
+    try {
+      const data = await compressImage(file, kind === "logo" ? 500 : 1200, kind === "logo" ? 500 : 650, kind === "logo" ? 90 * 1024 : 220 * 1024);
+      if (kind === "logo") setLogoUrl(data); else setBannerUrl(data);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Image upload could not be completed.");
+    } finally { setImageBusy(""); }
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,12 +70,13 @@ export default function ShopRegisterPage() {
         name: name.trim(), shopName: name.trim(), ownerUid: user.uid,
         ownerName: user.displayName || "", ownerEmail: user.email || "",
         phone: phone.trim(), city: city.trim(), address: address.trim(),
-        description: description.trim(), status: "pending", createdAt: serverTimestamp()
+        description: description.trim(), logoUrl, bannerUrl,
+        status: "pending", createdAt: serverTimestamp()
       });
       batch.set(lockRef, { ownerUid: user.uid, shopId: shopRef.id, createdAt: serverTimestamp() });
       await batch.commit();
       setMessage("Registration submitted. Your shop is PENDING until Admin reviews and approves it.");
-      setName(""); setPhone(""); setCity(""); setAddress(""); setDescription("");
+      setName(""); setPhone(""); setCity(""); setAddress(""); setDescription(""); setLogoUrl(""); setBannerUrl("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Registration could not be submitted.");
     } finally { setBusy(false); }
@@ -67,8 +108,13 @@ export default function ShopRegisterPage() {
           <label><span>📍 City</span><input required value={city} onChange={(e) => setCity(e.target.value)} placeholder="Your city" /></label>
           <label className="register-field-wide"><span>🗺️ Full address</span><input required value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Shop number, area, landmark..." /></label>
           <label className="register-field-wide"><span>💬 About your shop <small>(optional)</small></span><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell customers what makes your ice cream special..." rows={3} /></label>
+          <div className="register-field-wide register-image-fields">
+            <label><span>🖼️ Shop logo <small>(optional)</small></span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={!!imageBusy || busy} onChange={(e) => void chooseImage(e.target.files?.[0], "logo")} />{imageBusy === "logo" && <small>Logo compress ho raha hai…</small>}{logoUrl && <img className="register-image-preview" src={logoUrl} alt="Shop logo preview" />} {logoUrl && <button type="button" className="admin-secondary small" onClick={() => setLogoUrl("")}>Logo remove</button>}</label>
+            <label><span>🌄 Shop banner <small>(optional)</small></span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={!!imageBusy || busy} onChange={(e) => void chooseImage(e.target.files?.[0], "banner")} />{imageBusy === "banner" && <small>Banner compress ho raha hai…</small>}{bannerUrl && <img className="register-image-preview register-banner-preview" src={bannerUrl} alt="Shop banner preview" />} {bannerUrl && <button type="button" className="admin-secondary small" onClick={() => setBannerUrl("")}>Banner remove</button>}</label>
+            <small>Images automatically WebP mein compress hongi. Logo max 90 KB aur banner max 220 KB. Firebase Storage ki zaroorat nahi.</small>
+          </div>
         </div>
-        <button className="register-submit" disabled={busy}>{busy ? "Submitting…" : "Submit for Admin Approval  →"}</button>
+        <button className="register-submit" disabled={busy || !!imageBusy}>{busy ? "Submitting…" : "Submit for Admin Approval  →"}</button>
         <p className="register-approval-note">🔒 Your shop will be visible to customers only after Admin approval.</p>
       </form>}
       {message && <p className="admin-success register-message" role="status">{message}</p>}
