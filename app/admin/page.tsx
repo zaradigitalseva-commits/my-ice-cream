@@ -16,6 +16,7 @@ export default function AdminPage() {
   const [customers, setCustomers] = useState<{id:string;name?:string;phone?:string;email?:string;uid?:string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [customerError, setCustomerError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -34,10 +35,18 @@ export default function AdminPage() {
     try {
       const result = await getDocs(query(collection(db, "shops"), orderBy("createdAt", "desc")));
       setShops(result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "दुकानों की सूची लोड नहीं हो सकी।");
+      setLoading(false);
+      return;
+    }
+    try {
       const customerResult = await getDocs(collection(db, "customers"));
       setCustomers(customerResult.docs.map((item) => ({ id: item.id, ...item.data() } as {id:string;name?:string;phone?:string;email?:string;uid?:string})));
+      setCustomerError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load shops. Check Firestore rules and database setup.");
+      setCustomers([]);
+      setCustomerError(err instanceof Error ? err.message : "ग्राहकों की सूची पढ़ने की अनुमति नहीं है।");
     } finally { setLoading(false); }
   }
 
@@ -82,7 +91,7 @@ export default function AdminPage() {
       if (status === "live") {
         const expiry = shop.subscriptionExpiresAt?.toDate?.() as Date | undefined;
         if (shop.subscriptionStatus !== "active" || !expiry || expiry.getTime() <= Date.now()) {
-          throw new Error("₹299 subscription verify नहीं है या expire हो चुका है। पहले Subscription Payments में payment verify करें।");
+          throw new Error("यह दुकान अभी प्रकाशित नहीं हो सकती। पहले Subscription payments में ₹299 का भुगतान Verify & activate करें।");
         }
       }
       await updateDoc(doc(db, "shops", shop.id), { status, updatedAt: new Date() });
@@ -122,11 +131,12 @@ export default function AdminPage() {
       </div><small className="admin-muted">PNG, JPG या WebP image चुनें, फिर “लोगो सेव करें” दबाएँ। लोगो अपने-आप छोटा करके सेव होगा।</small>
     </section><section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
-    <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>सभी ग्राहक रिकॉर्ड — ऐप से जुड़े और दुकानदार द्वारा बनाए गए।</p></div><span className="admin-count">{customers.length} customers</span></div><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>नाम</th><th>मोबाइल</th><th>ईमेल</th><th>स्थिति</th></tr></thead><tbody>{customers.map((customer)=><tr key={customer.id}><td>{customer.name||"—"}</td><td>{customer.phone||customer.id}</td><td>{customer.email||"—"}</td><td>{customer.uid?"App account linked":"Shop-created record"}</td></tr>)}</tbody></table></div></section>
+    <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>सभी ग्राहक रिकॉर्ड — ऐप से जुड़े और दुकानदार द्वारा बनाए गए।</p></div><span className="admin-count">{customers.length} customers</span></div>
+      {customerError && <p className="admin-error" role="alert">ग्राहक सूची लोड नहीं हुई: {customerError} · Firebase Console में सही Firestore Rules प्रकाशित हैं या नहीं जाँचें। दुकानें और बाकी Admin dashboard इससे अलग काम करते रहेंगे।</p>}<div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>नाम</th><th>मोबाइल</th><th>ईमेल</th><th>स्थिति</th></tr></thead><tbody>{customers.map((customer)=><tr key={customer.id}><td>{customer.name||"—"}</td><td>{customer.phone||customer.id}</td><td>{customer.email||"—"}</td><td>{customer.uid?"App account linked":"Shop-created record"}</td></tr>)}</tbody></table></div></section>
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>
       <div className="admin-filters"><label>Search shops<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Shop, owner, mobile, city or ID…" /></label><label>Filter by status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="live">Live</option><option value="inactive">Inactive</option><option value="rejected">Rejected</option></select></label></div>
       {loading ? <p className="admin-muted">Loading shops…</p> : shops.length === 0 ? <div className="admin-empty"><span>🏪</span><h3>No shop registrations yet</h3><p>When a shop registration is saved to the Firestore <code>shops</code> collection, it will appear here for review.</p></div> :
-      visibleShops.length === 0 ? <div className="admin-empty"><span>🔎</span><h3>No matching shops</h3><p>Search ya status filter badal kar dobara dekhein.</p><button className="admin-secondary" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</button></div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Shop details</th><th>Owner details</th><th>Contact & address</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleShops.map((shop) => { const status = (shop.status || "pending").toLowerCase(); return <tr key={shop.id}><td><strong>{shop.name || shop.shopName || "Unnamed shop"}</strong><small>ID: {shop.id}</small><small>{shop.description || shop.about || "Shop description not provided"}</small></td><td><strong>{shop.ownerName || "Name not provided"}</strong><small>{shop.ownerEmail || "Email not provided"}</small><small>UID: {shop.ownerUid || "—"}</small></td><td className="admin-contact-cell"><strong>📱 {shop.phone || shop.mobile || shop.mobileNumber || "Mobile not provided"}</strong><div className="admin-address"><b>📍 Shop address</b><span>{[shop.address, shop.fullAddress, shop.shopAddress, shop.location].find((value) => value?.trim()) || "Full address not provided by shop owner"}</span><small>City: {shop.city || "Not provided"}{shop.landmark ? ` · Landmark: ${shop.landmark}` : ""}</small></div></td><td><span className={`admin-status ${status}`}>{status}</span></td><td className="admin-actions">{status !== "live" && <button className="admin-primary small" onClick={() => void setShopStatus(shop, "live")}>Approve & publish</button>}{status !== "inactive" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "inactive")}>Pause shop</button>}{status === "pending" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "rejected")}>Reject</button>}</td></tr>; })}</tbody></table></div>}
+      visibleShops.length === 0 ? <div className="admin-empty"><span>🔎</span><h3>No matching shops</h3><p>Search ya status filter badal kar dobara dekhein.</p><button className="admin-secondary" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</button></div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Shop details</th><th>Owner details</th><th>Contact & address</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleShops.map((shop) => { const status = (shop.status || "pending").toLowerCase(); return <tr key={shop.id}><td><strong>{shop.name || shop.shopName || "Unnamed shop"}</strong><small>ID: {shop.id}</small><small>{shop.description || shop.about || "Shop description not provided"}</small></td><td><strong>{shop.ownerName || "Name not provided"}</strong><small>{shop.ownerEmail || "Email not provided"}</small><small>UID: {shop.ownerUid || "—"}</small></td><td className="admin-contact-cell"><strong>📱 {shop.phone || shop.mobile || shop.mobileNumber || "Mobile not provided"}</strong><div className="admin-address"><b>📍 Shop address</b><span>{[shop.address, shop.fullAddress, shop.shopAddress, shop.location].find((value) => value?.trim()) || "Full address not provided by shop owner"}</span><small>City: {shop.city || "Not provided"}{shop.landmark ? ` · Landmark: ${shop.landmark}` : ""}</small></div></td><td><span className={"admin-status " + status}>{status}</span><small>Subscription: {shop.subscriptionStatus || "not active"}</small>{shop.subscriptionExpiresAt && <small>Expires: {shop.subscriptionExpiresAt.toDate().toLocaleDateString("en-IN")}</small>}</td><td className="admin-actions">{status !== "live" && shop.subscriptionStatus === "active" && !!shop.subscriptionExpiresAt && shop.subscriptionExpiresAt.toDate().getTime() > Date.now() && <button className="admin-primary small" onClick={() => void setShopStatus(shop, "live")}>Approve & publish</button>}{status !== "live" && (shop.subscriptionStatus !== "active" || !shop.subscriptionExpiresAt || shop.subscriptionExpiresAt.toDate().getTime() <= Date.now()) && <><span className="admin-muted">Subscription required</span><Link href="/admin/payments" className="admin-primary small">Check payments</Link></>}{status !== "inactive" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "inactive")}>Pause shop</button>}{status === "pending" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "rejected")}>Reject</button>}</td></tr>; })}</tbody></table></div>}
     </section>
     <p className="admin-footnote">Signed in as verified admin · Approving a shop makes it eligible to appear to customers. Status changes are protected by Firestore security rules.</p>
   </main>;
