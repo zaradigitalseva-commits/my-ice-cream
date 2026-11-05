@@ -62,7 +62,7 @@ service cloud.firestore {
 
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || (resource.data.status == "live" && (validSubscription(resource.data) || resource.data.adminActivated == true));
+        || resource.data.status == "live";
 
       // A shop owner may register only a pending shop.
       // Subscription and admin-activation fields cannot be self-granted.
@@ -129,7 +129,7 @@ service cloud.firestore {
 
         allow read: if isAdmin()
           || ownsShop(shopId)
-          || (liveShop(shopId) && resource.data.active == true);
+          || (get(/databases/$(database)/documents/shops/$(shopId)).data.status == "live" && resource.data.active == true);
 
         allow create: if isAdmin()
           || (
