@@ -26,6 +26,9 @@ export default function AdminPage() {
   const [logoBusy, setLogoBusy] = useState(false);
   const [deletingShopId, setDeletingShopId] = useState("");
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
+  const [siteQr, setSiteQr] = useState("");
+  const [pendingQrFile, setPendingQrFile] = useState<File | null>(null);
+  const [qrBusy, setQrBusy] = useState(false);
 
   useEffect(() => {
     if (!auth) { setAuthReady(true); setError("Firebase configuration is missing."); return; }
@@ -66,7 +69,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
     getDoc(doc(db, "siteSettings", "branding")).then((snapshot) => {
-      if (snapshot.exists()) setSiteLogo(String(snapshot.data().logoDataUrl || ""));
+      if (snapshot.exists()) { setSiteLogo(String(snapshot.data().logoDataUrl || "")); setSiteQr(String(snapshot.data().upiQrDataUrl || "")); }
     }).catch((err) => setLogoError(err instanceof Error ? err.message : "Logo load failed."));
   }, [user]);
 
@@ -83,6 +86,21 @@ export default function AdminPage() {
       setNotice(file ? "वेबसाइट का लोगो सेव हो गया।" : "वेबसाइट का लोगो हटा दिया गया।");
     } catch (err) { setError(err instanceof Error ? err.message : "Logo save नहीं हो पाया।"); }
     finally { setLogoBusy(false); }
+  }
+
+  async function saveUpiQr(file?: File) {
+    if (!db) return;
+    setQrBusy(true); setError(""); setNotice("");
+    try {
+      let upiQrDataUrl = "";
+      if (file) {
+        upiQrDataUrl = await compressImageToWebP(file, { maxDimension: 700, maxBytes: 120 * 1024, initialQuality: 0.86 });
+      }
+      await setDoc(doc(db, "siteSettings", "branding"), { upiQrDataUrl, upiQrUpdatedAt: new Date(), updatedAt: new Date() }, { merge: true });
+      setSiteQr(upiQrDataUrl);
+      setNotice(file ? "Admin UPI QR Code सेव हो गया।" : "UPI QR Code हटा दिया गया।");
+    } catch (err) { setError(err instanceof Error ? err.message : "UPI QR Code सेव नहीं हो पाया।"); }
+    finally { setQrBusy(false); }
   }
 
   async function setShopStatus(shop: Shop, status: "live" | "inactive" | "pending" | "rejected") {
@@ -181,6 +199,13 @@ export default function AdminPage() {
         {pendingLogoFile && <button className="admin-secondary small" disabled={logoBusy} onClick={() => setPendingLogoFile(null)}>रद्द करें</button>}
         {siteLogo && <button className="admin-secondary small" disabled={logoBusy} onClick={() => { void saveSiteLogo().then(() => setPendingLogoFile(null)); }}>लोगो हटाएँ</button>}
       </div><small className="admin-muted">PNG, JPG या WebP image चुनें, फिर “लोगो सेव करें” दबाएँ। लोगो अपने-आप छोटा करके सेव होगा।</small>
+    </section><section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Subscription UPI QR Code</h2><p>यह QR सभी shopkeepers को ₹299 monthly subscription payment के लिए दिखेगा।</p></div></div>
+      <div className="site-logo-editor">{siteQr ? <img src={siteQr} alt="Admin UPI payment QR code" /> : <div className="site-logo-empty">UPI QR अभी सेट नहीं है</div>}
+        <label className="admin-primary small">{pendingQrFile ? "दूसरा QR चुनें" : "UPI QR फोटो चुनें"}<input type="file" accept="image/*" hidden disabled={qrBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) { setPendingQrFile(file); setNotice(""); setError(""); } event.currentTarget.value = ""; }} /></label>
+        {pendingQrFile && <button className="admin-primary small" disabled={qrBusy} onClick={() => { void saveUpiQr(pendingQrFile).then(() => setPendingQrFile(null)); }}>{qrBusy ? "सेव हो रहा है…" : "QR Code सेव करें"}</button>}
+        {pendingQrFile && <button className="admin-secondary small" disabled={qrBusy} onClick={() => setPendingQrFile(null)}>रद्द करें</button>}
+        {siteQr && <button className="admin-secondary small" disabled={qrBusy} onClick={() => { void saveUpiQr().then(() => setPendingQrFile(null)); }}>QR हटाएँ</button>}
+      </div><small className="admin-muted">साफ़ QR फोटो चुनें। फोटो अपने-आप WebP में छोटा करके सेव होगी। नया QR लगाने पर पुराना बदल जाएगा।</small>
     </section><section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>सभी ग्राहक रिकॉर्ड — ऐप से जुड़े और दुकानदार द्वारा बनाए गए।</p></div><span className="admin-count">{customerError ? "Unavailable" : `${customers.length} customers`}</span></div>{customerError && <p className="admin-error" role="alert">Customer records load नहीं हो पाए: {customerError}. Shop management अभी भी इस्तेमाल कर सकते हैं।</p>}<div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>नाम</th><th>मोबाइल</th><th>ईमेल</th><th>स्थिति</th></tr></thead><tbody>{customers.map((customer)=><tr key={customer.id}><td>{customer.name||"—"}</td><td>{customer.phone||customer.id}</td><td>{customer.email||"—"}</td><td>{customer.uid?"App account linked":"Shop-created record"}</td></tr>)}</tbody></table></div></section>

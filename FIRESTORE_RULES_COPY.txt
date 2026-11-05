@@ -31,17 +31,65 @@ service cloud.firestore {
 
     function liveShop(shopId) {
       let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
-      return shop.status == "live" && (validSubscription(shop) || shop.adminActivated == true);
+      return shop.status in ["live", "LIVE", "Live"] && (validSubscription(shop) || shop.adminActivated == true);
     }
 
+    function validOrderItem(shopId, item) {
+      return item is map
+        && item.keys().hasOnly(["productId", "name", "price", "quantity"])
+        && item.productId is string
+        && item.productId.size() > 0
+        && item.name is string
+        && item.name.size() > 0
+        && item.name.size() <= 120
+        && item.price is number
+        && item.price >= 0
+        && item.quantity is int
+        && item.quantity > 0
+        && item.quantity <= 100
+        && exists(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId))
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.shopId == shopId
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.active == true
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.name == item.name
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.price == item.price;
+    }
+
+    function validOrderItems(shopId, items) {
+      return items is list && items.size() > 0 && items.size() <= 8
+        && validOrderItem(shopId, items[0])
+        && (items.size() < 2 || validOrderItem(shopId, items[1]))
+        && (items.size() < 3 || validOrderItem(shopId, items[2]))
+        && (items.size() < 4 || validOrderItem(shopId, items[3]))
+        && (items.size() < 5 || validOrderItem(shopId, items[4]))
+        && (items.size() < 6 || validOrderItem(shopId, items[5]))
+        && (items.size() < 7 || validOrderItem(shopId, items[6]))
+        && (items.size() < 8 || validOrderItem(shopId, items[7]));
+    }
+
+    function orderItemsSubtotal(items) {
+      return items[0].price * items[0].quantity
+        + (items.size() > 1 ? items[1].price * items[1].quantity : 0)
+        + (items.size() > 2 ? items[2].price * items[2].quantity : 0)
+        + (items.size() > 3 ? items[3].price * items[3].quantity : 0)
+        + (items.size() > 4 ? items[4].price * items[4].quantity : 0)
+        + (items.size() > 5 ? items[5].price * items[5].quantity : 0)
+        + (items.size() > 6 ? items[6].price * items[6].quantity : 0)
+        + (items.size() > 7 ? items[7].price * items[7].quantity : 0);
+    }
     function validProduct(data, shopId) {
-      return data.shopId == shopId
+      return data.keys().hasOnly([
+          "shopId", "ownerUid", "name", "description", "price",
+          "originalPrice", "category", "stock", "imageUrl", "active",
+          "updatedAt", "createdAt"
+        ])
+        && data.shopId == shopId
         && data.ownerUid == request.auth.uid
         && data.name is string
         && data.name.size() > 0
         && data.name.size() <= 120
         && data.price is number
         && data.price >= 0
+        && (!("stock" in data) || (data.stock is int && data.stock >= 0))
         && data.active is bool
         && data.category is string
         && data.description is string
@@ -55,7 +103,7 @@ service cloud.firestore {
 
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || (resource.data.status == "live" && (validSubscription(resource.data) || resource.data.adminActivated == true));
+        || resource.data.status == "live";
 
       // A shop owner may register only a pending shop.
       // Subscription and admin-activation fields cannot be self-granted.
@@ -122,7 +170,7 @@ service cloud.firestore {
 
         allow read: if isAdmin()
           || ownsShop(shopId)
-          || (liveShop(shopId) && resource.data.active == true);
+          || (get(/databases/$(database)/documents/shops/$(shopId)).data.status == "live" && resource.data.active == true);
 
         allow create: if isAdmin()
           || (
@@ -246,7 +294,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /shopOwnerLocks/{ownerUid} {
-      allow read: if signedIn() && request.auth.uid == ownerUid;
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == ownerUid);
       allow create: if signedIn()
         && request.auth.uid == ownerUid
         && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid))
@@ -254,7 +302,8 @@ service cloud.firestore {
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.shopId is string
         && request.resource.data.shopId.size() > 0;
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     match /orders/{orderId} {
@@ -286,16 +335,20 @@ service cloud.firestore {
         && request.resource.data.deliveryFee is number
         && request.resource.data.deliveryFee >= 0
         && request.resource.data.total is number
+        && request.resource.data.subtotal >= (get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.minimumOrder is number ? get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.minimumOrder : 0)
         && request.resource.data.total == request.resource.data.subtotal + request.resource.data.deliveryFee
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
-        && request.resource.data.items.size() <= 100
+        && request.resource.data.items.size() <= 8
+        && validOrderItems(request.resource.data.shopId, request.resource.data.items)
+        && request.resource.data.subtotal == orderItemsSubtotal(request.resource.data.items)
         && (
           (request.resource.data.fulfillmentType == "pickup"
             && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.pickupAvailable != false
             && request.resource.data.deliveryFee == 0)
           || (request.resource.data.fulfillmentType == "delivery"
             && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.deliveryAvailable == true
+            && request.resource.data.deliveryFee == (get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.deliveryFee is number ? get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.deliveryFee : 0)
             && request.resource.data.deliveryAddress is string
             && request.resource.data.deliveryAddress.size() > 0)
         );
@@ -369,7 +422,8 @@ service cloud.firestore {
         && ownsShop(request.resource.data.shopId)
         && request.resource.data.paymentId is string
         && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "paymentId", "createdAt"]);
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     match /siteSettings/{settingId} {
