@@ -34,6 +34,48 @@ service cloud.firestore {
       return shop.status in ["live", "LIVE", "Live"] && (validSubscription(shop) || shop.adminActivated == true);
     }
 
+    function validOrderItem(shopId, item) {
+      return item is map
+        && item.keys().hasOnly(["productId", "name", "price", "quantity"])
+        && item.productId is string
+        && item.productId.size() > 0
+        && item.name is string
+        && item.name.size() > 0
+        && item.name.size() <= 120
+        && item.price is number
+        && item.price >= 0
+        && item.quantity is int
+        && item.quantity > 0
+        && item.quantity <= 100
+        && exists(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId))
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.shopId == shopId
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.active == true
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.name == item.name
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.price == item.price;
+    }
+
+    function validOrderItems(shopId, items) {
+      return items is list && items.size() > 0 && items.size() <= 8
+        && validOrderItem(shopId, items[0])
+        && (items.size() < 2 || validOrderItem(shopId, items[1]))
+        && (items.size() < 3 || validOrderItem(shopId, items[2]))
+        && (items.size() < 4 || validOrderItem(shopId, items[3]))
+        && (items.size() < 5 || validOrderItem(shopId, items[4]))
+        && (items.size() < 6 || validOrderItem(shopId, items[5]))
+        && (items.size() < 7 || validOrderItem(shopId, items[6]))
+        && (items.size() < 8 || validOrderItem(shopId, items[7]));
+    }
+
+    function orderItemsSubtotal(items) {
+      return items[0].price * items[0].quantity
+        + (items.size() > 1 ? items[1].price * items[1].quantity : 0)
+        + (items.size() > 2 ? items[2].price * items[2].quantity : 0)
+        + (items.size() > 3 ? items[3].price * items[3].quantity : 0)
+        + (items.size() > 4 ? items[4].price * items[4].quantity : 0)
+        + (items.size() > 5 ? items[5].price * items[5].quantity : 0)
+        + (items.size() > 6 ? items[6].price * items[6].quantity : 0)
+        + (items.size() > 7 ? items[7].price * items[7].quantity : 0);
+    }
     function validProduct(data, shopId) {
       return data.keys().hasOnly([
           "shopId", "ownerUid", "name", "description", "price",
@@ -296,7 +338,9 @@ service cloud.firestore {
         && request.resource.data.total == request.resource.data.subtotal + request.resource.data.deliveryFee
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
-        && request.resource.data.items.size() <= 100
+        && request.resource.data.items.size() <= 8
+        && validOrderItems(request.resource.data.shopId, request.resource.data.items)
+        && request.resource.data.subtotal == orderItemsSubtotal(request.resource.data.items)
         && (
           (request.resource.data.fulfillmentType == "pickup"
             && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.pickupAvailable != false

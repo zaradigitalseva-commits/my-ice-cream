@@ -28,7 +28,7 @@ export default function ShopDetailsPage(){
   if(!user){if(auth)await signInWithPopup(auth,googleProvider);return;}
   if(!db||!shop)return;
   const items=products.filter(p=>(cart[p.id]||0)>0).map(p=>({productId:p.id,name:p.name||"Product",price:Number(p.price||0),quantity:cart[p.id]}));
-  if(!items.length){setMessage("Cart is empty.");return;}
+  if(!items.length){setMessage("Cart is empty.");return;}if(items.length>8){setMessage("एक ऑर्डर में अधिकतम 8 अलग-अलग products चुनें।");return;}
   const cleanPhone=phone.replace(/\D/g,"");if(!/^\d{10}$/.test(cleanPhone)){setMessage("Enter exactly 10 digits for mobile number.");return;}const cleanCustomerName=(customerName.trim()||user.displayName||"").trim();if(!cleanCustomerName){setMessage("Enter your name before placing the order.");return;}
   if(!shopOpen){setMessage("This shop is currently closed. Please order during opening hours.");return;}
   if(fulfillmentType==="delivery"&&(!shop.deliveryAvailable||!address.trim())){setMessage("Enter your delivery address.");return;}
