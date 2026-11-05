@@ -144,7 +144,6 @@ export default function AdminPage() {
         }
       }
 
-      await updateDoc(doc(firestore, "shops", shop.id), { status: "deleted" }).catch(() => undefined);
       const finalBatch = writeBatch(firestore);
       finalBatch.delete(doc(firestore, "shops", shop.id));
       await finalBatch.commit();
