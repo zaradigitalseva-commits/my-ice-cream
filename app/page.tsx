@@ -8,7 +8,7 @@ import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
 type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };
-type MarketplaceProduct = { id: string; shopId: string; shopName: string; city?: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; stock?: number; imageUrl?: string };
+type MarketplaceProduct = { id: string; shopId: string; shopName: string; city?: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string };
 const categories = ["All treats", "Ice cream", "Kulfi", "Cones", "Family packs", "Party orders"];
 
 export default function HomePage() {
@@ -126,7 +126,7 @@ export default function HomePage() {
       }).map((product) => <Link href={"/shop/" + product.shopId + "?product=" + product.id} className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
         {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
         <div className="shop-card-body"><span className="pill">{product.category || "Ice cream"}</span><h3>{product.name || "Ice cream treat"}</h3>
-          {product.description && <p>{product.description}</p>}<strong>₹{Number(product.price || 0).toFixed(2)}</strong><p className="admin-muted">{Number(product.stock || 0) > 0 ? "Available: " + Number(product.stock) : "Out of stock"}</p>
+          {product.description && <p>{product.description}</p>}<strong>₹{Number(product.price || 0).toFixed(2)}</strong>
           {product.originalPrice && product.originalPrice > Number(product.price || 0) && <del className="admin-muted"> ₹{Number(product.originalPrice).toFixed(2)}</del>}
           <p>🏪 {product.shopName} · {product.city || "Local shop"}</p><span className="admin-secondary">इस दुकान के सभी प्रोडक्ट देखें →</span>
         </div></Link>)}</div>}
