@@ -17,6 +17,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [customerError, setCustomerError] = useState("");
+  const [logoError, setLogoError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -57,7 +58,7 @@ export default function AdminPage() {
     if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
     getDoc(doc(db, "siteSettings", "branding")).then((snapshot) => {
       if (snapshot.exists()) setSiteLogo(String(snapshot.data().logoDataUrl || ""));
-    }).catch((err) => setError(err instanceof Error ? err.message : "Logo load failed."));
+    }).catch((err) => setLogoError(err instanceof Error ? err.message : "Logo load failed."));
   }, [user]);
 
   async function saveSiteLogo(file?: File) {
@@ -96,7 +97,11 @@ export default function AdminPage() {
         ...(status === "live" ? { adminActivated: true, adminActivatedBy: user?.email || "", adminActivatedAt: new Date() } : {}),
         updatedAt: new Date()
       });
-      setShops((current) => current.map((item) => item.id === shop.id ? { ...item, status } : item));
+      setShops((current) => current.map((item) => item.id === shop.id ? {
+        ...item,
+        status,
+        ...(status === "live" ? { adminActivated: true, adminActivatedBy: user?.email || "", adminActivatedAt: Timestamp.now() } : {})
+      } : item));
       setNotice(`${shop.name || shop.shopName || "Shop"} status changed to ${status.toUpperCase()}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update shop status.");
@@ -129,7 +134,7 @@ export default function AdminPage() {
         {pendingLogoFile && <button className="admin-primary small" disabled={logoBusy} onClick={() => { void saveSiteLogo(pendingLogoFile).then(() => setPendingLogoFile(null)); }}>{logoBusy ? "सेव हो रहा है…" : "लोगो सेव करें"}</button>}
         {pendingLogoFile && <button className="admin-secondary small" disabled={logoBusy} onClick={() => setPendingLogoFile(null)}>रद्द करें</button>}
         {siteLogo && <button className="admin-secondary small" disabled={logoBusy} onClick={() => { void saveSiteLogo().then(() => setPendingLogoFile(null)); }}>लोगो हटाएँ</button>}
-      </div><small className="admin-muted">PNG, JPG या WebP image चुनें, फिर “लोगो सेव करें” दबाएँ। लोगो अपने-आप छोटा करके सेव होगा।</small>
+      </div>{logoError && <p className="admin-error" role="alert">Logo load नहीं हुआ: {logoError}</p>}<small className="admin-muted">PNG, JPG या WebP image चुनें, फिर “लोगो सेव करें” दबाएँ। लोगो अपने-आप छोटा करके सेव होगा।</small>
     </section><section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>सभी ग्राहक रिकॉर्ड — ऐप से जुड़े और दुकानदार द्वारा बनाए गए।</p></div><span className="admin-count">{customers.length} customers</span></div>
