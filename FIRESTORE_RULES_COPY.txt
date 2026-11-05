@@ -31,17 +31,23 @@ service cloud.firestore {
 
     function liveShop(shopId) {
       let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
-      return shop.status == "live" && (validSubscription(shop) || shop.adminActivated == true);
+      return shop.status in ["live", "LIVE", "Live"] && (validSubscription(shop) || shop.adminActivated == true);
     }
 
     function validProduct(data, shopId) {
-      return data.shopId == shopId
+      return data.keys().hasOnly([
+          "shopId", "ownerUid", "name", "description", "price",
+          "originalPrice", "category", "stock", "imageUrl", "active",
+          "updatedAt", "createdAt"
+        ])
+        && data.shopId == shopId
         && data.ownerUid == request.auth.uid
         && data.name is string
         && data.name.size() > 0
         && data.name.size() <= 120
         && data.price is number
         && data.price >= 0
+        && (!("stock" in data) || (data.stock is int && data.stock >= 0))
         && data.active is bool
         && data.category is string
         && data.description is string
@@ -55,7 +61,7 @@ service cloud.firestore {
 
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || (resource.data.status == "live" && (validSubscription(resource.data) || resource.data.adminActivated == true));
+        || resource.data.status == "live";
 
       // A shop owner may register only a pending shop.
       // Subscription and admin-activation fields cannot be self-granted.
@@ -122,7 +128,7 @@ service cloud.firestore {
 
         allow read: if isAdmin()
           || ownsShop(shopId)
-          || (liveShop(shopId) && resource.data.active == true);
+          || (get(/databases/$(database)/documents/shops/$(shopId)).data.status == "live" && resource.data.active == true);
 
         allow create: if isAdmin()
           || (
@@ -152,6 +158,22 @@ service cloud.firestore {
       }
     }
 
+    match /customerProfiles/{uid} {
+      // Customer profiles are tied to the authenticated UID. Phone stays unverified.
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() == 10
+        && request.resource.data.phone.matches('^[0-9]+$')
+        && request.resource.data.phoneVerified == false
+        && request.resource.data.keys().hasOnly(["uid", "name", "phone", "email", "phoneVerified", "updatedAt"]);
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
     match /customers/{phoneNumber} {
       // Admins can read the complete customer collection for the dashboard.
       // Customers and shop owners remain limited to their own related records.
@@ -246,7 +268,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /shopOwnerLocks/{ownerUid} {
-      allow read: if signedIn() && request.auth.uid == ownerUid;
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == ownerUid);
       allow create: if signedIn()
         && request.auth.uid == ownerUid
         && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid))
@@ -254,7 +276,8 @@ service cloud.firestore {
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.shopId is string
         && request.resource.data.shopId.size() > 0;
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     match /orders/{orderId} {
@@ -369,7 +392,8 @@ service cloud.firestore {
         && ownsShop(request.resource.data.shopId)
         && request.resource.data.paymentId is string
         && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "paymentId", "createdAt"]);
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     match /siteSettings/{settingId} {
