@@ -252,7 +252,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /shopOwnerLocks/{ownerUid} {
-      allow read: if signedIn() && request.auth.uid == ownerUid;
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == ownerUid);
       allow create: if signedIn()
         && request.auth.uid == ownerUid
         && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid))
