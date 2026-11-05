@@ -21,6 +21,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [siteLogo, setSiteLogo] = useState("");
+  const [logoError, setLogoError] = useState("");
   const [logoBusy, setLogoBusy] = useState(false);
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
 
@@ -58,7 +59,7 @@ export default function AdminPage() {
     if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
     getDoc(doc(db, "siteSettings", "branding")).then((snapshot) => {
       if (snapshot.exists()) setSiteLogo(String(snapshot.data().logoDataUrl || ""));
-    }).catch((err) => setError(err instanceof Error ? err.message : "Logo load failed."));
+    }).catch((err) => setLogoError(err instanceof Error ? err.message : "Logo load failed."));
   }, [user]);
 
   async function saveSiteLogo(file?: File) {
@@ -118,7 +119,7 @@ export default function AdminPage() {
     <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>ADMIN</span></Link><div className="admin-user"><span>{user.displayName || user.email}</span><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></div></header>
     <div className="admin-heading"><div><p className="admin-kicker">PLATFORM CONTROL</p><h1>Admin dashboard</h1><p>Review shop registrations and control which shops are visible to customers.</p></div><button className="admin-secondary" onClick={() => void loadShops()} disabled={loading}>↻ Refresh</button></div>
     <div className="admin-actions"><Link href="/admin/payments" className="admin-primary">Subscription payments</Link></div>
-    <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Website logo</h2><p>यह लोगो वेबसाइट के नाम की जगह सभी ग्राहकों को दिखेगा।</p></div></div>
+    <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Website logo</h2><p>यह लोगो वेबसाइट के नाम की जगह सभी ग्राहकों को दिखेगा।</p></div></div>{logoError && <p className="admin-error" role="alert">Logo settings load नहीं हो पाईं: {logoError}</p>}
       <div className="site-logo-editor">{siteLogo ? <img src={siteLogo} alt="Current website logo" /> : <div className="site-logo-empty">🍦 MY ICE CREAM</div>}
         <label className="admin-primary small">{pendingLogoFile ? "दूसरा लोगो चुनें" : "नया लोगो चुनें"}<input type="file" accept="image/*" disabled={logoBusy} hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) { setPendingLogoFile(file); setNotice(""); setError(""); } event.currentTarget.value = ""; }} /></label>
         {pendingLogoFile && <button className="admin-primary small" disabled={logoBusy} onClick={() => { void saveSiteLogo(pendingLogoFile).then(() => setPendingLogoFile(null)); }}>{logoBusy ? "सेव हो रहा है…" : "लोगो सेव करें"}</button>}
