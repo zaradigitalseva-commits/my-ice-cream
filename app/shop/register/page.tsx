@@ -4,31 +4,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
-
-async function compressImage(file: File, maxWidth: number, maxHeight: number, maxBytes: number): Promise<string> {
-  const source = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
-    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image could not be opened.")); };
-    image.src = url;
-  });
-  const scale = Math.min(1, maxWidth / source.width, maxHeight / source.height);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(source.width * scale));
-  canvas.height = Math.max(1, Math.round(source.height * scale));
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Image compression is not supported in this browser.");
-  context.drawImage(source, 0, 0, canvas.width, canvas.height);
-  let quality = 0.82;
-  let result = canvas.toDataURL("image/webp", quality);
-  while (result.length * 0.75 > maxBytes && quality > 0.35) {
-    quality -= 0.08;
-    result = canvas.toDataURL("image/webp", quality);
-  }
-  if (result.length * 0.75 > maxBytes) throw new Error("Image is too large. Please choose a smaller image.");
-  return result;
-}
+import { compressImageToWebP } from "@/lib/image-compression";
 
 export default function ShopRegisterPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -49,7 +25,7 @@ export default function ShopRegisterPage() {
     if (!file.type.startsWith("image/")) { setMessage("कृपया PNG, JPG या WebP image चुनें।"); return; }
     setImageBusy(kind); setMessage("");
     try {
-      const data = await compressImage(file, kind === "logo" ? 500 : 1200, kind === "logo" ? 500 : 650, kind === "logo" ? 90 * 1024 : 220 * 1024);
+      const data = await compressImageToWebP(file, { maxDimension: kind === "logo" ? 500 : 1200, maxBytes: kind === "logo" ? 90 * 1024 : 220 * 1024, initialQuality: 0.84 });
       if (kind === "logo") setLogoUrl(data); else setBannerUrl(data);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Image upload could not be completed.");
