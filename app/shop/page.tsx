@@ -53,6 +53,7 @@ export default function ShopPage() {
   const [imageBusy, setImageBusy] = useState(false);
   const [utr, setUtr] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
+  const [adminUpiQr, setAdminUpiQr] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [newCustomerName, setNewCustomerName] = useState("");
   const [customerLoading, setCustomerLoading] = useState(false);
@@ -94,6 +95,13 @@ export default function ShopPage() {
       finally { setLoading(false); }
     });
   }, [router]);
+
+  useEffect(() => {
+    if (!db || !shop) return;
+    getDoc(doc(db, "siteSettings", "branding"))
+      .then((snapshot) => setAdminUpiQr(snapshot.exists() ? String(snapshot.data().upiQrDataUrl || "") : ""))
+      .catch(() => setAdminUpiQr(""));
+  }, [shop?.id]);
 
   async function searchCustomer(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -381,7 +389,7 @@ export default function ShopPage() {
           <label>Shop banner (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"banner");}} /></label>{bannerUrl&&<img src={bannerUrl} alt="Shop banner preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:14}}/>}
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
         </form></section>
-        <section className="admin-panel"><h2>Monthly subscription</h2><p>Plan amount: ₹299 per month. Pay by UPI and submit the UTR number for Admin verification. Your subscription activates only after Admin confirms payment.</p><form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()}>Submit ₹299 payment for verification</button></form>{paymentNotice&&<p className="admin-success">{paymentNotice}</p>}</section>
+        <section className="admin-panel"><h2>Monthly subscription</h2><p>Plan amount: ₹299 per month. Admin का UPI QR scan करके भुगतान करें, फिर UTR नंबर जमा करें। Verification के बाद subscription 30 दिनों के लिए activate होगी।</p>{adminUpiQr ? <div style={{textAlign:"center",margin:"16px auto",maxWidth:320}}><img src={adminUpiQr} alt="Admin UPI QR Code" style={{width:"100%",maxWidth:280,objectFit:"contain",borderRadius:12,border:"1px solid #ddd",padding:8,background:"#fff"}}/><p className="admin-muted">Admin UPI Payment QR · ₹299</p></div> : <p className="admin-muted">Admin ने अभी UPI QR Code सेट नहीं किया है। कृपया Admin से संपर्क करें।</p>}<form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()}>Submit ₹299 payment for verification</button></form>{paymentNotice&&<p className="admin-success">{paymentNotice}</p>}</section>
         {live ? <section className="admin-panel"><h2>Products</h2><p>Add your products with price and photo. Only active LIVE shops are visible to customers.</p>
           <form className="register-form" onSubmit={saveProduct}>
             <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>
