@@ -335,6 +335,7 @@ service cloud.firestore {
         && request.resource.data.deliveryFee is number
         && request.resource.data.deliveryFee >= 0
         && request.resource.data.total is number
+        && request.resource.data.subtotal >= (get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.minimumOrder is number ? get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.minimumOrder : 0)
         && request.resource.data.total == request.resource.data.subtotal + request.resource.data.deliveryFee
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
@@ -347,6 +348,7 @@ service cloud.firestore {
             && request.resource.data.deliveryFee == 0)
           || (request.resource.data.fulfillmentType == "delivery"
             && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.deliveryAvailable == true
+            && request.resource.data.deliveryFee == (get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.deliveryFee is number ? get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.deliveryFee : 0)
             && request.resource.data.deliveryAddress is string
             && request.resource.data.deliveryAddress.size() > 0)
         );
