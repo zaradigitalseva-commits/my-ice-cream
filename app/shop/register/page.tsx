@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore/lite";
@@ -7,7 +8,10 @@ import { auth, db, googleProvider } from "@/lib/firebase";
 import { compressImageToWebP } from "@/lib/image-compression";
 
 export default function ShopRegisterPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [existingShop, setExistingShop] = useState<{ id: string; name?: string; shopName?: string; status?: string; city?: string } | null>(null);
+  const [checkingRegistration, setCheckingRegistration] = useState(true);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
@@ -18,7 +22,32 @@ export default function ShopRegisterPage() {
   const [imageBusy, setImageBusy] = useState<"logo" | "banner" | "">("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  useEffect(() => { if (!auth) return; return onAuthStateChanged(auth, setUser); }, []);
+  useEffect(() => { if (!auth) { setCheckingRegistration(false); return; } return onAuthStateChanged(auth, setUser); }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkExistingRegistration() {
+      if (!user || !db) { setExistingShop(null); setCheckingRegistration(false); return; }
+      setCheckingRegistration(true);
+      try {
+        const result = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid)));
+        if (cancelled) return;
+        const found = result.docs[0];
+        if (found) {
+          const data = { id: found.id, ...found.data() } as { id: string; name?: string; shopName?: string; status?: string; city?: string };
+          const status = (data.status || "pending").toLowerCase();
+          if (status === "live") { router.replace("/shop"); return; }
+          setExistingShop(data);
+        } else setExistingShop(null);
+      } catch (error) {
+        if (!cancelled) setMessage(error instanceof Error ? error.message : "Registration status could not be checked.");
+      } finally {
+        if (!cancelled) setCheckingRegistration(false);
+      }
+    }
+    void checkExistingRegistration();
+    return () => { cancelled = true; };
+  }, [user, router]);
 
   async function chooseImage(file: File | undefined, kind: "logo" | "banner") {
     if (!file) return;
@@ -38,7 +67,14 @@ export default function ShopRegisterPage() {
     setBusy(true); setMessage("");
     try {
       const existing = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid)));
-      if (!existing.empty) { setMessage("A shop registration already exists for this Google account. Open Shop Dashboard to check its status."); return; }
+      if (!existing.empty) {
+        const found = existing.docs[0];
+        const data = { id: found.id, ...found.data() } as { id: string; name?: string; shopName?: string; status?: string; city?: string };
+        if ((data.status || "pending").toLowerCase() === "live") { router.replace("/shop"); return; }
+        setExistingShop(data);
+        setMessage("Aapki purani registration mil gayi. Neeche status dekhein ya details edit karein.");
+        return;
+      }
       const shopRef = doc(collection(db, "shops"));
       const lockRef = doc(db, "shopOwnerLocks", user.uid);
       const batch = writeBatch(db);
@@ -51,7 +87,8 @@ export default function ShopRegisterPage() {
       });
       batch.set(lockRef, { ownerUid: user.uid, shopId: shopRef.id, createdAt: serverTimestamp() });
       await batch.commit();
-      setMessage("Registration submitted. Your shop is PENDING until Admin reviews and approves it.");
+      setExistingShop({ id: shopRef.id, name: name.trim(), shopName: name.trim(), city: city.trim(), status: "pending" });
+      setMessage("Registration submit ho gaya. Admin approval ka intezar karein.");
       setName(""); setPhone(""); setCity(""); setAddress(""); setDescription(""); setLogoUrl(""); setBannerUrl("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Registration could not be submitted.");
@@ -76,6 +113,21 @@ export default function ShopRegisterPage() {
     <section className="register-card">
       <div className="register-card-heading"><div><span className="register-step">01 / SHOP DETAILS</span><h2>Register your ice cream shop</h2><p>Bas kuch details bhariye — baaki hum sambhal lenge!</p></div><span className="register-card-icon">🏪</span></div>
       {!user ? <div className="register-signin"><p>Registration shuru karne ke liye apne Google account se sign in karein.</p><button className="register-submit" onClick={() => auth && signInWithPopup(auth, googleProvider).catch((e) => setMessage(e.message))}> <span>G</span> Continue with Google</button></div> :
+      checkingRegistration ? <div className="register-signin"><p>Aapki purani shop registration check ho rahi hai…</p></div> :
+      existingShop ? <div className="register-signin register-existing-status">
+        <div className="register-signed-in"><span>✓</span><div><small>Existing registration</small><strong>{existingShop.name || existingShop.shopName || "Your shop"}</strong></div></div>
+        <h3>Registration status</h3>
+        <p><strong className={"admin-status " + ((existingShop.status || "pending").toLowerCase())}>{(existingShop.status || "pending").toUpperCase()}</strong></p>
+        <p>{(existingShop.status || "pending").toLowerCase() === "rejected"
+          ? "Aapki registration reject hui hai. Zaroori details sudharne ke liye edit karein ya Admin se sampark karein."
+          : (existingShop.status || "pending").toLowerCase() === "inactive"
+            ? "Aapki shop filhaal inactive hai. Admin se sampark karein."
+            : "Aapki registration Admin review mein hai. Approval milne ke baad Shop Dashboard khul jayega."}</p>
+        <div className="register-status-actions">
+          <Link href="/shop#shop-profile" className="admin-primary role-link">✏️ Edit registration details</Link>
+          <Link href="/shop" className="admin-secondary role-link">Open Shop Dashboard →</Link>
+        </div>
+      </div> :
       <form className="register-form register-form-color" onSubmit={submit}>
         <div className="register-signed-in"> <span>✓</span><div><small>Signed in as</small><strong>{user.email}</strong></div></div>
         <div className="register-fields">
