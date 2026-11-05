@@ -16,6 +16,7 @@ export default function AdminPage() {
   const [customers, setCustomers] = useState<{id:string;name?:string;phone?:string;email?:string;uid?:string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [customerError, setCustomerError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -34,10 +35,20 @@ export default function AdminPage() {
     try {
       const result = await getDocs(query(collection(db, "shops"), orderBy("createdAt", "desc")));
       setShops(result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop)));
+    } catch (err) {
+      setError(err instanceof Error ? `Shops load failed: ${err.message}` : "Could not load shops. Check Firestore rules and database setup.");
+      setLoading(false);
+      return;
+    }
+    // Customer records are optional for the shop-review workflow. A customer
+    // permission problem must not make the entire admin dashboard look broken.
+    try {
       const customerResult = await getDocs(collection(db, "customers"));
       setCustomers(customerResult.docs.map((item) => ({ id: item.id, ...item.data() } as {id:string;name?:string;phone?:string;email?:string;uid?:string})));
+      setCustomerError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load shops. Check Firestore rules and database setup.");
+      setCustomers([]);
+      setCustomerError(err instanceof Error ? err.message : "Customer records could not be loaded.");
     } finally { setLoading(false); }
   }
 
@@ -116,7 +127,7 @@ export default function AdminPage() {
       </div><small className="admin-muted">PNG, JPG या WebP image चुनें, फिर “लोगो सेव करें” दबाएँ। लोगो अपने-आप छोटा करके सेव होगा।</small>
     </section><section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
-    <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>सभी ग्राहक रिकॉर्ड — ऐप से जुड़े और दुकानदार द्वारा बनाए गए।</p></div><span className="admin-count">{customers.length} customers</span></div><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>नाम</th><th>मोबाइल</th><th>ईमेल</th><th>स्थिति</th></tr></thead><tbody>{customers.map((customer)=><tr key={customer.id}><td>{customer.name||"—"}</td><td>{customer.phone||customer.id}</td><td>{customer.email||"—"}</td><td>{customer.uid?"App account linked":"Shop-created record"}</td></tr>)}</tbody></table></div></section>
+    <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>सभी ग्राहक रिकॉर्ड — ऐप से जुड़े और दुकानदार द्वारा बनाए गए।</p></div><span className="admin-count">{customerError ? "Unavailable" : `${customers.length} customers`}</span></div>{customerError && <p className="admin-error" role="alert">Customer records load नहीं हो पाए: {customerError}. Shop management अभी भी इस्तेमाल कर सकते हैं।</p>}<div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>नाम</th><th>मोबाइल</th><th>ईमेल</th><th>स्थिति</th></tr></thead><tbody>{customers.map((customer)=><tr key={customer.id}><td>{customer.name||"—"}</td><td>{customer.phone||customer.id}</td><td>{customer.email||"—"}</td><td>{customer.uid?"App account linked":"Shop-created record"}</td></tr>)}</tbody></table></div></section>
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>
       <div className="admin-filters"><label>Search shops<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Shop, owner, mobile, city or ID…" /></label><label>Filter by status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="live">Live</option><option value="inactive">Inactive</option><option value="rejected">Rejected</option></select></label></div>
       {loading ? <p className="admin-muted">Loading shops…</p> : shops.length === 0 ? <div className="admin-empty"><span>🏪</span><h3>No shop registrations yet</h3><p>When a shop registration is saved to the Firestore <code>shops</code> collection, it will appear here for review.</p></div> :
