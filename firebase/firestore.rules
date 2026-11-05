@@ -376,7 +376,8 @@ service cloud.firestore {
         && ownsShop(request.resource.data.shopId)
         && request.resource.data.paymentId is string
         && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "paymentId", "createdAt"]);
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     match /siteSettings/{settingId} {
