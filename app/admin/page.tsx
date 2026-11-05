@@ -31,8 +31,9 @@ export default function AdminPage() {
 
   async function loadShops() {
     if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
-    setLoading(true); setError(""); setNotice("");
+    setLoading(true); setError(""); setCustomerError(""); setNotice("");
     try {
+      await user.getIdToken(true);
       const result = await getDocs(query(collection(db, "shops"), orderBy("createdAt", "desc")));
       setShops(result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop)));
     } catch (err) {
