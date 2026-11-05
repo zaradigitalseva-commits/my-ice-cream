@@ -6,6 +6,7 @@ import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
+import { compressImageToWebP } from "@/lib/image-compression";
 
 type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number };
 type Order = { id: string; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
@@ -274,49 +275,26 @@ export default function ShopPage() {
   }
 
   async function compressProductImage(file: File) {
-    if (!file.type.startsWith("image/")) { setError("Please choose an image file."); return; }
     setImageBusy(true); setError("");
     try {
-      const source = URL.createObjectURL(file);
-      const image = new Image();
-      image.src = source;
-      await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("Image could not be opened.")); });
-      const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(image.width * scale));
-      canvas.height = Math.max(1, Math.round(image.height * scale));
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Image compression is not supported in this browser.");
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(source);
-      let quality = 0.82;
-      let result = canvas.toDataURL("image/webp", quality);
-      while (result.length > 300000 && quality > 0.35) { quality -= 0.1; result = canvas.toDataURL("image/webp", quality); }
-      if (result.length > 300000) throw new Error("Image is too large after compression. Choose a smaller photo.");
-      setImageUrl(result); setNotice("Image compressed to WebP and ready to save.");
+      const result = await compressImageToWebP(file, { maxDimension: 1200, maxBytes: 220 * 1024, initialQuality: 0.84 });
+      setImageUrl(result); setNotice("Image automatically compressed to WebP and ready to save.");
     } catch (e) { setError(e instanceof Error ? e.message : "Image compression failed."); }
     finally { setImageBusy(false); }
   }
 
   async function compressProfileImage(file: File, target: "logo" | "banner") {
-    if (!file.type.startsWith("image/")) { setError("Please choose an image file."); return; }
     setImageBusy(true); setError("");
-    const source = URL.createObjectURL(file);
     try {
-      const image = new Image(); image.src = source;
-      await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("Image could not be opened.")); });
-      const max = target === "logo" ? 600 : 1400;
-      const scale = Math.min(1, max / Math.max(image.width, image.height));
-      const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round(image.width * scale)); canvas.height = Math.max(1, Math.round(image.height * scale));
-      const context = canvas.getContext("2d"); if (!context) throw new Error("Image compression is not supported in this browser.");
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      let quality = 0.8; let result = canvas.toDataURL("image/webp", quality);
-      while (result.length > 300000 && quality > 0.35) { quality -= 0.1; result = canvas.toDataURL("image/webp", quality); }
-      if (result.length > 300000) throw new Error("Image is too large after compression. Choose a smaller photo.");
+      const result = await compressImageToWebP(file, {
+        maxDimension: target === "logo" ? 600 : 1400,
+        maxBytes: target === "logo" ? 100 * 1024 : 220 * 1024,
+        initialQuality: 0.84,
+      });
       if (target === "logo") setLogoUrl(result); else setBannerUrl(result);
-      setNotice((target === "logo" ? "Logo" : "Banner") + " compressed to WebP. Save shop profile to apply it.");
+      setNotice((target === "logo" ? "Logo" : "Banner") + " automatically compressed to WebP. Save shop profile to apply it.");
     } catch (e) { setError(e instanceof Error ? e.message : "Image compression failed."); }
-    finally { URL.revokeObjectURL(source); setImageBusy(false); }
+    finally { setImageBusy(false); }
   }
 
   function resetProduct() { setProductId(""); setProductName(""); setProductDescription(""); setPrice(""); setStock(""); setImageUrl(""); setProductActive(true); setProductCategory("Ice cream"); setOriginalPrice(""); }
