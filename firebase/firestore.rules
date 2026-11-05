@@ -73,7 +73,11 @@ service cloud.firestore {
           && (
             request.resource.data.status != "live"
             || validSubscription(request.resource.data)
-            || request.resource.data.adminActivated == true
+            || (
+              request.resource.data.adminActivated == true
+              && request.resource.data.adminActivatedBy == request.auth.token.email
+              && request.resource.data.adminActivatedAt is timestamp
+            )
           )
           && (
             !("subscriptionStatus" in request.resource.data)
@@ -142,9 +146,11 @@ service cloud.firestore {
           && resource.data.createdByShopId is string
           && ownsShop(resource.data.createdByShopId));
 
-      // Only verified platform admins may list all customer records.
-      // Customers and shopkeepers use direct document reads, not collection-wide listing.
-      allow list: if isAdmin();
+      // Admins may list all customers for support.
+      // A signed-in customer may query only their own profile (where uid == auth.uid).
+      // Shopkeepers use direct get() by phone number and cannot enumerate customers.
+      allow list: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
       allow create: if signedIn()
         && phoneNumber.matches('^[0-9]{10}$')
         && request.resource.data.phone == phoneNumber
