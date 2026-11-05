@@ -64,8 +64,21 @@ service cloud.firestore {
           /databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)
         ).data.shopId == shopId;
 
-      allow update: if (isAdmin()
-          && (request.resource.data.status != "live" || validSubscription(request.resource.data)))
+      allow update: if (
+          isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "status", "subscriptionStatus", "subscriptionExpiresAt", "updatedAt"
+          ])
+          && request.resource.data.status in ["pending", "live", "inactive", "rejected"]
+          && (
+            request.resource.data.status != "live"
+            || validSubscription(request.resource.data)
+          )
+          && (
+            !("subscriptionStatus" in request.resource.data)
+            || request.resource.data.subscriptionStatus in ["active", "inactive", "expired"]
+          )
+        )
         || (
           signedIn()
           && resource.data.ownerUid == request.auth.uid
@@ -127,8 +140,10 @@ service cloud.firestore {
         || (signedIn()
           && resource.data.createdByShopId is string
           && ownsShop(resource.data.createdByShopId));
-      allow list: if isAdmin()
-        || (signedIn() && resource.data.uid == request.auth.uid);
+
+      // Only verified platform admins may list all customer records.
+      // Customers and shopkeepers use direct document reads, not collection-wide listing.
+      allow list: if isAdmin();
       allow create: if signedIn()
         && phoneNumber.matches('^[0-9]{10}$')
         && request.resource.data.phone == phoneNumber
