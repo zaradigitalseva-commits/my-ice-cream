@@ -17,6 +17,7 @@ export default function HomePage() {
   const [shopOwner, setShopOwner] = useState(false);
   const [shops, setShops] = useState<Shop[]>([]);
   const [marketProducts, setMarketProducts] = useState<MarketplaceProduct[]>([]);
+  const [productLoadError, setProductLoadError] = useState("");
   const [loadingShops, setLoadingShops] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -60,10 +61,18 @@ export default function HomePage() {
           const liveShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
           setShops(liveShops);
           const groups = await Promise.all(liveShops.map(async (shop) => {
-            const snapshot = await getDocs(query(collection(firestore, "shops", shop.id, "products"), where("active", "==", true)));
-            return snapshot.docs.map((item) => ({ id: item.id, shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop", city: shop.city, ...item.data() } as MarketplaceProduct));
+            try {
+              const snapshot = await getDocs(query(collection(firestore, "shops", shop.id, "products"), where("active", "==", true)));
+              return { products: snapshot.docs.map((item) => ({ id: item.id, shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop", city: shop.city, ...item.data() } as MarketplaceProduct)), error: "" };
+            } catch (productError) {
+              return { products: [], error: shop.name || shop.shopName || shop.id };
+            }
           }));
-          if (active) setMarketProducts(groups.flat().filter((product) => Number(product.stock || 0) > 0));
+          if (active) {
+            setMarketProducts(groups.flatMap((group) => group.products));
+            const failedShops = groups.filter((group) => group.error).map((group) => group.error);
+            setProductLoadError(failedShops.length ? "Product read permission issue for: " + failedShops.join(", ") + ". Firebase Console mein firebase/firestore.rules publish karein." : "");
+          }
         }
       } catch (error) {
         if (active) setMessage(error instanceof Error ? error.message : "Shops could not be loaded.");
@@ -107,7 +116,7 @@ export default function HomePage() {
         const haystack = [product.name, product.description, product.category].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(searchText.trim().toLowerCase());
       }).length} products</span></div>
-      {loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : marketProducts.filter((product) => {
+      {productLoadError && <p className="admin-error" role="alert">{productLoadError}</p>}{loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : marketProducts.filter((product) => {
         const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
       }).length === 0 ? <div className="empty-panel"><h3>अभी कोई प्रोडक्ट उपलब्ध नहीं है</h3><p>LIVE दुकानों के उपलब्ध प्रोडक्ट यहाँ दिखाई देंगे।</p></div> :
@@ -117,7 +126,7 @@ export default function HomePage() {
       }).map((product) => <Link href={"/shop/" + product.shopId + "?product=" + product.id} className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
         {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
         <div className="shop-card-body"><span className="pill">{product.category || "Ice cream"}</span><h3>{product.name || "Ice cream treat"}</h3>
-          {product.description && <p>{product.description}</p>}<strong>₹{Number(product.price || 0).toFixed(2)}</strong>
+          {product.description && <p>{product.description}</p>}<strong>₹{Number(product.price || 0).toFixed(2)}</strong><p className="admin-muted">{Number(product.stock || 0) > 0 ? "Available: " + Number(product.stock) : "Out of stock"}</p>
           {product.originalPrice && product.originalPrice > Number(product.price || 0) && <del className="admin-muted"> ₹{Number(product.originalPrice).toFixed(2)}</del>}
           <p>🏪 {product.shopName} · {product.city || "Local shop"}</p><span className="admin-secondary">इस दुकान के सभी प्रोडक्ट देखें →</span>
         </div></Link>)}</div>}
