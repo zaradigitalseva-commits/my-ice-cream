@@ -6,6 +6,7 @@ import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebas
 import { collection, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
+import { compressImageToWebP } from "@/lib/image-compression";
 
 type Shop = { id: string; name?: string; shopName?: string; ownerName?: string; ownerEmail?: string; ownerUid?: string; status?: string; phone?: string; mobile?: string; mobileNumber?: string; city?: string; address?: string; fullAddress?: string; shopAddress?: string; location?: string; landmark?: string; description?: string; about?: string; createdAt?: Timestamp | Date | string };
 
@@ -74,17 +75,7 @@ export default function AdminPage() {
     try {
       let logoDataUrl = "";
       if (file) {
-        if (!file.type.startsWith("image/")) throw new Error("कृपया image file चुनें।");
-        const source = await createImageBitmap(file);
-        const scale = Math.min(1, 900 / source.width, 900 / source.height);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(source.width * scale));
-        canvas.height = Math.max(1, Math.round(source.height * scale));
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("Image process नहीं हो पाई।");
-        context.drawImage(source, 0, 0, canvas.width, canvas.height);
-        logoDataUrl = canvas.toDataURL("image/webp", 0.78);
-        if (logoDataUrl.length > 850000) throw new Error("Logo बहुत बड़ा है। छोटी image चुनें।");
+        logoDataUrl = await compressImageToWebP(file, { maxDimension: 900, maxBytes: 180 * 1024, initialQuality: 0.84 });
       }
       await setDoc(doc(db, "siteSettings", "branding"), { logoDataUrl, updatedAt: new Date() }, { merge: true });
       setSiteLogo(logoDataUrl);
