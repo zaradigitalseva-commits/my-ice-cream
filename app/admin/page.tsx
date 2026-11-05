@@ -34,6 +34,12 @@ export default function AdminPage() {
     if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
     setLoading(true); setError(""); setNotice("");
     try {
+      // Refresh the Firebase ID token so Firestore Rules receive current
+      // email_verified claims after a user verifies their Google account.
+      const token = await user.getIdTokenResult(true);
+      if (token.claims.email_verified !== true) {
+        throw new Error("Firebase token is not marked email-verified. Sign out and sign in again, then retry.");
+      }
       const result = await getDocs(query(collection(db, "shops"), orderBy("createdAt", "desc")));
       setShops(result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop)));
     } catch (err) {
@@ -91,7 +97,18 @@ export default function AdminPage() {
     if (!db) return;
     setNotice(""); setError("");
     try {
-      await updateDoc(doc(db, "shops", shop.id), { status, updatedAt: new Date() });
+      // Manual approval must carry the activation fields required by Firestore Rules.
+      // Turning a shop off also clears the manual activation flag.
+      const changes = status === "live"
+        ? {
+            status,
+            adminActivated: true,
+            adminActivatedBy: user?.email || "",
+            adminActivatedAt: new Date(),
+            updatedAt: new Date(),
+          }
+        : { status, adminActivated: false, updatedAt: new Date() };
+      await updateDoc(doc(db, "shops", shop.id), changes);
       setShops((current) => current.map((item) => item.id === shop.id ? { ...item, status } : item));
       setNotice(`${shop.name || shop.shopName || "Shop"} status changed to ${status.toUpperCase()}.`);
     } catch (err) {
