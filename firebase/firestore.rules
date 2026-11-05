@@ -137,20 +137,18 @@ service cloud.firestore {
     }
 
     match /customers/{phoneNumber} {
-      allow get: if isAdmin()
+      // Admins can read the complete customer collection for the dashboard.
+      // Customers and shop owners remain limited to their own related records.
+      allow read: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid)
-        || (signedIn()
-          && !exists(/databases/$(database)/documents/customers/$(phoneNumber))
-          && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)))
         || (signedIn()
           && resource.data.createdByShopId is string
           && ownsShop(resource.data.createdByShopId));
 
-      // Admins may list all customers for support.
-      // A signed-in customer may query only their own profile (where uid == auth.uid).
-      // Shopkeepers use direct get() by phone number and cannot enumerate customers.
-      allow list: if isAdmin()
-        || (signedIn() && resource.data.uid == request.auth.uid);
+      // Shop owners may check a not-yet-created phone record during customer creation.
+      allow get: if signedIn()
+        && !exists(/databases/$(database)/documents/customers/$(phoneNumber))
+        && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid));
       allow create: if signedIn()
         && phoneNumber.matches('^[0-9]{10}$')
         && request.resource.data.phone == phoneNumber
