@@ -47,8 +47,7 @@ service cloud.firestore {
         && data.name.size() <= 120
         && data.price is number
         && data.price >= 0
-        && data.stock is int
-        && data.stock >= 0
+        && (!("stock" in data) || (data.stock is int && data.stock >= 0))
         && data.active is bool
         && data.category is string
         && data.description is string
@@ -146,7 +145,7 @@ service cloud.firestore {
             && validProduct(request.resource.data, shopId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "name", "description", "price", "originalPrice", "category",
-              "stock", "imageUrl", "active", "updatedAt"
+              "imageUrl", "active", "updatedAt"
             ])
           );
 
