@@ -158,22 +158,6 @@ service cloud.firestore {
       }
     }
 
-    match /customerProfiles/{uid} {
-      // Customer profiles are tied to the authenticated UID. Phone stays unverified.
-      allow read: if signedIn() && request.auth.uid == uid;
-      allow create, update: if signedIn()
-        && request.auth.uid == uid
-        && request.resource.data.uid == uid
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() <= 120
-        && request.resource.data.phone is string
-        && request.resource.data.phone.size() == 10
-        && request.resource.data.phone.matches('^[0-9]+$')
-        && request.resource.data.phoneVerified == false
-        && request.resource.data.keys().hasOnly(["uid", "name", "phone", "email", "phoneVerified", "updatedAt"]);
-      allow delete: if signedIn() && request.auth.uid == uid;
-    }
     match /customers/{phoneNumber} {
       // Admins can read the complete customer collection for the dashboard.
       // Customers and shop owners remain limited to their own related records.
