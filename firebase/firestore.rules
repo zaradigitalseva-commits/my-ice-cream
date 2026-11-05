@@ -31,7 +31,7 @@ service cloud.firestore {
 
     function liveShop(shopId) {
       let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
-      return shop.status == "live" && validSubscription(shop);
+      return shop.status == "live" && (validSubscription(shop) || shop.adminActivated == true);
     }
 
     function validProduct(data, shopId) {
@@ -55,7 +55,7 @@ service cloud.firestore {
 
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || (resource.data.status == "live" && validSubscription(resource.data));
+        || (resource.data.status == "live" && (validSubscription(resource.data) || resource.data.adminActivated == true));
 
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
@@ -67,12 +67,13 @@ service cloud.firestore {
       allow update: if (
           isAdmin()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "status", "subscriptionStatus", "subscriptionExpiresAt", "updatedAt"
+            "status", "subscriptionStatus", "subscriptionExpiresAt", "adminActivated", "adminActivatedBy", "adminActivatedAt", "updatedAt"
           ])
           && request.resource.data.status in ["pending", "live", "inactive", "rejected"]
           && (
             request.resource.data.status != "live"
             || validSubscription(request.resource.data)
+            || request.resource.data.adminActivated == true
           )
           && (
             !("subscriptionStatus" in request.resource.data)
