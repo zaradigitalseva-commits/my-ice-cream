@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc } from "firebase/firestore/lite";
+import { collection, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc, where, writeBatch } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
@@ -24,6 +24,7 @@ export default function AdminPage() {
   const [siteLogo, setSiteLogo] = useState("");
   const [logoError, setLogoError] = useState("");
   const [logoBusy, setLogoBusy] = useState(false);
+  const [deletingShopId, setDeletingShopId] = useState("");
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
 
   useEffect(() => {
@@ -107,6 +108,53 @@ export default function AdminPage() {
     }
   }
 
+  async function deleteShopCompletely(shop: Shop) {
+    if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
+    const shopName = shop.name || shop.shopName || "this shop";
+    if (!window.confirm(`PERMANENT DELETE: ${shopName}? This will delete its products, orders, sales, subscription payments, UTR reservations, shop-created unlinked customer records, owner lock, and shop record from Firebase. This cannot be undone.`)) return;
+    if (!window.confirm(`Confirm permanent deletion of "${shopName}" (ID: ${shop.id})?`)) return;
+    setDeletingShopId(shop.id); setError(""); setNotice("");
+    try {
+      const firestore = db;
+      const deleteInChunks = async (refs: ReturnType<typeof doc>[]) => {
+        for (let i = 0; i < refs.length; i += 450) {
+          const batch = writeBatch(firestore);
+          refs.slice(i, i + 450).forEach((ref) => batch.delete(ref));
+          await batch.commit();
+        }
+      };
+      const productSnap = await getDocs(collection(firestore, "shops", shop.id, "products"));
+      await deleteInChunks(productSnap.docs.map((item) => item.ref));
+
+      const relatedCollections = ["orders", "sales", "subscriptionPayments", "utrReservations"] as const;
+      for (const collectionName of relatedCollections) {
+        const related = await getDocs(query(collection(firestore, collectionName), where("shopId", "==", shop.id)));
+        await deleteInChunks(related.docs.map((item) => item.ref));
+      }
+
+      const customerSnap = await getDocs(query(collection(firestore, "customers"), where("createdByShopId", "==", shop.id)));
+      const orphanedCustomers = customerSnap.docs.filter((item) => !item.data().uid);
+      await deleteInChunks(orphanedCustomers.map((item) => item.ref));
+
+      if (shop.ownerUid) {
+        const lockRef = doc(firestore, "shopOwnerLocks", shop.ownerUid);
+        const lockSnap = await getDoc(lockRef);
+        if (lockSnap.exists() && lockSnap.data().shopId === shop.id) {
+          const batch = writeBatch(firestore); batch.delete(lockRef); await batch.commit();
+        }
+      }
+
+      await updateDoc(doc(firestore, "shops", shop.id), { status: "deleted" }).catch(() => undefined);
+      const finalBatch = writeBatch(firestore);
+      finalBatch.delete(doc(firestore, "shops", shop.id));
+      await finalBatch.commit();
+      setShops((current) => current.filter((item) => item.id !== shop.id));
+      setNotice(`${shopName} and its related Firebase records have been permanently deleted.`);
+    } catch (err) {
+      setError(err instanceof Error ? `Delete incomplete: ${err.message}. Some records may already have been removed; refresh and retry after checking Firestore Rules.` : "Shop deletion failed. Some records may already have been removed.");
+    } finally { setDeletingShopId(""); }
+  }
+
   if (!authReady) return <main className="admin-wrap"><p>Checking admin access…</p></main>;
   if (!user) return <main className="admin-wrap"><Link href="/" className="admin-back">← Back to home</Link><section className="admin-panel"><h1>Admin sign in</h1><p>Sign in with an authorized admin Google account to continue.</p><button className="admin-primary" onClick={() => auth && signInWithPopup(auth, googleProvider).catch((err) => setError(err.message))}>Continue with Google</button>{error && <p className="admin-error">{error}</p>}</section></main>;
   if (!isAdminEmail(user.email) || !user.emailVerified) return <main className="admin-wrap"><Link href="/" className="admin-back">← Back to home</Link><section className="admin-panel"><h1>Access not allowed</h1><p>This Google account is not on the verified admin allowlist.</p><p className="admin-muted">{user.email}</p><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></section></main>;
@@ -140,7 +188,7 @@ export default function AdminPage() {
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>
       <div className="admin-filters"><label>Search shops<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Shop, owner, mobile, city or ID…" /></label><label>Filter by status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="live">Live</option><option value="inactive">Inactive</option><option value="rejected">Rejected</option></select></label></div>
       {loading ? <p className="admin-muted">Loading shops…</p> : shops.length === 0 ? <div className="admin-empty"><span>🏪</span><h3>No shop registrations yet</h3><p>When a shop registration is saved to the Firestore <code>shops</code> collection, it will appear here for review.</p></div> :
-      visibleShops.length === 0 ? <div className="admin-empty"><span>🔎</span><h3>No matching shops</h3><p>Search ya status filter badal kar dobara dekhein.</p><button className="admin-secondary" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</button></div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Shop details</th><th>Owner details</th><th>Contact & address</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleShops.map((shop) => { const status = (shop.status || "pending").toLowerCase(); return <tr key={shop.id}><td><strong>{shop.name || shop.shopName || "Unnamed shop"}</strong><small>ID: {shop.id}</small><small>{shop.description || shop.about || "Shop description not provided"}</small></td><td><strong>{shop.ownerName || "Name not provided"}</strong><small>{shop.ownerEmail || "Email not provided"}</small><small>UID: {shop.ownerUid || "—"}</small></td><td className="admin-contact-cell"><strong>📱 {shop.phone || shop.mobile || shop.mobileNumber || "Mobile not provided"}</strong><div className="admin-address"><b>📍 Shop address</b><span>{[shop.address, shop.fullAddress, shop.shopAddress, shop.location].find((value) => value?.trim()) || "Full address not provided by shop owner"}</span><small>City: {shop.city || "Not provided"}{shop.landmark ? ` · Landmark: ${shop.landmark}` : ""}</small></div></td><td><span className={`admin-status ${status}`}>{status}</span></td><td className="admin-actions">{status !== "live" && <button className="admin-primary small" onClick={() => void setShopStatus(shop, "live")}>Approve & publish</button>}{status !== "inactive" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "inactive")}>Pause shop</button>}{status === "pending" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "rejected")}>Reject</button>}</td></tr>; })}</tbody></table></div>}
+      visibleShops.length === 0 ? <div className="admin-empty"><span>🔎</span><h3>No matching shops</h3><p>Search ya status filter badal kar dobara dekhein.</p><button className="admin-secondary" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</button></div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Shop details</th><th>Owner details</th><th>Contact & address</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleShops.map((shop) => { const status = (shop.status || "pending").toLowerCase(); return <tr key={shop.id}><td><strong>{shop.name || shop.shopName || "Unnamed shop"}</strong><small>ID: {shop.id}</small><small>{shop.description || shop.about || "Shop description not provided"}</small></td><td><strong>{shop.ownerName || "Name not provided"}</strong><small>{shop.ownerEmail || "Email not provided"}</small><small>UID: {shop.ownerUid || "—"}</small></td><td className="admin-contact-cell"><strong>📱 {shop.phone || shop.mobile || shop.mobileNumber || "Mobile not provided"}</strong><div className="admin-address"><b>📍 Shop address</b><span>{[shop.address, shop.fullAddress, shop.shopAddress, shop.location].find((value) => value?.trim()) || "Full address not provided by shop owner"}</span><small>City: {shop.city || "Not provided"}{shop.landmark ? ` · Landmark: ${shop.landmark}` : ""}</small></div></td><td><span className={`admin-status ${status}`}>{status}</span></td><td className="admin-actions">{status !== "live" && <button className="admin-primary small" onClick={() => void setShopStatus(shop, "live")}>Approve & publish</button>}{status !== "inactive" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "inactive")}>Pause shop</button><button className="admin-secondary small" style={{color:"#b42318",borderColor:"#b42318"}} disabled={deletingShopId===shop.id} onClick={() => void deleteShopCompletely(shop)}>{deletingShopId===shop.id ? "Deleting…" : "Delete permanently"}</button>}{status === "pending" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "rejected")}>Reject</button>}</td></tr>; })}</tbody></table></div>}
     </section>
     <p className="admin-footnote">Signed in as verified admin · Approving a shop makes it eligible to appear to customers. Status changes are protected by Firestore security rules.</p>
   </main>;
