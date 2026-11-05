@@ -15,7 +15,7 @@ export default function ShopDetailsPage(){
  const [phone,setPhone]=useState(""); const [address,setAddress]=useState(""); const [fulfillmentType,setFulfillmentType]=useState<"pickup"|"delivery">("pickup"); const [busy,setBusy]=useState(false); const [message,setMessage]=useState("");
  useEffect(()=>{if(!auth)return;return onAuthStateChanged(auth,setUser)},[]);
  useEffect(()=>{let active=true; async function load(){if(!db)return;try{const s=await getDoc(doc(db,"shops",shopId));if(!s.exists()||s.data().status!=="live"){setMessage("This shop is not available.");return;}const p=await getDocs(query(collection(db,"shops",shopId,"products"),where("active","==",true)));if(active){setShop({id:s.id,...s.data()} as Shop);setProducts(p.docs.map(x=>({id:x.id,...x.data()} as Product)));}}catch(e){setMessage(e instanceof Error?e.message:"Could not load shop.");}}void load();return()=>{active=false}},[shopId]);
- const visibleProducts=useMemo(()=>selectedProductId?products.filter(p=>p.id===selectedProductId):products,[products,selectedProductId]);
+ const visibleProducts=products; // Product links may carry a selected product ID, but customers must always see the full shop catalogue.
  const subtotal=useMemo(()=>products.reduce((sum,p)=>sum+(cart[p.id]||0)*Number(p.price||0),0),[products,cart]);
  const deliveryFee=fulfillmentType==="delivery"?Number(shop?.deliveryFee||0):0;
  const total=subtotal+deliveryFee;
