@@ -396,7 +396,7 @@ service cloud.firestore {
         && (
           (request.resource.data.paymentType == "initial_listing"
             && request.resource.data.amount == 599
-            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.status == "pending"
+            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.status in ["pending", "live", "LIVE", "Live"]
             && (!( "initialPaymentVerified" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data)
               || get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified != true)
             && (!( "subscriptionExpiresAt" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data)
@@ -404,7 +404,7 @@ service cloud.firestore {
           || (request.resource.data.paymentType == "monthly_renewal"
             && request.resource.data.amount == 299
             && (get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified == true
-              || "subscriptionExpiresAt" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data))
+              || get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.subscriptionExpiresAt is timestamp))
         )
         && request.resource.data.utr is string
         && request.resource.data.utr.matches('^[A-Z0-9]{6,40}    match /utrReservations/{utr} {
