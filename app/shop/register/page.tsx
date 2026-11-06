@@ -1,11 +1,13 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
 export default function ShopRegisterPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -34,8 +36,8 @@ export default function ShopRegisterPage() {
       });
       batch.set(lockRef, { ownerUid: user.uid, shopId: shopRef.id, createdAt: serverTimestamp() });
       await batch.commit();
-      setMessage("Registration submitted. अब Shop Dashboard में पहली बार की ₹599 listing payment का UTR जमा करें। Admin verification के बाद आपकी shop LIVE होगी।");
-      setName(""); setPhone(""); setCity(""); setAddress(""); setDescription("");
+      router.replace("/shop?payment=1");
+      return;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Registration could not be submitted.");
     } finally { setBusy(false); }
