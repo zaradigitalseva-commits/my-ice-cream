@@ -122,10 +122,10 @@ export default function ShopRegisterPage() {
           ? "Aapki registration reject hui hai. Zaroori details sudharne ke liye edit karein ya Admin se sampark karein."
           : (existingShop.status || "pending").toLowerCase() === "inactive"
             ? "Aapki shop filhaal inactive hai. Admin se sampark karein."
-            : "Aapki registration Admin review mein hai. Approval milne ke baad Shop Dashboard khul jayega."}</p>
+            : "Aapki shop registration save hai. Pehle ₹599 listing payment UTR जमा करें; Admin payment verify karne ke baad shop LIVE hogi."}</p>
         <div className="register-status-actions">
           <Link href="/shop#shop-profile" className="admin-primary role-link">✏️ Edit registration details</Link>
-          <Link href="/shop" className="admin-secondary role-link">Open Shop Dashboard →</Link>
+          <Link href="/shop?payment=1" className="admin-secondary role-link">Open payment & Shop Dashboard →</Link>
         </div>
       </div> :
       <form className="register-form register-form-color" onSubmit={submit}>
