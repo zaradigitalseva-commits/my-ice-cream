@@ -151,8 +151,6 @@ service cloud.firestore {
         && request.resource.data.name.size() > 0
         && (
           (request.resource.data.uid == request.auth.uid
-            && request.auth.token.phone_number is string
-            && request.auth.token.phone_number.matches('.*' + phoneNumber + '$')
             && !exists(/databases/$(database)/documents/customers/$(phoneNumber)))
           || (request.resource.data.uid == ""
             && request.resource.data.registered == false
@@ -165,14 +163,10 @@ service cloud.firestore {
         && (
           (resource.data.uid == request.auth.uid
             && request.resource.data.uid == request.auth.uid
-            && request.auth.token.phone_number is string
-            && request.auth.token.phone_number.matches('.*' + phoneNumber + '$')
             && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(["name", "email", "updatedAt", "registered"]))
           || (resource.data.uid == ""
             && request.resource.data.uid == request.auth.uid
-            && request.auth.token.phone_number is string
-            && request.auth.token.phone_number.matches('.*' + phoneNumber + '$')
             && request.resource.data.registered == true
             && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(["uid", "name", "email", "registered", "updatedAt"]))
