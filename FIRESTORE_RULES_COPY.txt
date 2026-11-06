@@ -429,7 +429,9 @@ service cloud.firestore {
     }
 
     match /paymentPendingLocks/{shopId} {
-      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      // Shop owners may read the lock document even when it does not exist yet.
+      allow get: if isAdmin() || ownsShop(shopId);
+      allow list: if isAdmin();
       allow create: if signedIn()
         && !exists(/databases/$(database)/documents/paymentPendingLocks/$(shopId))
         && ownsShop(shopId)
