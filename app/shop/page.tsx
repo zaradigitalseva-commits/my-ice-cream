@@ -7,7 +7,7 @@ import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, runTransact
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
-type Shop = { id: string; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date }; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number };
+type Shop = { id: string; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date }; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number };
 type Order = { id: string; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
 type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
@@ -199,6 +199,9 @@ export default function ShopPage() {
       if (!/^[A-Z0-9]{6,40}$/.test(normalizedUtr)) {
         throw new Error("Please enter a valid UTR (6–40 letters or numbers).");
       }
+      const firstListingPayment = !shop.initialPaymentVerified && !shop.subscriptionExpiresAt;
+      const paymentType = firstListingPayment ? "initial_listing" : "monthly_renewal";
+      const amount = firstListingPayment ? 599 : 299;
       const paymentRef = doc(collection(db, "subscriptionPayments"));
       const reservationRef = doc(db, "utrReservations", normalizedUtr);
       await runTransaction(db, async (transaction) => {
@@ -216,13 +219,14 @@ export default function ShopPage() {
           ownerUid: user.uid,
           shopId: shop.id,
           shopName: shop.name || shop.shopName || "",
-          amount: 299,
+          amount,
+          paymentType,
           utr: normalizedUtr,
           status: "pending",
           createdAt: serverTimestamp()
         });
       });
-      setPaymentNotice("₹299 payment details submitted. Admin verification is pending.");
+      setPaymentNotice(`₹${amount} ${firstListingPayment ? "first listing" : "monthly renewal"} payment details submitted. Admin verification is pending.`);
       setUtr("");
     } catch (e) { setError(e instanceof Error ? e.message : "Payment details could not be submitted."); }
     finally { setBusy(false); }
@@ -308,6 +312,8 @@ export default function ShopPage() {
   }
 
   const subscriptionExpiry = shop?.subscriptionExpiresAt?.toDate?.();
+  const firstListingPayment = Boolean(shop && !shop.initialPaymentVerified && !shop.subscriptionExpiresAt);
+  const subscriptionAmount = firstListingPayment ? 599 : 299;
   const live = (shop?.status || "").toLowerCase() === "live" && shop?.subscriptionStatus === "active" && Boolean(subscriptionExpiry && subscriptionExpiry.getTime() > Date.now());
   return <main className="admin-wrap">
     <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></header>
@@ -365,7 +371,7 @@ export default function ShopPage() {
           <label>Shop banner (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"banner");}} /></label>{bannerUrl&&<img src={bannerUrl} alt="Shop banner preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:14}}/>}
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
         </form></section>
-        <section className="admin-panel"><h2>Monthly subscription</h2><p>Plan amount: ₹299 per month. Pay by UPI and submit the UTR number for Admin verification. Your subscription activates only after Admin confirms payment.</p><p><strong>Subscription:</strong> {live ? "Active until " + subscriptionExpiry?.toLocaleDateString("en-IN") : "Not active — shop is hidden from customers until payment is verified."}</p><form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()}>Submit ₹299 payment for verification</button></form>{paymentNotice&&<p className="admin-success">{paymentNotice}</p>}</section>
+        <section className="admin-panel"><h2>{firstListingPayment ? "First-time shop listing" : "Monthly subscription renewal"}</h2><p>{firstListingPayment ? "पहली बार की एकमुश्त फीस ₹599 है। इसमें shop listing, Admin approval और पहला महीना शामिल है। इसके बाद हर महीने renewal ₹299 होगा।" : "आपकी पहली listing और पहला महीना पहले से कवर है। अब अगले 30 दिनों के लिए renewal ₹299 है।"} UPI से भुगतान करें और UTR जमा करें। Admin verification के बाद shop activate होगी / subscription आगे बढ़ेगा।</p><p><strong>अभी देय राशि:</strong> ₹{subscriptionAmount} · <strong>Subscription:</strong> {live ? "Active until " + subscriptionExpiry?.toLocaleDateString("en-IN") : "Not active — verification के बाद ही shop LIVE होगी."}</p><form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()}>Submit ₹{subscriptionAmount} payment for verification</button></form>{paymentNotice&&<p className="admin-success">{paymentNotice}</p>}</section>
         {live ? <section className="admin-panel"><h2>Products</h2><p>Add products with price and details. Only active LIVE shops are visible to customers.</p>
           <form className="register-form" onSubmit={saveProduct}>
             <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>
