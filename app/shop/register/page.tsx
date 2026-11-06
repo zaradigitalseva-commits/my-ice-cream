@@ -87,8 +87,8 @@ export default function ShopRegisterPage() {
       });
       batch.set(lockRef, { ownerUid: user.uid, shopId: shopRef.id, createdAt: serverTimestamp() });
       await batch.commit();
-      setExistingShop({ id: shopRef.id, name: name.trim(), shopName: name.trim(), city: city.trim(), status: "pending" });
-      setMessage("Registration submit ho gaya. Admin approval ka intezar karein.");
+      router.replace("/shop?payment=1");
+      return;
       setName(""); setPhone(""); setCity(""); setAddress(""); setDescription(""); setLogoUrl(""); setBannerUrl("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Registration could not be submitted.");
@@ -105,8 +105,8 @@ export default function ShopRegisterPage() {
       <div className="register-hero-copy">
         <span className="register-badge">🍨 SHOP PARTNER PROGRAM</span>
         <h1>Apni ice cream shop ko <em>online</em> laayein!</h1>
-        <p>Apni shop register karein aur aas-paas ke customers tak pahunch banayein. Details submit karne ke baad Admin approval zaroori hai.</p>
-        <div className="register-benefits"><span>✨ Free shop listing</span><span>📍 Local customers</span><span>💛 Easy order access</span></div>
+        <p>Apni shop register karein aur aas-paas ke customers tak pahunch banayein. पहली listing ₹599 (पहला महीना शामिल) है। उसके बाद renewal ₹299 प्रति माह है। UPI UTR जमा करें; Admin payment verify करने के बाद दुकान LIVE होगी।</p>
+        <div className="register-benefits"><span>✨ पहली listing ₹599</span><span>📍 पहला महीना शामिल</span><span>💛 Renewal ₹299/माह</span></div>
       </div>
       <div className="register-hero-art" aria-hidden="true"><span className="register-spark spark-one">✦</span><span className="register-spark spark-two">✧</span><div className="register-scoop">🍦</div><div className="register-art-caption">Your shop, more visible!</div></div>
     </section>
