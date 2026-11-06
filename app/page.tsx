@@ -136,7 +136,7 @@ export default function HomePage() {
           </div>
         </Link>)}</div>}
     </section>
-    <section id="for-shops" className="shop-onboarding"><div><p className="eyebrow">For ice cream businesses</p><h2>Bring your shop to MY ICE CREAM</h2><p>Register your shop for free review. Your shop becomes public only after Admin approval.</p></div><Link href="/shop/register" className="primary-button">Register your shop</Link></section>
+    <section id="for-shops" className="shop-onboarding"><div><p className="eyebrow">For ice cream businesses</p><h2>Bring your shop to MY ICE CREAM</h2><p>First listing is ₹599 (includes Admin approval and the first month). Renewals are ₹299/month. Your shop becomes public after payment verification.</p></div><Link href="/shop/register" className="primary-button">Register your shop</Link></section>
     <footer className="footer" id="about"><span>© {new Date().getFullYear()} MY ICE CREAM</span><span>Unlimited shops · Sweet moments · Easy ordering</span></footer>
   </main>;
 }
