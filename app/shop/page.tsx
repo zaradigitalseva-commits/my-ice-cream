@@ -345,7 +345,7 @@ export default function ShopPage() {
     catch (e) { setError(e instanceof Error ? e.message : "Could not delete product."); }
   }
 
-  const live = (shop?.status || "").toLowerCase() === "live";
+  const live = (shop?.status || "").toLowerCase() === "live" && shop?.subscriptionStatus === "active" && Boolean(subscriptionExpiry && subscriptionExpiry.getTime() > Date.now());
   return <main className="admin-wrap">
     <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></header>
     {loading ? <section className="admin-panel"><h1>Loading your shop…</h1></section> : !shop ?
@@ -409,7 +409,7 @@ export default function ShopPage() {
           <label>Shop banner (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"banner");}} /></label>{bannerUrl&&<img src={bannerUrl} alt="Shop banner preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:14}}/>}
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
         </form></section>
-        <section className="admin-panel"><h2>{firstListingPayment ? "First-time shop listing" : "Monthly subscription renewal"}</h2><p>{firstListingPayment ? "पहली बार की फीस ₹599 है। इसमें shop listing review, Admin approval और पहला 30 दिन शामिल है। इसके बाद हर महीने renewal ₹299 होगा।" : "पहली listing और पहला महीना पूरा हो चुका है। अगले 30 दिनों के लिए renewal ₹299 है।"} Admin का UPI QR scan करके भुगतान करें, फिर UTR नंबर जमा करें। Admin verification के बाद ही shop LIVE होगी / subscription आगे बढ़ेगा।</p><p><strong>अभी देय राशि: ₹{subscriptionAmount}</strong>{subscriptionExpiry ? ` · वर्तमान expiry: ${subscriptionExpiry.toLocaleDateString("en-IN")}` : ""}</p>{adminUpiQr ? <div style={{textAlign:"center",margin:"16px auto",maxWidth:320}}><img src={adminUpiQr} alt="Admin UPI QR Code" style={{width:"100%",maxWidth:280,objectFit:"contain",borderRadius:12,border:"1px solid #ddd",padding:8,background:"#fff"}}/><p className="admin-muted">Admin UPI Payment QR · ₹{subscriptionAmount}</p></div> : <p className="admin-error">Admin ने अभी UPI QR Code सेट नहीं किया है। भुगतान से पहले Admin से संपर्क करें।</p>}<form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()||pendingPayment}>Submit ₹{subscriptionAmount} payment for verification</button></form>{paymentNotice&&<p className="admin-success">{paymentNotice}</p>}{pendingPayment&&<p className="admin-muted">एक payment verification के लिए pending है। दूसरी payment जमा न करें।</p>}</section>
+        
         {live ? <section className="admin-panel"><h2>Products</h2><p>Add your products with price and photo. Only active LIVE shops are visible to customers.</p>
           <form className="register-form" onSubmit={saveProduct}>
             <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>
