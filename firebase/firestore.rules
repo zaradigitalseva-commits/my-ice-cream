@@ -330,7 +330,8 @@ service cloud.firestore {
           (request.resource.data.paymentType == "initial_listing"
             && request.resource.data.amount == 599
             && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.status == "pending"
-            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified != true
+            && (!("initialPaymentVerified" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data)
+              || get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified != true)
             && !("subscriptionExpiresAt" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data))
           || (request.resource.data.paymentType == "monthly_renewal"
             && request.resource.data.amount == 299
