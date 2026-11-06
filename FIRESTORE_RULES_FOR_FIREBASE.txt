@@ -465,49 +465,4 @@ service cloud.firestore {
       allow read, write: if false;
     }
   }
-})
-        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.ownerUid == request.auth.uid
-        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.shopId == request.resource.data.shopId
-        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.paymentId == paymentId
-        && getAfter(/databases/$(database)/documents/paymentPendingLocks/$(request.resource.data.shopId)).data.paymentId == paymentId;
-      allow update, delete: if isAdmin();
-    }
-
-    match /paymentPendingLocks/{shopId} {
-      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
-      allow create: if signedIn()
-        && !exists(/databases/$(database)/documents/paymentPendingLocks/$(shopId))
-        && ownsShop(shopId)
-        && request.resource.data.shopId == shopId
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.paymentId is string
-        && request.resource.data.keys().hasOnly(["shopId", "ownerUid", "paymentId", "createdAt"])
-        && getAfter(/databases/$(database)/documents/subscriptionPayments/$(request.resource.data.paymentId)).data.ownerUid == request.auth.uid
-        && getAfter(/databases/$(database)/documents/subscriptionPayments/$(request.resource.data.paymentId)).data.shopId == shopId;
-      allow update, delete: if isAdmin();
-    }
-
-    match /utrReservations/{utr} {
-      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
-      allow create: if signedIn()
-        && !exists(/databases/$(database)/documents/utrReservations/$(utr))
-        && utr.matches('^[A-Z0-9]{6,40}$')
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.shopId is string
-        && ownsShop(request.resource.data.shopId)
-        && request.resource.data.paymentId is string
-        && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "paymentId", "createdAt"]);
-      allow update: if false;
-      allow delete: if isAdmin();
-    }
-
-    match /siteSettings/{settingId} {
-      allow read: if settingId == "branding";
-      allow write: if isAdmin() && settingId == "branding";
-    }
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
 }
