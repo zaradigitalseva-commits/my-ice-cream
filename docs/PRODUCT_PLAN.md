@@ -19,7 +19,8 @@ Create one responsive web app/PWA with role-based experiences for customers, sho
 
 ### Shopkeeper experience
 - Register a shop with name, logo/photo, address, and contact number.
-- Submit monthly subscription payment UTR for manual approval.
+- First-time listing payment is ₹599 and includes listing review/approval plus the first 30-day subscription period.
+- Submit renewal payment UTR of ₹299 for each following 30-day period; payments are manually verified by Admin.
 - See LIVE/inactive subscription status.
 - Manage shop profile and product listings with name, photo, price, category, and description; edit or delete each listing.
 - Do not track stock, inventory, cost, or expiry dates.
