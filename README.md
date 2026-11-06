@@ -16,7 +16,7 @@ The repository now contains a Next.js App Router + TypeScript starter, a respons
 
 - Customers can browse without creating an account.
 - Customer and shopkeeper sign-in is planned through Google sign-in; admin access must be restricted to explicitly authorized accounts.
-- Planned shop subscription: ₹299 per month, with UTR submission and manual admin approval in the initial release.
+- Shop pricing: first-time listing is ₹599 (includes listing review/approval and the first 30-day subscription period); renewals are ₹299 per 30 days. UPI UTR is submitted for manual admin verification; no payment gateway or auto-debit is used.
 - Home delivery is optional per shop. A customer is asked for a delivery address only after choosing Home Delivery.
 - Customer private details and transaction history must not be visible to unrelated shops.
 - Public party/bulk requests expose only the details the customer chooses to share.
