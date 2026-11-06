@@ -24,6 +24,9 @@ export default function AdminPage() {
   const [siteLogo, setSiteLogo] = useState("");
   const [logoBusy, setLogoBusy] = useState(false);
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
+  const [siteQr, setSiteQr] = useState("");
+  const [pendingQrFile, setPendingQrFile] = useState<File | null>(null);
+  const [qrBusy, setQrBusy] = useState(false);
 
   useEffect(() => {
     if (!auth) { setAuthReady(true); setError("Firebase configuration is missing."); return; }
@@ -57,9 +60,37 @@ export default function AdminPage() {
   useEffect(() => {
     if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
     getDoc(doc(db, "siteSettings", "branding")).then((snapshot) => {
-      if (snapshot.exists()) setSiteLogo(String(snapshot.data().logoDataUrl || ""));
+      if (snapshot.exists()) {
+        setSiteLogo(String(snapshot.data().logoDataUrl || ""));
+        setSiteQr(String(snapshot.data().upiQrDataUrl || ""));
+      }
     }).catch((err) => setLogoError(err instanceof Error ? err.message : "Logo load failed."));
   }, [user]);
+
+  async function saveUpiQr(file?: File) {
+    if (!db) return;
+    setQrBusy(true); setError(""); setNotice("");
+    try {
+      let upiQrDataUrl = "";
+      if (file) {
+        if (!file.type.startsWith("image/")) throw new Error("कृपया UPI QR की image चुनें।");
+        const source = await createImageBitmap(file);
+        const scale = Math.min(1, 700 / source.width, 700 / source.height);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(source.width * scale));
+        canvas.height = Math.max(1, Math.round(source.height * scale));
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("QR image process नहीं हो पाई।");
+        context.drawImage(source, 0, 0, canvas.width, canvas.height);
+        upiQrDataUrl = canvas.toDataURL("image/webp", 0.82);
+        if (upiQrDataUrl.length > 850000) throw new Error("QR image बहुत बड़ी है। छोटी image चुनें।");
+      }
+      await setDoc(doc(db, "siteSettings", "branding"), { upiQrDataUrl, upiQrUpdatedAt: new Date(), updatedAt: new Date() }, { merge: true });
+      setSiteQr(upiQrDataUrl);
+      setNotice(file ? "UPI QR Code सेव हो गया।" : "UPI QR Code हटा दिया गया।");
+    } catch (err) { setError(err instanceof Error ? err.message : "UPI QR Code सेव नहीं हो पाया।"); }
+    finally { setQrBusy(false); }
+  }
 
   async function saveSiteLogo(file?: File) {
     if (!db) return;
@@ -90,18 +121,11 @@ export default function AdminPage() {
     if (!db) return;
     setNotice(""); setError("");
     try {
-      // Platform admins may publish any shop without a customer payment.
-      // The explicit flag is also checked by Firestore rules for public visibility.
-      await updateDoc(doc(db, "shops", shop.id), {
-        status,
-        ...(status === "live" ? { adminActivated: true, adminActivatedBy: user?.email || "", adminActivatedAt: new Date() } : {}),
-        updatedAt: new Date()
-      });
-      setShops((current) => current.map((item) => item.id === shop.id ? {
-        ...item,
-        status,
-        ...(status === "live" ? { adminActivated: true, adminActivatedBy: user?.email || "", adminActivatedAt: Timestamp.now() } : {})
-      } : item));
+      if (status === "live") {
+        throw new Error("Shop को LIVE करने के लिए पहले ₹599/₹299 payment verify करें। Subscription payments पेज से payment approve करें।");
+      }
+      await updateDoc(doc(db, "shops", shop.id), { status, updatedAt: new Date() });
+      setShops((current) => current.map((item) => item.id === shop.id ? { ...item, status } : item));
       setNotice(`${shop.name || shop.shopName || "Shop"} status changed to ${status.toUpperCase()}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update shop status.");
@@ -135,6 +159,14 @@ export default function AdminPage() {
         {pendingLogoFile && <button className="admin-secondary small" disabled={logoBusy} onClick={() => setPendingLogoFile(null)}>रद्द करें</button>}
         {siteLogo && <button className="admin-secondary small" disabled={logoBusy} onClick={() => { void saveSiteLogo().then(() => setPendingLogoFile(null)); }}>लोगो हटाएँ</button>}
       </div>{logoError && <p className="admin-error" role="alert">Logo load नहीं हुआ: {logoError}</p>}<small className="admin-muted">PNG, JPG या WebP image चुनें, फिर “लोगो सेव करें” दबाएँ। लोगो अपने-आप छोटा करके सेव होगा।</small>
+    </section>
+    <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>UPI payment QR</h2><p>दुकानदारों को ₹599 पहली listing और ₹299 renewal का भुगतान इसी QR से करना होगा।</p></div></div>
+      <div className="site-logo-editor">{siteQr ? <img src={siteQr} alt="Admin UPI payment QR" /> : <div className="site-logo-empty">UPI QR अभी सेट नहीं है</div>}
+        <label className="admin-primary small">{pendingQrFile ? "दूसरा QR चुनें" : "UPI QR चुनें"}<input type="file" accept="image/*" hidden disabled={qrBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) { setPendingQrFile(file); setError(""); } event.currentTarget.value = ""; }} /></label>
+        {pendingQrFile && <button className="admin-primary small" disabled={qrBusy} onClick={() => { void saveUpiQr(pendingQrFile).then(() => setPendingQrFile(null)); }}>{qrBusy ? "सेव हो रहा है…" : "QR सेव करें"}</button>}
+        {pendingQrFile && <button className="admin-secondary small" disabled={qrBusy} onClick={() => setPendingQrFile(null)}>रद्द करें</button>}
+        {siteQr && <button className="admin-secondary small" disabled={qrBusy} onClick={() => { void saveUpiQr().then(() => setPendingQrFile(null)); }}>QR हटाएँ</button>}
+      </div><small className="admin-muted">साफ़ UPI QR image चुनें। Image वेबसाइट में compressed WebP के रूप में सेव होगी।</small>
     </section><section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>सभी ग्राहक रिकॉर्ड — ऐप से जुड़े और दुकानदार द्वारा बनाए गए।</p></div><span className="admin-count">{customers.length} customers</span></div>
@@ -142,8 +174,8 @@ export default function AdminPage() {
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>
       <div className="admin-filters"><label>Search shops<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Shop, owner, mobile, city or ID…" /></label><label>Filter by status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="live">Live</option><option value="inactive">Inactive</option><option value="rejected">Rejected</option></select></label></div>
       {loading ? <p className="admin-muted">Loading shops…</p> : shops.length === 0 ? <div className="admin-empty"><span>🏪</span><h3>No shop registrations yet</h3><p>When a shop registration is saved to the Firestore <code>shops</code> collection, it will appear here for review.</p></div> :
-      visibleShops.length === 0 ? <div className="admin-empty"><span>🔎</span><h3>No matching shops</h3><p>Search ya status filter badal kar dobara dekhein.</p><button className="admin-secondary" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</button></div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Shop details</th><th>Owner details</th><th>Contact & address</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleShops.map((shop) => { const status = (shop.status || "pending").toLowerCase(); return <tr key={shop.id}><td><strong>{shop.name || shop.shopName || "Unnamed shop"}</strong><small>ID: {shop.id}</small><small>{shop.description || shop.about || "Shop description not provided"}</small></td><td><strong>{shop.ownerName || "Name not provided"}</strong><small>{shop.ownerEmail || "Email not provided"}</small><small>UID: {shop.ownerUid || "—"}</small></td><td className="admin-contact-cell"><strong>📱 {shop.phone || shop.mobile || shop.mobileNumber || "Mobile not provided"}</strong><div className="admin-address"><b>📍 Shop address</b><span>{[shop.address, shop.fullAddress, shop.shopAddress, shop.location].find((value) => value?.trim()) || "Full address not provided by shop owner"}</span><small>City: {shop.city || "Not provided"}{shop.landmark ? ` · Landmark: ${shop.landmark}` : ""}</small></div></td><td><span className={"admin-status " + status}>{status}</span><small>Subscription: {shop.subscriptionStatus || "not active"}</small>{shop.subscriptionExpiresAt && <small>Expires: {shop.subscriptionExpiresAt.toDate().toLocaleDateString("en-IN")}</small>}</td><td className="admin-actions">{status !== "live" && <button className="admin-primary small" onClick={() => void setShopStatus(shop, "live")}>Activate without payment</button>}{status !== "inactive" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "inactive")}>Pause shop</button>}{status === "pending" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "rejected")}>Reject</button>}</td></tr>; })}</tbody></table></div>}
+      visibleShops.length === 0 ? <div className="admin-empty"><span>🔎</span><h3>No matching shops</h3><p>Search ya status filter badal kar dobara dekhein.</p><button className="admin-secondary" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</button></div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Shop details</th><th>Owner details</th><th>Contact & address</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleShops.map((shop) => { const status = (shop.status || "pending").toLowerCase(); return <tr key={shop.id}><td><strong>{shop.name || shop.shopName || "Unnamed shop"}</strong><small>ID: {shop.id}</small><small>{shop.description || shop.about || "Shop description not provided"}</small></td><td><strong>{shop.ownerName || "Name not provided"}</strong><small>{shop.ownerEmail || "Email not provided"}</small><small>UID: {shop.ownerUid || "—"}</small></td><td className="admin-contact-cell"><strong>📱 {shop.phone || shop.mobile || shop.mobileNumber || "Mobile not provided"}</strong><div className="admin-address"><b>📍 Shop address</b><span>{[shop.address, shop.fullAddress, shop.shopAddress, shop.location].find((value) => value?.trim()) || "Full address not provided by shop owner"}</span><small>City: {shop.city || "Not provided"}{shop.landmark ? ` · Landmark: ${shop.landmark}` : ""}</small></div></td><td><span className={"admin-status " + status}>{status}</span><small>Subscription: {shop.subscriptionStatus || "not active"}</small>{shop.subscriptionExpiresAt && <small>Expires: {shop.subscriptionExpiresAt.toDate().toLocaleDateString("en-IN")}</small>}</td><td className="admin-actions">{status !== "inactive" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "inactive")}>Pause shop</button>}{status === "pending" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "rejected")}>Reject</button>}</td></tr>; })}</tbody></table></div>}
     </section>
-    <p className="admin-footnote">Signed in as verified admin · Admins can activate any shop without payment; this is recorded as an admin override. Status changes are protected by Firestore security rules.</p>
+    <p className="admin-footnote">Signed in as verified admin · Shop activation is available only after verified subscription payment.</p>
   </main>;
 }
