@@ -404,7 +404,8 @@ service cloud.firestore {
           || (request.resource.data.paymentType == "monthly_renewal"
             && request.resource.data.amount == 299
             && (get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified == true
-              || get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.subscriptionExpiresAt is timestamp))
+              || ("subscriptionExpiresAt" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data
+                && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.subscriptionExpiresAt is timestamp))
         )
         && request.resource.data.utr is string
         && request.resource.data.utr.matches('^[A-Z0-9]{6,40}    match /utrReservations/{utr} {
@@ -446,7 +447,9 @@ service cloud.firestore {
         && request.resource.data.shopId == shopId
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.paymentId is string
-        && request.resource.data.keys().hasOnly(["shopId", "ownerUid", "paymentId", "createdAt"]);
+        && request.resource.data.keys().hasOnly(["shopId", "ownerUid", "paymentId", "createdAt"])
+        && getAfter(/databases/$(database)/documents/subscriptionPayments/$(request.resource.data.paymentId)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/subscriptionPayments/$(request.resource.data.paymentId)).data.shopId == shopId;
       allow update, delete: if isAdmin();
     }
 
