@@ -9,14 +9,14 @@ The repository now contains a Next.js App Router + TypeScript starter, a respons
 ## Product roles
 
 - **Customer:** Browse public shops and products as a guest; sign in when needed for orders, saved items, and personal history.
-- **Shopkeeper:** Manage one or more shops, products, stock, orders, billing, offers, and shop settings.
+- **Shopkeeper:** Manage shop details, product listings, customer orders, billing, offers, and shop settings. Inventory and stock tracking are intentionally not part of this app.
 - **Admin:** Approve shop registrations and subscription payments, manage shop status, and view platform-level reports.
 
 ## Important product decisions
 
 - Customers can browse without creating an account.
 - Customer and shopkeeper sign-in is planned through Google sign-in; admin access must be restricted to explicitly authorized accounts.
-- Planned shop subscription: ₹299 per month, with UTR submission and manual admin approval in the initial release.
+- Shop pricing: first-time listing is ₹599 (includes Admin review and the first 30-day period); renewals are ₹299 per 30 days. UPI UTR is submitted for manual Admin verification; no payment gateway or auto-debit is used.
 - Home delivery is optional per shop. A customer is asked for a delivery address only after choosing Home Delivery.
 - Customer private details and transaction history must not be visible to unrelated shops.
 - Public party/bulk requests expose only the details the customer chooses to share.
