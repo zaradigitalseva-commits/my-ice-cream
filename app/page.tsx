@@ -56,7 +56,7 @@ export default function HomePage() {
       if (!db) { setLoadingShops(false); return; }
       const firestore = db;
       try {
-        const result = await getDocs(query(collection(firestore, "shops"), where("status", "==", "live")));
+        const result = await getDocs(query(collection(firestore, "shops"), where("status", "==", "live"), where("subscriptionStatus", "==", "active"), where("subscriptionExpiresAt", ">", new Date())));
         if (active) {
           const liveShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
           setShops(liveShops);
