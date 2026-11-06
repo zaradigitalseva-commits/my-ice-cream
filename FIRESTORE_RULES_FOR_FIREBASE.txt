@@ -55,7 +55,7 @@ service cloud.firestore {
 
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || (resource.data.status == "live" && (validSubscription(resource.data) || resource.data.adminActivated == true));
+        || (resource.data.status == "live" && validSubscription(resource.data));
 
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
