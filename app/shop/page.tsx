@@ -65,7 +65,16 @@ export default function ShopPage() {
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
   const [salePayment, setSalePayment] = useState<"paid" | "unpaid">("paid");
   const [showShopDashboard, setShowShopDashboard] = useState(false);
+  const [upiQrDataUrl, setUpiQrDataUrl] = useState("");
+  const [pendingPayment, setPendingPayment] = useState(false);
   const [whatsAppUrl, setWhatsAppUrl] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("payment") === "1") {
+      setShowShopDashboard(true);
+      setPendingPayment(true);
+    }
+  }, []);
 
   async function loadProducts(shopId: string) {
     if (!db) return;
@@ -82,6 +91,8 @@ export default function ShopPage() {
       if (!db) { setLoading(false); return; }
       try {
         const result = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
+        const qrSettings = await getDoc(doc(db, "siteSettings", "branding"));
+        if (qrSettings.exists()) setUpiQrDataUrl(String(qrSettings.data().upiQrDataUrl || ""));
         const owned = result.docs[0];
         if (owned) {
           const data = { id: owned.id, ...owned.data() } as Shop;
@@ -202,6 +213,8 @@ export default function ShopPage() {
       const firstListingPayment = !shop.initialPaymentVerified && !shop.subscriptionExpiresAt;
       const paymentType = firstListingPayment ? "initial_listing" : "monthly_renewal";
       const amount = firstListingPayment ? 599 : 299;
+      const pendingPayments = await getDocs(query(collection(db, "subscriptionPayments"), where("shopId", "==", shop.id), where("status", "==", "pending")));
+      if (!pendingPayments.empty) throw new Error("आपकी एक payment पहले से verification के लिए pending है। Admin के निर्णय तक दूसरी payment जमा न करें।");
       const paymentRef = doc(collection(db, "subscriptionPayments"));
       const reservationRef = doc(db, "utrReservations", normalizedUtr);
       await runTransaction(db, async (transaction) => {
@@ -227,6 +240,7 @@ export default function ShopPage() {
         });
       });
       setPaymentNotice(`₹${amount} ${firstListingPayment ? "first listing" : "monthly renewal"} payment details submitted. Admin verification is pending.`);
+      setPendingPayment(true);
       setUtr("");
     } catch (e) { setError(e instanceof Error ? e.message : "Payment details could not be submitted."); }
     finally { setBusy(false); }
@@ -347,6 +361,7 @@ export default function ShopPage() {
         </section>
         <div className="admin-panel" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}><div><p className="admin-kicker">SHOP MANAGEMENT</p><h2 style={{margin:0}}>दुकान का डैशबोर्ड</h2><p style={{margin:"6px 0 0"}}>प्रोडक्ट, ऑर्डर, दुकान की जानकारी और पेमेंट मैनेज करें।</p></div><button type="button" className="admin-primary" onClick={()=>setShowShopDashboard(v=>!v)}>{showShopDashboard?"डैशबोर्ड बंद करें":"दुकान का डैशबोर्ड खोलें"}</button></div>
         {showShopDashboard && <>
+        {pendingPayment && <p className="admin-success" role="status">आपकी payment verification के लिए भेज दी गई है। Admin approval के बाद ही दुकान LIVE होगी।</p>}
         <section className="admin-panel"><h2>Business overview</h2><div className="admin-stats"><div><strong>{orders.length}</strong><span>Total orders</span></div><div><strong>₹{orders.filter(o=>o.paymentStatus==="paid").reduce((s,o)=>s+Number(o.total||0),0).toFixed(0)}</strong><span>Paid sales</span></div><div><strong>{orders.filter(o=>["placed","accepted","preparing","ready"].includes(o.status||"")).length}</strong><span>Open orders</span></div><div></div></div></section><section className="admin-panel"><h2>Orders & customers</h2><p>View orders from customers who purchased from your shop.</p><Link href="/shop/orders" className="admin-primary role-link">Open orders</Link></section><section className="admin-panel"><h2>Shop profile</h2><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
           <label>Mobile number<input required value={phone} onChange={e=>setPhone(e.target.value)} /></label>
@@ -371,7 +386,7 @@ export default function ShopPage() {
           <label>Shop banner (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"banner");}} /></label>{bannerUrl&&<img src={bannerUrl} alt="Shop banner preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:14}}/>}
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
         </form></section>
-        <section className="admin-panel"><h2>{firstListingPayment ? "First-time shop listing" : "Monthly subscription renewal"}</h2><p>{firstListingPayment ? "पहली बार की एकमुश्त फीस ₹599 है। इसमें shop listing, Admin approval और पहला महीना शामिल है। इसके बाद हर महीने renewal ₹299 होगा।" : "आपकी पहली listing और पहला महीना पहले से कवर है। अब अगले 30 दिनों के लिए renewal ₹299 है।"} UPI से भुगतान करें और UTR जमा करें। Admin verification के बाद shop activate होगी / subscription आगे बढ़ेगा।</p><p><strong>अभी देय राशि:</strong> ₹{subscriptionAmount} · <strong>Subscription:</strong> {live ? "Active until " + subscriptionExpiry?.toLocaleDateString("en-IN") : "Not active — verification के बाद ही shop LIVE होगी."}</p><form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()}>Submit ₹{subscriptionAmount} payment for verification</button></form>{paymentNotice&&<p className="admin-success">{paymentNotice}</p>}</section>
+        <section className="admin-panel"><h2>{firstListingPayment ? "First-time shop listing" : "Monthly subscription renewal"}</h2><p>{firstListingPayment ? "पहली बार की एकमुश्त फीस ₹599 है। इसमें shop listing, Admin approval और पहला महीना शामिल है। इसके बाद हर महीने renewal ₹299 होगा।" : "आपकी पहली listing और पहला महीना पहले से कवर है। अब अगले 30 दिनों के लिए renewal ₹299 है।"} UPI से भुगतान करें और UTR जमा करें। Admin verification के बाद shop activate होगी / subscription आगे बढ़ेगा।</p><p><strong>अभी देय राशि:</strong> ₹{subscriptionAmount} · <strong>Subscription:</strong> {live ? "Active until " + subscriptionExpiry?.toLocaleDateString("en-IN") : "Not active — verification के बाद ही shop LIVE होगी."}</p>{upiQrDataUrl ? <div style={{margin:"16px 0",textAlign:"center"}}><img src={upiQrDataUrl} alt="Admin UPI payment QR" style={{width:220,maxWidth:"100%",height:"auto",borderRadius:12,border:"1px solid #ddd"}}/><p className="admin-muted">ऊपर दिए QR से ₹{subscriptionAmount} भुगतान करें, फिर UTR भरें।</p></div> : <p className="admin-error">Admin ने अभी UPI QR सेट नहीं किया है। भुगतान से पहले दुकान के Admin से संपर्क करें।</p>}<form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()}>Submit ₹{subscriptionAmount} payment for verification</button></form>{paymentNotice&&<p className="admin-success">{paymentNotice}</p>}</section>
         {live ? <section className="admin-panel"><h2>Products</h2><p>Add products with price and details. Only active LIVE shops are visible to customers.</p>
           <form className="register-form" onSubmit={saveProduct}>
             <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>
