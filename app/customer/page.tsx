@@ -1,21 +1,157 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut, linkWithPhoneNumber, RecaptchaVerifier, type ConfirmationResult, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
-type Sale = {id:string;shopName?:string;items?:{name:string;quantity:number;price:number}[];subtotal?:number;discount?:number;discountType?:string;total?:number;paymentStatus?:string;createdAt?:{toDate?:()=>Date}};
-type OnlineOrder = {id:string;shopName?:string;items?:{name:string;quantity:number;price:number}[];total?:number;status?:string;paymentStatus?:string;createdAt?:{toDate?:()=>Date}};
-export default function CustomerPage(){
- const router=useRouter();const[user,setUser]=useState<User|null>(null);const[sales,setSales]=useState<Sale[]>([]);const[onlineOrders,setOnlineOrders]=useState<OnlineOrder[]>([]);const[loading,setLoading]=useState(true);const[saving,setSaving]=useState(false);const[error,setError]=useState("");const[notice,setNotice]=useState("");const[name,setName]=useState("");const[phone,setPhone]=useState("");const[otp,setOtp]=useState("");const[otpSent,setOtpSent]=useState(false);const[otpVerified,setOtpVerified]=useState(false);const[otpBusy,setOtpBusy]=useState(false);const[confirmation,setConfirmation]=useState<ConfirmationResult|null>(null);const recaptchaRef=useRef<RecaptchaVerifier|null>(null);
- useEffect(()=>{if(!auth)return;return onAuthStateChanged(auth,async u=>{setUser(u);if(!u){router.replace("/");return;}if(isAdminEmail(u.email)&&u.emailVerified){router.replace("/admin");return;}if(!db){setLoading(false);return;}try{const existing=await getDocs(query(collection(db,"customers"),where("uid","==",u.uid)));if(!existing.empty){const p=existing.docs[0].data();setName(String(p.name||u.displayName||""));setPhone(String(p.phone||""));}const phoneProfile=existing.docs[0]?.data();if(phoneProfile){const savedPhone=String(phoneProfile.phone||"");setName(String(phoneProfile.name||u.displayName||""));setPhone(savedPhone);setOtpVerified(Boolean(u.phoneNumber&&u.phoneNumber.replace(/\D/g,"").slice(-10)===savedPhone));}if(u.phoneNumber){const verifiedDigits=u.phoneNumber.replace(/\D/g,"").slice(-10);if(verifiedDigits.length===10){setPhone(verifiedDigits);setOtpVerified(true);}}const result=await getDocs(query(collection(db,"sales"),where("customerUid","==",u.uid)));setSales(result.docs.map(d=>({id:d.id,...d.data()} as Sale)).sort((a,b)=>(b.createdAt?.toDate?.().getTime()||0)-(a.createdAt?.toDate?.().getTime()||0)));const online=await getDocs(query(collection(db,"orders"),where("customerUid","==",u.uid)));setOnlineOrders(online.docs.map(d=>({id:d.id,...d.data()} as OnlineOrder)).sort((a,b)=>(b.createdAt?.toDate?.().getTime()||0)-(a.createdAt?.toDate?.().getTime()||0)));}catch(e){setError(e instanceof Error?e.message:"जानकारी लोड नहीं हो सकी।");}finally{setLoading(false);}})},[router]);
- async function sendPhoneOtp(){if(!auth||!user)return;const digits=phone.replace(/\D/g,"");if(!/^\d{10}$/.test(digits)){setError("सही 10 अंकों का मोबाइल नंबर भरें।");return;}setOtpBusy(true);setError("");try{if(!recaptchaRef.current)recaptchaRef.current=new RecaptchaVerifier(auth,"customer-recaptcha",{size:"normal"});const result=await linkWithPhoneNumber(user,"+91"+digits,recaptchaRef.current);setConfirmation(result);setOtpSent(true);setOtpVerified(false);setNotice("OTP आपके मोबाइल पर भेज दिया गया है।");}catch(e){recaptchaRef.current?.clear();recaptchaRef.current=null;setError(e instanceof Error?e.message:"OTP भेजा नहीं जा सका। Firebase में Phone Authentication चालू होना चाहिए।");}finally{setOtpBusy(false);}}
- async function verifyPhoneOtp(){if(!confirmation||!user)return;setOtpBusy(true);setError("");try{const result=await confirmation.confirm(otp.trim());setUser(result.user);setOtpVerified(true);setNotice("मोबाइल नंबर OTP से verify हो गया।");setConfirmation(null);setOtpSent(false);}catch(e){setError(e instanceof Error?e.message:"OTP गलत है या expire हो गया।");}finally{setOtpBusy(false);}}
- async function saveProfile(e:React.FormEvent){e.preventDefault();if(!db||!user)return;const digits=phone.replace(/\D/g,"");if(!name.trim()||!/^\d{10}$/.test(digits)){setError("नाम और 10 अंकों का मोबाइल नंबर सही भरें।");return;}if(!otpVerified||user.phoneNumber?.replace(/\D/g,"").slice(-10)!==digits){setError("पहले मोबाइल नंबर OTP से verify करें।");return;}setSaving(true);setError("");setNotice("");try{const ref=doc(db,"customers",digits);await setDoc(ref,{uid:user.uid,name:name.trim(),phone:digits,email:user.email||"",registered:true,updatedAt:serverTimestamp()},{merge:true});setPhone(digits);setNotice("आपकी प्रोफ़ाइल और verified मोबाइल नंबर सेव हो गया।");}catch(e){setError(e instanceof Error?e.message:"जानकारी सेव नहीं हो सकी।");}finally{setSaving(false);}}
- return <main className="admin-wrap"><header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>CUSTOMER</span></Link><button className="admin-secondary" onClick={()=>auth&&signOut(auth)}>Sign out</button></header>
- <section className="admin-panel"><p className="admin-kicker">CUSTOMER ACCOUNT</p><h1>Welcome{user?.displayName?", "+user.displayName:""}!</h1><p>अपना नाम और मोबाइल नंबर सेव करें। आपकी दुकान से की गई खरीदारी यहाँ एक साथ दिखेगी।<br/><small>मोबाइल नंबर सेव करने से पहले OTP verification जरूरी है।</small></p><form className="register-form" onSubmit={saveProfile}><label>आपका नाम<input required value={name} onChange={e=>setName(e.target.value)} /></label><label>10 अंकों का मोबाइल नंबर<input required inputMode="numeric" maxLength={10} value={phone} onChange={e=>{setPhone(e.target.value.replace(/\D/g,"").slice(0,10));setOtpSent(false);setOtpVerified(false);setConfirmation(null);}} /></label>{!otpVerified&&<><div id="customer-recaptcha" /><button type="button" className="admin-secondary" disabled={otpBusy||phone.length!==10} onClick={()=>void sendPhoneOtp()}>{otpBusy?"भेजा जा रहा है…":"मोबाइल OTP भेजें"}</button>{otpSent&&<label>OTP दर्ज करें<input inputMode="numeric" maxLength={6} value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,"").slice(0,6))} /></label>}{otpSent&&<button type="button" className="admin-primary" disabled={otpBusy||otp.length<6} onClick={()=>void verifyPhoneOtp()}>{otpBusy?"जाँच हो रही है…":"OTP Verify करें"}</button>}</>}{otpVerified&&<p className="admin-success">✓ मोबाइल नंबर verified</p>}<button className="admin-primary" disabled={saving||!otpVerified}>{saving?"सेव हो रहा है…":"जानकारी सेव करें"}</button></form>{error&&<p className="admin-error">{error}</p>}{notice&&<p className="admin-success">{notice}</p>}<Link href="/" className="admin-primary role-link">Explore all shops</Link></section>
- <section className="admin-panel"><h2>मेरे Online Orders</h2>{loading?<p className="admin-muted">लोड हो रहा है…</p>:onlineOrders.length===0?<p className="admin-muted">अभी कोई Online Order नहीं है।</p>:<div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>दुकान / सामान</th><th>कुल</th><th>स्थिति</th><th>पेमेंट</th><th>तारीख</th></tr></thead><tbody>{onlineOrders.map(o=><tr key={o.id}><td><strong>{o.shopName||"दुकान"}</strong><small>{(o.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")}</small><small>Order ID: {o.id}</small></td><td>₹{Number(o.total||0).toFixed(2)}</td><td>{o.status||"—"}</td><td>{o.paymentStatus||"unpaid"}</td><td>{o.createdAt?.toDate?.().toLocaleString("en-IN")||"—"}</td></tr>)}</tbody></table></div>}</section><section className="admin-panel"><h2>मेरी खरीदारी (दुकान पर बने बिल)</h2>{loading?<p className="admin-muted">लोड हो रहा है…</p>:sales.length===0?<p className="admin-muted">अभी कोई खरीदारी दर्ज नहीं है।</p>:<div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>दुकान / सामान</th><th>छूट</th><th>कुल</th><th>पेमेंट</th><th>तारीख</th></tr></thead><tbody>{sales.map(s=><tr key={s.id}><td><strong>{s.shopName||"दुकान"}</strong><small>{(s.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")}</small></td><td>₹{Number(s.discount||0).toFixed(2)} {s.discountType==="percent"?"(%)":""}</td><td>₹{Number(s.total||0).toFixed(2)}</td><td>{s.paymentStatus||"unpaid"}</td><td>{s.createdAt?.toDate?.().toLocaleString("en-IN")||"—"}</td></tr>)}</tbody></table></div>}</section></main>
+type Item = { name: string; quantity: number; price?: number };
+type FirestoreDate = { toDate?: () => Date };
+type Sale = { id: string; shopName?: string; items?: Item[]; subtotal?: number; discount?: number; discountType?: string; total?: number; paymentStatus?: string; createdAt?: FirestoreDate };
+type OnlineOrder = { id: string; shopName?: string; items?: Item[]; subtotal?: number; deliveryFee?: number; total?: number; status?: string; paymentStatus?: string; createdAt?: FirestoreDate };
+type Purchase = { id: string; kind: "Online Order" | "Shop Bill"; shopName: string; items: Item[]; subtotal: number; discount: number; deliveryFee: number; total: number; status: string; paymentStatus: string; createdAt?: FirestoreDate };
+
+function dateValue(value?: FirestoreDate) {
+  try { return value?.toDate?.() || null; } catch { return null; }
+}
+function money(value: number) {
+  return "₹" + Number(value || 0).toFixed(2);
+}
+
+export default function CustomerPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [onlineOrders, setOnlineOrders] = useState<OnlineOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+
+  useEffect(() => {
+    if (!auth) { setLoading(false); return; }
+    return onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (!u) { router.replace("/"); return; }
+      if (isAdminEmail(u.email) && u.emailVerified) { router.replace("/admin"); return; }
+      if (!db) { setLoading(false); return; }
+      try {
+        const existing = await getDocs(query(collection(db, "customers"), where("uid", "==", u.uid)));
+        if (!existing.empty) {
+          const profile = existing.docs[0].data();
+          setName(String(profile.name || u.displayName || ""));
+          setPhone(String(profile.phone || ""));
+        }
+        const [salesResult, ordersResult] = await Promise.all([
+          getDocs(query(collection(db, "sales"), where("customerUid", "==", u.uid))),
+          getDocs(query(collection(db, "orders"), where("customerUid", "==", u.uid))),
+        ]);
+        setSales(salesResult.docs.map((d) => ({ id: d.id, ...d.data() } as Sale)));
+        setOnlineOrders(ordersResult.docs.map((d) => ({ id: d.id, ...d.data() } as OnlineOrder)));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "जानकारी लोड नहीं हो सकी।");
+      } finally {
+        setLoading(false);
+      }
+    });
+  }, [router]);
+
+  async function saveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    if (!db || !user) return;
+    const digits = phone.replace(/\D/g, "");
+    if (!name.trim() || !/^\d{10}$/.test(digits)) {
+      setError("नाम और 10 अंकों का मोबाइल नंबर सही भरें।");
+      return;
+    }
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const ref = doc(db, "customers", digits);
+      await setDoc(ref, {
+        uid: user.uid, name: name.trim(), phone: digits, email: user.email || "",
+        registered: true, updatedAt: serverTimestamp(),
+      }, { merge: true });
+      setPhone(digits);
+      setNotice("आपकी जानकारी सेव हो गई।");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "जानकारी सेव नहीं हो सकी।");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const purchases: Purchase[] = [
+    ...onlineOrders.map((o) => ({
+      id: o.id, kind: "Online Order" as const, shopName: o.shopName || "दुकान",
+      items: o.items || [], subtotal: Number(o.subtotal || 0), discount: 0,
+      deliveryFee: Number(o.deliveryFee || 0), total: Number(o.total || 0),
+      status: o.status || "placed", paymentStatus: o.paymentStatus || "unpaid",
+      createdAt: o.createdAt,
+    })),
+    ...sales.map((s) => ({
+      id: s.id, kind: "Shop Bill" as const, shopName: s.shopName || "दुकान",
+      items: s.items || [], subtotal: Number(s.subtotal || 0),
+      discount: Number(s.discount || 0), deliveryFee: 0, total: Number(s.total || 0),
+      status: "बिल", paymentStatus: s.paymentStatus || "unpaid", createdAt: s.createdAt,
+    })),
+  ].sort((a, b) => (dateValue(b.createdAt)?.getTime() || 0) - (dateValue(a.createdAt)?.getTime() || 0));
+
+  return (
+    <main className="admin-wrap">
+      <header className="admin-header">
+        <Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>CUSTOMER</span></Link>
+        <button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button>
+      </header>
+      <section className="admin-panel">
+        <p className="admin-kicker">CUSTOMER ACCOUNT</p>
+        <h1>Welcome{name ? ", " + name : user?.displayName ? ", " + user.displayName : ""}!</h1>
+        <p>अपना नाम और मोबाइल नंबर सेव करें। आपकी सभी दुकानों की खरीदारी नीचे एक ही जगह दिखेगी।</p>
+        <form className="register-form" onSubmit={saveProfile}>
+          <label>आपका नाम<input required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label>10 अंकों का मोबाइल नंबर<input required inputMode="numeric" maxLength={10} value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} /></label>
+          <button className="admin-primary" disabled={saving}>{saving ? "सेव हो रहा है…" : "जानकारी सेव करें"}</button>
+        </form>
+        {error && <p className="admin-error">{error}</p>}
+        {notice && <p className="admin-success">{notice}</p>}
+        <Link href="/" className="admin-primary role-link">Explore all shops</Link>
+      </section>
+      <section className="admin-panel">
+        <div className="admin-panel-head">
+          <div><p className="admin-kicker">PURCHASE HISTORY</p><h2>मेरी खरीदारी</h2></div>
+          <strong>{purchases.length} रिकॉर्ड</strong>
+        </div>
+        <p className="admin-muted">Online Orders और दुकान पर बने Bills — सभी दुकानों की खरीदारी नई से पुरानी तारीख के क्रम में।</p>
+        {loading ? <p className="admin-muted">खरीदारी लोड हो रही है…</p> :
+          purchases.length === 0 ? <p className="admin-muted">अभी कोई खरीदारी दर्ज नहीं है। खरीदारी करने के बाद उसका रिकॉर्ड यहाँ दिखेगा।</p> :
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead><tr><th>दुकान / सामान</th><th>प्रकार</th><th>कुल</th><th>स्थिति</th><th>पेमेंट</th><th>तारीख और समय</th></tr></thead>
+              <tbody>
+                {purchases.map((purchase) => {
+                  const date = dateValue(purchase.createdAt);
+                  return <tr key={purchase.kind + "-" + purchase.id}>
+                    <td>
+                      <strong>{purchase.shopName}</strong>
+                      <small>{purchase.items.map((item) => item.name + " × " + item.quantity).join(", ") || "सामान का विवरण उपलब्ध नहीं"}</small>
+                      {purchase.items.some((item) => Number.isFinite(item.price)) && <small>{purchase.items.map((item) => item.name + ": " + money(Number(item.price || 0)) + " × " + item.quantity).join(" · ")}</small>}
+                      <small>ID: {purchase.id}</small>
+                    </td>
+                    <td>{purchase.kind === "Online Order" ? "ऑनलाइन ऑर्डर" : "दुकान का बिल"}</td>
+                    <td><strong>{money(purchase.total)}</strong>{purchase.deliveryFee > 0 && <small>Delivery: {money(purchase.deliveryFee)}</small>}{purchase.discount > 0 && <small>छूट: {money(purchase.discount)}{purchase.kind === "Shop Bill" && purchase.subtotal > 0 ? " · " + (sales.find((s) => s.id === purchase.id)?.discountType === "percent" ? "%" : "") : ""}</small>}</td>
+                    <td>{purchase.status}</td>
+                    <td>{purchase.paymentStatus === "paid" ? "Paid" : "Unpaid"}</td>
+                    <td>{date ? date.toLocaleString("en-IN") : "तारीख उपलब्ध नहीं"}</td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    </main>
+  );
 }
