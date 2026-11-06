@@ -394,21 +394,55 @@ service cloud.firestore {
         && request.resource.data.status == "pending"
         && request.resource.data.paymentType in ["initial_listing", "monthly_renewal"]
         && (
-          (request.resource.data.paymentType == "initial_listing"
+          (
+            request.resource.data.paymentType == "initial_listing"
             && request.resource.data.amount == 599
             && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.status in ["pending", "live", "LIVE", "Live"]
-            && (!( "initialPaymentVerified" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data)
-              || get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified != true)
-            && (!( "subscriptionExpiresAt" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data)
-              || get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.subscriptionExpiresAt == null))
-          || (request.resource.data.paymentType == "monthly_renewal"
+            && (
+              !("initialPaymentVerified" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data)
+              || get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified != true
+            )
+            && (
+              !("subscriptionExpiresAt" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data)
+              || get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.subscriptionExpiresAt == null
+            )
+          )
+          || (
+            request.resource.data.paymentType == "monthly_renewal"
             && request.resource.data.amount == 299
-            && (get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified == true
-              || ("subscriptionExpiresAt" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data
-                && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.subscriptionExpiresAt is timestamp))
+            && (
+              get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified == true
+              || (
+                "subscriptionExpiresAt" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data
+                && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.subscriptionExpiresAt is timestamp
+              )
+            )
+          )
         )
         && request.resource.data.utr is string
-        && request.resource.data.utr.matches('^[A-Z0-9]{6,40}    match /utrReservations/{utr} {
+        && request.resource.data.utr.matches('^[A-Z0-9]{6,40}$')
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.shopId == request.resource.data.shopId
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.paymentId == paymentId
+        && getAfter(/databases/$(database)/documents/paymentPendingLocks/$(request.resource.data.shopId)).data.paymentId == paymentId;
+      allow update, delete: if isAdmin();
+    }
+
+    match /paymentPendingLocks/{shopId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/paymentPendingLocks/$(shopId))
+        && ownsShop(shopId)
+        && request.resource.data.shopId == shopId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.paymentId is string
+        && request.resource.data.keys().hasOnly(["shopId", "ownerUid", "paymentId", "createdAt"])
+        && getAfter(/databases/$(database)/documents/subscriptionPayments/$(request.resource.data.paymentId)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/subscriptionPayments/$(request.resource.data.paymentId)).data.shopId == shopId;
+      allow update, delete: if isAdmin();
+    }
+
+    match /utrReservations/{utr} {
       allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create: if signedIn()
         && !exists(/databases/$(database)/documents/utrReservations/$(utr))
