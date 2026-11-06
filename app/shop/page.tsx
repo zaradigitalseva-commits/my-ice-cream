@@ -88,7 +88,9 @@ export default function ShopPage() {
         const owned = result.docs[0];
         if (owned) {
           const data = { id: owned.id, ...owned.data() } as Shop;
-          setShop(data); if ((data.status || "").toLowerCase() === "live" || window.location.hash === "#shop-profile" || new URLSearchParams(window.location.search).get("payment") === "1") setShowShopDashboard(true); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
+          setShop(data); if ((data.status || "").toLowerCase() === "live" || window.location.hash === "#shop-profile" || new URLSearchParams(window.location.search).get("payment") === "1") setShowShopDashboard(true);
+          const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
+          setPendingPayment(lock.exists()); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
           setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
           if ((data.status || "").toLowerCase() === "live") { await loadProducts(data.id); const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", data.id))); setOrders(orderResult.docs.map(item => ({ id: item.id, ...item.data() } as Order))); }
         }
