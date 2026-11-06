@@ -34,7 +34,7 @@ export default function ShopRegisterPage() {
       });
       batch.set(lockRef, { ownerUid: user.uid, shopId: shopRef.id, createdAt: serverTimestamp() });
       await batch.commit();
-      setMessage("Registration submitted. Submit the ₹299 subscription payment from your Shop Dashboard. Your shop becomes LIVE after Admin verifies the payment.");
+      setMessage("Registration submitted. अब Shop Dashboard में पहली बार की ₹599 listing payment का UTR जमा करें। Admin verification के बाद आपकी shop LIVE होगी।");
       setName(""); setPhone(""); setCity(""); setAddress(""); setDescription("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Registration could not be submitted.");
@@ -52,7 +52,7 @@ export default function ShopRegisterPage() {
         <span className="register-badge">🍨 SHOP PARTNER PROGRAM</span>
         <h1>Apni ice cream shop ko <em>online</em> laayein!</h1>
         <p>Apni shop register karein aur aas-paas ke customers tak pahunch banayein. Details submit karne ke baad Admin approval zaroori hai.</p>
-        <div className="register-benefits"><span>✨ ₹299/month subscription</span><span>📍 Local customers</span><span>💛 Easy order access</span></div>
+        <div className="register-benefits"><span>✨ First listing ₹599 (first month included)</span><span>📍 Local customers</span><span>💛 Easy order access</span></div>
       </div>
       <div className="register-hero-art" aria-hidden="true"><span className="register-spark spark-one">✦</span><span className="register-spark spark-two">✧</span><div className="register-scoop">🍦</div><div className="register-art-caption">Your shop, more visible!</div></div>
     </section>
@@ -68,8 +68,8 @@ export default function ShopRegisterPage() {
           <label className="register-field-wide"><span>🗺️ Full address</span><input required value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Shop number, area, landmark..." /></label>
           <label className="register-field-wide"><span>💬 About your shop <small>(optional)</small></span><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell customers what makes your ice cream special..." rows={3} /></label>
         </div>
-        <button className="register-submit" disabled={busy}>{busy ? "Submitting…" : "Submit for Admin Approval  →"}</button>
-        <p className="register-approval-note">🔒 Your shop will be visible to customers only after Admin approval.</p>
+        <button className="register-submit" disabled={busy}>{busy ? "Submitting…" : "Continue to ₹599 payment  →"}</button>
+        <p className="register-approval-note">🔒 पहली बार ₹599 में listing, Admin approval और पहला महीना शामिल है। इसके बाद renewal ₹299/month होगा। Shop payment verification के बाद ही LIVE होगी।</p>
       </form>}
       {message && <p className="admin-success register-message" role="status">{message}</p>}
     </section>
