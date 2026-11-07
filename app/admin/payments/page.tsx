@@ -3,11 +3,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { collection, doc, getDocs, runTransaction } from "firebase/firestore/lite";
+import { collection, doc, getDoc, getDocs, runTransaction } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
-type Payment = { id: string; ownerUid?: string; shopId?: string; shopName?: string; amount?: number; paymentType?: "initial_listing" | "monthly_renewal"; utr?: string; status?: string; createdAt?: { toDate?: () => Date } };
+type Payment = { id: string; ownerUid?: string; shopId?: string; shopName?: string; amount?: number; paymentType?: "initial_listing" | "monthly_renewal"; utr?: string; status?: string; createdAt?: { toDate?: () => Date }; shopDetails?: { name?: string; shopName?: string; ownerName?: string; ownerEmail?: string; ownerUid?: string; phone?: string; city?: string; address?: string; description?: string; status?: string } };
 
 export default function AdminPaymentsPage() {
   const router = useRouter();
@@ -18,6 +18,19 @@ export default function AdminPaymentsPage() {
   const [busyId, setBusyId] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
 
+  async function loadPayments() {
+    if (!db) return;
+    const result = await getDocs(collection(db, "subscriptionPayments"));
+    const payments = await Promise.all(result.docs.map(async (item) => {
+      const payment = { id: item.id, ...item.data() } as Payment;
+      if (!payment.shopId) return payment;
+      const shopSnap = await getDoc(doc(db, "shops", payment.shopId));
+      const shopDetails = shopSnap.exists() ? shopSnap.data() as Payment["shopDetails"] : undefined;
+      return { ...payment, shopDetails };
+    }));
+    setItems(payments);
+  }
+
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, async (nextUser) => {
@@ -25,10 +38,8 @@ export default function AdminPaymentsPage() {
       if (!nextUser) { router.replace("/admin"); return; }
       if (!isAdminEmail(nextUser.email) || !nextUser.emailVerified) { router.replace("/"); return; }
       if (!db) return;
-      try {
-        const result = await getDocs(collection(db, "subscriptionPayments"));
-        setItems(result.docs.map((item) => ({ id: item.id, ...item.data() } as Payment)));
-      } catch (e) { setError(e instanceof Error ? e.message : "Payments could not be loaded."); }
+      try { await loadPayments(); }
+      catch (e) { setError(e instanceof Error ? e.message : "Payments could not be loaded."); }
       finally { setLoading(false); }
     });
   }, [router]);
@@ -97,16 +108,28 @@ export default function AdminPaymentsPage() {
   return <main className="admin-wrap">
     <header className="admin-header"><Link href="/admin" className="admin-brand">🍦 MY ICE CREAM <span>ADMIN</span></Link><Link href="/admin" className="admin-secondary">Dashboard</Link></header>
     <section className="admin-panel"><h1>Subscription payments</h1>
-      <p>पहली दुकान listing ₹599 (पहले 30 दिन शामिल), उसके बाद हर 30 दिन में ₹299 renewal। UTR और shop details जाँचकर ही payment verify करें।</p>
-      <div className="admin-filters"><label>Payment status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option><option value="all">All payments</option></select></label><button className="admin-secondary" onClick={() => { setLoading(true); setError(""); if (!db) { setLoading(false); return; } getDocs(collection(db, "subscriptionPayments")).then((result) => setItems(result.docs.map((item) => ({ id: item.id, ...item.data() } as Payment)))).catch((e) => setError(e instanceof Error ? e.message : "Payments could not be loaded.")).finally(() => setLoading(false)); }}>↻ Refresh history</button></div>
+      <p>पहली दुकान listing ₹599 (पहले 30 दिन शामिल), उसके बाद हर 30 दिन में ₹299 renewal। यहाँ दुकान की पूरी जानकारी और UTR देखकर ही payment verify करें।</p>
+      <div className="admin-filters"><label>Payment status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option><option value="all">All payments</option></select></label><button className="admin-secondary" onClick={() => { setLoading(true); setError(""); loadPayments().catch((e) => setError(e instanceof Error ? e.message : "Payments could not be loaded.")).finally(() => setLoading(false)); }}>↻ Refresh history</button></div>
       {error && <p className="admin-error" role="alert">{error}</p>}
       {loading ? <p>Loading…</p> : visibleItems.length === 0 ? <p className="admin-muted">इस filter में कोई payment record नहीं मिला।</p> : visibleItems.map((payment) => {
         const initial = payment.paymentType === "initial_listing";
         return <article className="admin-panel" key={payment.id}>
-          <h2>{payment.shopName || payment.shopId}</h2>
+          <h2>{payment.shopDetails?.name || payment.shopDetails?.shopName || payment.shopName || payment.shopId || "Shop payment"}</h2>
           <p><strong>{initial ? "First-time listing + first 30 days" : "Monthly renewal"}</strong> · Amount: ₹{payment.amount}</p>
-          <p>UTR: <b>{payment.utr}</b></p><p>Shop ID: {payment.shopId}</p><p>Owner UID: {payment.ownerUid}</p><p>Status: <strong>{(payment.status || "pending").toUpperCase()}</strong></p>
-          {payment.createdAt?.toDate && <p>Submitted: {payment.createdAt.toDate().toLocaleString("en-IN")}</p>}
+          <div className="admin-payment-details">
+            <p><b>UTR / Transaction ID:</b> <strong>{payment.utr || "Not provided"}</strong></p>
+            <p><b>Shop ID:</b> {payment.shopId || "—"}</p>
+            <p><b>Shop owner:</b> {payment.shopDetails?.ownerName || "—"}</p>
+            <p><b>Owner email:</b> {payment.shopDetails?.ownerEmail || "—"}</p>
+            <p><b>Mobile:</b> {payment.shopDetails?.phone || "—"}</p>
+            <p><b>City:</b> {payment.shopDetails?.city || "—"}</p>
+            <p><b>Full address:</b> {payment.shopDetails?.address || "—"}</p>
+            <p><b>Shop description:</b> {payment.shopDetails?.description || "—"}</p>
+            <p><b>Owner UID:</b> {payment.ownerUid || "—"}</p>
+            <p><b>Shop status:</b> {(payment.shopDetails?.status || "unknown").toUpperCase()}</p>
+            <p><b>Payment status:</b> <strong>{(payment.status || "pending").toUpperCase()}</strong></p>
+            <p><b>Submitted:</b> {payment.createdAt?.toDate ? payment.createdAt.toDate().toLocaleString("en-IN") : "Date unavailable"}</p>
+          </div>
           {payment.status === "pending" && <div className="admin-actions">
             <button className="admin-primary small" disabled={busyId===payment.id} onClick={() => void verify(payment)}>{busyId===payment.id ? "Please wait…" : initial ? "Verify ₹599 & activate first 30 days" : "Verify ₹299 & extend 30 days"}</button>
             <button className="admin-secondary small" disabled={busyId===payment.id} onClick={() => void reject(payment)}>Reject</button>
