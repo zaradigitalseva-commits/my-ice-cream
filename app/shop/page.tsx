@@ -88,13 +88,17 @@ export default function ShopPage() {
         const owned = result.docs[0];
         if (owned) {
           const data = { id: owned.id, ...owned.data() } as Shop;
-          const expiryDate = data.subscriptionExpiresAt && typeof (data.subscriptionExpiresAt as { toDate?: () => Date }).toDate === "function" ? (data.subscriptionExpiresAt as { toDate: () => Date }).toDate() : data.subscriptionExpiresAt instanceof Date ? data.subscriptionExpiresAt : null;
-          const hasActiveSubscription = data.subscriptionStatus === "active" && Boolean(expiryDate && expiryDate.getTime() > Date.now());
-          setShop(data); if (!hasActiveSubscription || (data.status || "").toLowerCase() === "live" || window.location.hash === "#shop-profile" || new URLSearchParams(window.location.search).get("payment") === "1") setShowShopDashboard(true);
+          const isLiveShop = ["live", "LIVE", "Live"].includes(String(data.status || ""));
+          setShop(data);
+          if (isLiveShop || window.location.hash === "#shop-profile" || new URLSearchParams(window.location.search).get("payment") === "1") setShowShopDashboard(true);
           const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
           setPendingPayment(lock.exists()); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
           setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
-          if ((data.status || "").toLowerCase() === "live" && hasActiveSubscription) { await loadProducts(data.id); const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", data.id))); setOrders(orderResult.docs.map(item => ({ id: item.id, ...item.data() } as Order))); }
+          if (isLiveShop) {
+            await loadProducts(data.id);
+            const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", data.id)));
+            setOrders(orderResult.docs.map(item => ({ id: item.id, ...item.data() } as Order)));
+          }
         }
       } catch (e) { setError(e instanceof Error ? e.message : "Could not load your shop."); }
       finally { setLoading(false); }
@@ -347,7 +351,9 @@ export default function ShopPage() {
     catch (e) { setError(e instanceof Error ? e.message : "Could not delete product."); }
   }
 
-  const live = (shop?.status || "").toLowerCase() === "live" && shop?.subscriptionStatus === "active" && Boolean(subscriptionExpiry && subscriptionExpiry.getTime() > Date.now());
+  // Admin-approved LIVE status is the source of truth for shop access.
+  // Do not hide products or dashboard features because older LIVE records lack subscription metadata.
+  const live = ["live", "LIVE", "Live"].includes(String(shop?.status || ""));
   return <main className="admin-wrap">
     <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></header>
     {loading ? <section className="admin-panel"><h1>Loading your shop…</h1></section> : !shop ?
