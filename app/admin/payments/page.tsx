@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, runTransaction } from "firebase/firestore/lite";
+import { collection, doc, getDocs, runTransaction } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
@@ -119,7 +119,7 @@ export default function AdminPaymentsPage() {
       <p>पहली दुकान listing ₹599 (पहले 30 दिन शामिल), उसके बाद हर 30 दिन में ₹299 renewal। यहाँ दुकान की पूरी जानकारी और UTR देखकर ही payment verify करें।</p>
       <div className="admin-filters"><label>Payment status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option><option value="all">All payments</option></select></label><button className="admin-secondary" onClick={() => { setLoading(true); setError(""); loadPayments().catch((e) => setError(e instanceof Error ? e.message : "Payments could not be loaded.")).finally(() => setLoading(false)); }}>↻ Refresh history</button></div>
       {error && <p className="admin-error" role="alert">{error}</p>}
-      {loading ? <p>Loading…</p> : visibleItems.length === 0 && shopsWithoutPayment.length === 0 ? <p className="admin-muted">अभी कोई payment या pending shop registration नहीं मिली।</p> : <>
+      {loading ? <p>Loading…</p> : visibleItems.length === 0 && !((statusFilter === "pending" || statusFilter === "all") && shopsWithoutPayment.length > 0) ? <p className="admin-muted">अभी कोई payment या pending shop registration नहीं मिली।</p> : <>
       {visibleItems.map((payment) => {
         const initial = payment.paymentType === "initial_listing";
         return <article className="admin-panel" key={payment.id}>
