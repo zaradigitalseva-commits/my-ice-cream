@@ -394,13 +394,15 @@ service cloud.firestore {
       allow create: if signedIn()
         // Accept only the fields used by the subscription payment workflow.
         && request.resource.data.keys().hasOnly([
-          "ownerUid", "shopId", "status", "paymentType", "amount", "utr", "createdAt"
+          "ownerUid", "shopId", "shopName", "status", "paymentType", "amount", "utr", "createdAt"
         ])
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.shopId is string
         && request.resource.data.shopId.size() > 0
         && ownsShop(request.resource.data.shopId)
         && request.resource.data.status == "pending"
+        && (!("shopName" in request.resource.data)
+          || (request.resource.data.shopName is string && request.resource.data.shopName.size() <= 120))
         && (!("createdAt" in request.resource.data)
           || request.resource.data.createdAt is timestamp)
         && request.resource.data.paymentType in ["initial_listing", "monthly_renewal"]
