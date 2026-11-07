@@ -8,7 +8,7 @@ import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
-type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number };
+type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
 type Order = { id: string; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
 type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
@@ -68,6 +68,7 @@ export default function ShopPage() {
   const [salePayment, setSalePayment] = useState<"paid" | "unpaid">("paid");
   const [showShopDashboard, setShowShopDashboard] = useState(false);
   const [whatsAppUrl, setWhatsAppUrl] = useState("");
+  const [pendingPayment, setPendingPayment] = useState(false);
 
   async function loadProducts(shopId: string) {
     if (!db) return;
@@ -87,9 +88,13 @@ export default function ShopPage() {
         const owned = result.docs[0];
         if (owned) {
           const data = { id: owned.id, ...owned.data() } as Shop;
-          setShop(data); if ((data.status || "").toLowerCase() === "live" || window.location.hash === "#shop-profile") setShowShopDashboard(true); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
+          const expiryDate = data.subscriptionExpiresAt && typeof (data.subscriptionExpiresAt as { toDate?: () => Date }).toDate === "function" ? (data.subscriptionExpiresAt as { toDate: () => Date }).toDate() : data.subscriptionExpiresAt instanceof Date ? data.subscriptionExpiresAt : null;
+          const hasActiveSubscription = data.subscriptionStatus === "active" && Boolean(expiryDate && expiryDate.getTime() > Date.now());
+          setShop(data); if (!hasActiveSubscription || (data.status || "").toLowerCase() === "live" || window.location.hash === "#shop-profile" || new URLSearchParams(window.location.search).get("payment") === "1") setShowShopDashboard(true);
+          const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
+          setPendingPayment(lock.exists()); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
           setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
-          if ((data.status || "").toLowerCase() === "live") { await loadProducts(data.id); const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", data.id))); setOrders(orderResult.docs.map(item => ({ id: item.id, ...item.data() } as Order))); }
+          if ((data.status || "").toLowerCase() === "live" && hasActiveSubscription) { await loadProducts(data.id); const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", data.id))); setOrders(orderResult.docs.map(item => ({ id: item.id, ...item.data() } as Order))); }
         }
       } catch (e) { setError(e instanceof Error ? e.message : "Could not load your shop."); }
       finally { setLoading(false); }
@@ -213,6 +218,10 @@ export default function ShopPage() {
     finally { setCustomerBusy(false); }
   }
 
+  const firstListingPayment = Boolean(shop && shop.initialPaymentVerified !== true && !shop.subscriptionExpiresAt);
+  const subscriptionAmount = firstListingPayment ? 599 : 299;
+  const subscriptionExpiry = shop?.subscriptionExpiresAt && typeof (shop.subscriptionExpiresAt as { toDate?: () => Date }).toDate === "function" ? (shop.subscriptionExpiresAt as { toDate: () => Date }).toDate() : shop?.subscriptionExpiresAt instanceof Date ? shop.subscriptionExpiresAt : null;
+
   async function submitSubscription(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!db || !shop || !user) return;
@@ -224,8 +233,11 @@ export default function ShopPage() {
       }
       const paymentRef = doc(collection(db, "subscriptionPayments"));
       const reservationRef = doc(db, "utrReservations", normalizedUtr);
+      const pendingLockRef = doc(db, "paymentPendingLocks", shop.id);
       await runTransaction(db, async (transaction) => {
         const reservation = await transaction.get(reservationRef);
+        const pendingLock = await transaction.get(pendingLockRef);
+        if (pendingLock.exists()) throw new Error("आपकी एक payment पहले से verification के लिए pending है। Admin के निर्णय तक दूसरी payment जमा न करें।");
         if (reservation.exists()) {
           throw new Error("This UTR has already been submitted. Please check the number or contact admin.");
         }
@@ -235,17 +247,20 @@ export default function ShopPage() {
           paymentId: paymentRef.id,
           createdAt: serverTimestamp()
         });
+        transaction.set(pendingLockRef, { ownerUid: user.uid, shopId: shop.id, paymentId: paymentRef.id, createdAt: serverTimestamp() });
         transaction.set(paymentRef, {
           ownerUid: user.uid,
           shopId: shop.id,
           shopName: shop.name || shop.shopName || "",
-          amount: 299,
+          amount: subscriptionAmount,
+          paymentType: firstListingPayment ? "initial_listing" : "monthly_renewal",
           utr: normalizedUtr,
           status: "pending",
           createdAt: serverTimestamp()
         });
       });
-      setPaymentNotice("₹299 payment details submitted. Admin verification is pending.");
+      setPaymentNotice(`₹${subscriptionAmount} ${firstListingPayment ? "first listing" : "monthly renewal"} payment details submitted. Admin verification is pending.`);
+      setPendingPayment(true);
       setUtr("");
     } catch (e) { setError(e instanceof Error ? e.message : "Payment details could not be submitted."); }
     finally { setBusy(false); }
@@ -332,7 +347,7 @@ export default function ShopPage() {
     catch (e) { setError(e instanceof Error ? e.message : "Could not delete product."); }
   }
 
-  const live = (shop?.status || "").toLowerCase() === "live";
+  const live = (shop?.status || "").toLowerCase() === "live" && shop?.subscriptionStatus === "active" && Boolean(subscriptionExpiry && subscriptionExpiry.getTime() > Date.now());
   return <main className="admin-wrap">
     <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></header>
     {loading ? <section className="admin-panel"><h1>Loading your shop…</h1></section> : !shop ?
@@ -365,6 +380,13 @@ export default function ShopPage() {
         </section>
         <div className="admin-panel" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}><div><p className="admin-kicker">SHOP MANAGEMENT</p><h2 style={{margin:0}}>दुकान का डैशबोर्ड</h2><p style={{margin:"6px 0 0"}}>प्रोडक्ट, ऑर्डर, दुकान की जानकारी और पेमेंट मैनेज करें।</p></div><button type="button" className="admin-primary" onClick={()=>setShowShopDashboard(v=>!v)}>{showShopDashboard?"डैशबोर्ड बंद करें":"दुकान का डैशबोर्ड खोलें"}</button></div>
         {showShopDashboard && <>
+        {(!live || subscriptionExpiry) && <section className="admin-panel" id="subscription-payment">{/* Subscription payment is shown before shop management. */}
+          <h2>{firstListingPayment ? "पहली दुकान लिस्टिंग फीस" : "मासिक रिन्यूअल"}</h2>
+          <p>{firstListingPayment ? "₹599 में दुकान की listing review, Admin approval और पहला महीना शामिल है।" : "आपकी अगली 30 दिन की subscription फीस ₹299 है।"}</p>
+          {adminUpiQr ? <div style={{textAlign:"center",margin:"12px auto",maxWidth:300}}><img src={adminUpiQr} alt="Admin UPI QR Code" style={{width:"100%",maxWidth:240,objectFit:"contain",borderRadius:12,border:"1px solid #ddd",padding:8,background:"#fff"}}/><p className="admin-muted">UPI QR · ₹{subscriptionAmount}</p></div> : <p className="admin-error">Admin ने अभी UPI QR सेट नहीं किया है।</p>}
+          <form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()||pendingPayment}>Submit ₹{subscriptionAmount} payment</button></form>
+          {paymentNotice&&<p className="admin-success">{paymentNotice}</p>}{pendingPayment&&<p className="admin-muted">Payment verification pending — कृपया दोबारा भुगतान न करें।</p>}
+        </section>}
         <section className="admin-panel"><h2>Business overview</h2><div className="admin-stats"><div><strong>{orders.length}</strong><span>Total orders</span></div><div><strong>₹{orders.filter(o=>o.paymentStatus==="paid").reduce((s,o)=>s+Number(o.total||0),0).toFixed(0)}</strong><span>Paid sales</span></div><div><strong>{orders.filter(o=>["placed","accepted","preparing","ready"].includes(o.status||"")).length}</strong><span>Open orders</span></div></div></section><section className="admin-panel"><h2>Orders & customers</h2><p>View orders from customers who purchased from your shop.</p><Link href="/shop/orders" className="admin-primary role-link">Open orders</Link></section><section className="admin-panel" id="shop-profile"><h2>Shop profile / Registration details</h2><p>Apni registration ki details yahan update karein. Changes save karne ke baad Admin ko updated details dikhengi.</p><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
           <label>Mobile number<input required value={phone} onChange={e=>setPhone(e.target.value)} /></label>
@@ -389,7 +411,7 @@ export default function ShopPage() {
           <label>Shop banner (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"banner");}} /></label>{bannerUrl&&<img src={bannerUrl} alt="Shop banner preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:14}}/>}
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
         </form></section>
-        <section className="admin-panel"><h2>Monthly subscription</h2><p>Plan amount: ₹299 per month. Admin का UPI QR scan करके भुगतान करें, फिर UTR नंबर जमा करें। Verification के बाद subscription 30 दिनों के लिए activate होगी।</p>{adminUpiQr ? <div style={{textAlign:"center",margin:"16px auto",maxWidth:320}}><img src={adminUpiQr} alt="Admin UPI QR Code" style={{width:"100%",maxWidth:280,objectFit:"contain",borderRadius:12,border:"1px solid #ddd",padding:8,background:"#fff"}}/><p className="admin-muted">Admin UPI Payment QR · ₹299</p></div> : <p className="admin-muted">Admin ने अभी UPI QR Code सेट नहीं किया है। कृपया Admin से संपर्क करें।</p>}<form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()}>Submit ₹299 payment for verification</button></form>{paymentNotice&&<p className="admin-success">{paymentNotice}</p>}</section>
+        
         {live ? <section className="admin-panel"><h2>Products</h2><p>Add your products with price and photo. Only active LIVE shops are visible to customers.</p>
           <form className="register-form" onSubmit={saveProduct}>
             <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>

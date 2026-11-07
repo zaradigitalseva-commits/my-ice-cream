@@ -31,7 +31,7 @@ service cloud.firestore {
 
     function liveShop(shopId) {
       let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
-      return shop.status in ["live", "LIVE", "Live"] && (validSubscription(shop) || shop.adminActivated == true);
+      return shop.status in ["live", "LIVE", "Live"] && validSubscription(shop);
     }
 
     function validOrderItem(shopId, item) {
@@ -103,7 +103,7 @@ service cloud.firestore {
 
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || resource.data.status == "live";
+        || (resource.data.status in ["live", "LIVE", "Live"] && validSubscription(resource.data));
 
       // A shop owner may register only a pending shop.
       // Subscription and admin-activation fields cannot be self-granted.
@@ -131,17 +131,12 @@ service cloud.firestore {
       allow update: if (
           isAdmin()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "status", "subscriptionStatus", "subscriptionExpiresAt", "adminActivated", "adminActivatedBy", "adminActivatedAt", "updatedAt"
+            "status", "subscriptionStatus", "subscriptionExpiresAt", "initialPaymentVerified", "updatedAt"
           ])
           && request.resource.data.status in ["pending", "live", "inactive", "rejected"]
           && (
             request.resource.data.status != "live"
             || validSubscription(request.resource.data)
-            || (
-              request.resource.data.adminActivated == true
-              && request.resource.data.adminActivatedBy == request.auth.token.email
-              && request.resource.data.adminActivatedAt is timestamp
-            )
           )
           && (
             !("subscriptionStatus" in request.resource.data)
@@ -170,7 +165,7 @@ service cloud.firestore {
 
         allow read: if isAdmin()
           || ownsShop(shopId)
-          || (get(/databases/$(database)/documents/shops/$(shopId)).data.status == "live" && resource.data.active == true);
+          || (liveShop(shopId) && resource.data.active == true);
 
         allow create: if isAdmin()
           || (
@@ -397,12 +392,55 @@ service cloud.firestore {
         && request.resource.data.shopId is string
         && ownsShop(request.resource.data.shopId)
         && request.resource.data.status == "pending"
-        && request.resource.data.amount == 299
+        && request.resource.data.paymentType in ["initial_listing", "monthly_renewal"]
+        && (
+          (
+            request.resource.data.paymentType == "initial_listing"
+            && request.resource.data.amount == 599
+            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.status in ["pending", "live", "LIVE", "Live"]
+            && (
+              !("initialPaymentVerified" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data)
+              || get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified != true
+            )
+            && (
+              !("subscriptionExpiresAt" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data)
+              || get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.subscriptionExpiresAt == null
+            )
+          )
+          || (
+            request.resource.data.paymentType == "monthly_renewal"
+            && request.resource.data.amount == 299
+            && (
+              get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.initialPaymentVerified == true
+              || (
+                "subscriptionExpiresAt" in get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data
+                && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.subscriptionExpiresAt is timestamp
+              )
+            )
+          )
+        )
         && request.resource.data.utr is string
         && request.resource.data.utr.matches('^[A-Z0-9]{6,40}$')
         && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.ownerUid == request.auth.uid
         && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.shopId == request.resource.data.shopId
-        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.paymentId == paymentId;
+        && getAfter(/databases/$(database)/documents/utrReservations/$(request.resource.data.utr)).data.paymentId == paymentId
+        && getAfter(/databases/$(database)/documents/paymentPendingLocks/$(request.resource.data.shopId)).data.paymentId == paymentId;
+      allow update, delete: if isAdmin();
+    }
+
+    match /paymentPendingLocks/{shopId} {
+      // Shop owners may read the lock document even when it does not exist yet.
+      allow get: if isAdmin() || ownsShop(shopId);
+      allow list: if isAdmin();
+      allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/paymentPendingLocks/$(shopId))
+        && ownsShop(shopId)
+        && request.resource.data.shopId == shopId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.paymentId is string
+        && request.resource.data.keys().hasOnly(["shopId", "ownerUid", "paymentId", "createdAt"])
+        && getAfter(/databases/$(database)/documents/subscriptionPayments/$(request.resource.data.paymentId)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/subscriptionPayments/$(request.resource.data.paymentId)).data.shopId == shopId;
       allow update, delete: if isAdmin();
     }
 

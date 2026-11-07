@@ -56,7 +56,7 @@ export default function HomePage() {
       if (!db) { setLoadingShops(false); return; }
       const firestore = db;
       try {
-        const result = await getDocs(query(collection(firestore, "shops"), where("status", "==", "live")));
+        const result = await getDocs(query(collection(firestore, "shops"), where("status", "in", ["live", "LIVE", "Live"]), where("subscriptionStatus", "==", "active"), where("subscriptionExpiresAt", ">", new Date())));
         if (active) {
           const liveShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
           setShops(liveShops);
@@ -120,16 +120,12 @@ export default function HomePage() {
         const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
       }).length === 0 ? <div className="empty-panel"><h3>अभी कोई प्रोडक्ट उपलब्ध नहीं है</h3><p>LIVE दुकानों के उपलब्ध प्रोडक्ट यहाँ दिखाई देंगे।</p></div> :
-      <div className="shop-grid">{marketProducts.filter((product) => {
+      <div className="shop-grid marketplace-product-grid">{marketProducts.filter((product) => {
         const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
-      }).map((product) => <Link href={"/shop/" + product.shopId + "?product=" + product.id} className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
+      }).map((product) => <Link href={"/shop/" + product.shopId} className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
         {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
-        <div className="shop-card-body"><span className="pill">{product.category || "Ice cream"}</span><h3>{product.name || "Ice cream treat"}</h3>
-          {product.description && <p>{product.description}</p>}<strong>₹{Number(product.price || 0).toFixed(2)}</strong>
-          {product.originalPrice && product.originalPrice > Number(product.price || 0) && <del className="admin-muted"> ₹{Number(product.originalPrice).toFixed(2)}</del>}
-          <p>🏪 {product.shopName} · {product.city || "Local shop"}</p><span className="admin-secondary">इस दुकान के सभी प्रोडक्ट देखें →</span>
-        </div></Link>)}</div>}
+        <div className="shop-card-body marketplace-product-summary"><h3>{product.name || "Ice cream treat"}</h3><strong>₹{Number(product.price || 0).toFixed(2)}</strong></div></Link>)}</div>}
     </section>
     <section id="shops" className="bottom-live-shops">
       
@@ -145,7 +141,7 @@ export default function HomePage() {
           </div>
         </Link>)}</div>}
     </section>
-    <section id="for-shops" className="shop-onboarding"><div><p className="eyebrow">For ice cream businesses</p><h2>Bring your shop to MY ICE CREAM</h2><p>Register your shop for free review. Your shop becomes public only after Admin approval.</p></div><Link href="/shop/register" className="primary-button">Register your shop</Link></section>
+    <section id="for-shops" className="shop-onboarding"><div><p className="eyebrow">For ice cream businesses</p><h2>Bring your shop to MY ICE CREAM</h2><p>First listing ₹599 includes the first 30 days. Submit your UPI UTR; Admin verifies payment before the shop goes LIVE. Renewal is ₹299 per month.</p></div><Link href="/shop/register" className="primary-button">Register your shop</Link></section>
     <footer className="footer" id="about"><span>© {new Date().getFullYear()} MY ICE CREAM</span><span>Unlimited shops · Sweet moments · Easy ordering</span></footer>
   </main>;
 }
