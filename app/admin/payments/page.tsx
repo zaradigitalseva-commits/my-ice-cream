@@ -16,6 +16,7 @@ export default function AdminPaymentsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("pending");
 
   useEffect(() => {
     if (!auth) return;
@@ -25,7 +26,7 @@ export default function AdminPaymentsPage() {
       if (!isAdminEmail(nextUser.email) || !nextUser.emailVerified) { router.replace("/"); return; }
       if (!db) return;
       try {
-        const result = await getDocs(query(collection(db, "subscriptionPayments"), where("status", "==", "pending")));
+        const result = await getDocs(collection(db, "subscriptionPayments"));
         setItems(result.docs.map((item) => ({ id: item.id, ...item.data() } as Payment)));
       } catch (e) { setError(e instanceof Error ? e.message : "Payments could not be loaded."); }
       finally { setLoading(false); }
@@ -65,7 +66,7 @@ export default function AdminPaymentsPage() {
         tx.update(shopRef, { ...(initial ? { initialPaymentVerified: true } : {}), subscriptionStatus: "active", subscriptionExpiresAt: expiry, status: "live", updatedAt: new Date() });
         tx.delete(lockRef);
       });
-      setItems((current) => current.filter((item) => item.id !== payment.id));
+      setItems((current) => current.map((item) => item.id === payment.id ? { ...item, status: "verified" } : item));
     } catch (e) { setError(e instanceof Error ? e.message : "Could not verify payment."); }
     finally { setBusyId(""); }
   }
@@ -84,27 +85,32 @@ export default function AdminPaymentsPage() {
         if (lock.exists() && lock.data().paymentId === payment.id) tx.delete(lockRef);
         tx.update(paymentRef, { status: "rejected", verifiedAt: new Date(), verifiedBy: user?.email || "" });
       });
-      setItems((current) => current.filter((item) => item.id !== payment.id));
+      setItems((current) => current.map((item) => item.id === payment.id ? { ...item, status: "rejected" } : item));
     } catch (e) { setError(e instanceof Error ? e.message : "Could not reject payment."); }
     finally { setBusyId(""); }
   }
+
+  const visibleItems = items.filter((item) => statusFilter === "all" || (item.status || "pending") === statusFilter).sort((a, b) => {
+    const at = a.createdAt?.toDate?.().getTime() || 0; const bt = b.createdAt?.toDate?.().getTime() || 0; return bt - at;
+  });
 
   return <main className="admin-wrap">
     <header className="admin-header"><Link href="/admin" className="admin-brand">🍦 MY ICE CREAM <span>ADMIN</span></Link><Link href="/admin" className="admin-secondary">Dashboard</Link></header>
     <section className="admin-panel"><h1>Subscription payments</h1>
       <p>पहली दुकान listing ₹599 (पहले 30 दिन शामिल), उसके बाद हर 30 दिन में ₹299 renewal। UTR और shop details जाँचकर ही payment verify करें।</p>
+      <div className="admin-filters"><label>Payment status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option><option value="all">All payments</option></select></label><button className="admin-secondary" onClick={() => { setLoading(true); setError(""); if (!db) { setLoading(false); return; } getDocs(collection(db, "subscriptionPayments")).then((result) => setItems(result.docs.map((item) => ({ id: item.id, ...item.data() } as Payment)))).catch((e) => setError(e instanceof Error ? e.message : "Payments could not be loaded.")).finally(() => setLoading(false)); }}>↻ Refresh history</button></div>
       {error && <p className="admin-error" role="alert">{error}</p>}
-      {loading ? <p>Loading…</p> : items.length === 0 ? <p className="admin-muted">No pending payments.</p> : items.map((payment) => {
+      {loading ? <p>Loading…</p> : visibleItems.length === 0 ? <p className="admin-muted">इस filter में कोई payment record नहीं मिला।</p> : visibleItems.map((payment) => {
         const initial = payment.paymentType === "initial_listing";
         return <article className="admin-panel" key={payment.id}>
           <h2>{payment.shopName || payment.shopId}</h2>
           <p><strong>{initial ? "First-time listing + first 30 days" : "Monthly renewal"}</strong> · Amount: ₹{payment.amount}</p>
-          <p>UTR: <b>{payment.utr}</b></p><p>Shop ID: {payment.shopId}</p><p>Owner UID: {payment.ownerUid}</p>
+          <p>UTR: <b>{payment.utr}</b></p><p>Shop ID: {payment.shopId}</p><p>Owner UID: {payment.ownerUid}</p><p>Status: <strong>{(payment.status || "pending").toUpperCase()}</strong></p>
           {payment.createdAt?.toDate && <p>Submitted: {payment.createdAt.toDate().toLocaleString("en-IN")}</p>}
-          <div className="admin-actions">
+          {payment.status === "pending" && <div className="admin-actions">
             <button className="admin-primary small" disabled={busyId===payment.id} onClick={() => void verify(payment)}>{busyId===payment.id ? "Please wait…" : initial ? "Verify ₹599 & activate first 30 days" : "Verify ₹299 & extend 30 days"}</button>
             <button className="admin-secondary small" disabled={busyId===payment.id} onClick={() => void reject(payment)}>Reject</button>
-          </div>
+          </div>}
         </article>;
       })}
     </section>
