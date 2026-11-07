@@ -20,11 +20,12 @@ export default function AdminPaymentsPage() {
 
   async function loadPayments() {
     if (!db) return;
-    const result = await getDocs(collection(db, "subscriptionPayments"));
+    const firestore = db;
+    const result = await getDocs(collection(firestore, "subscriptionPayments"));
     const payments = await Promise.all(result.docs.map(async (item) => {
       const payment = { id: item.id, ...item.data() } as Payment;
       if (!payment.shopId) return payment;
-      const shopSnap = await getDoc(doc(db, "shops", payment.shopId));
+      const shopSnap = await getDoc(doc(firestore, "shops", payment.shopId));
       const shopDetails = shopSnap.exists() ? shopSnap.data() as Payment["shopDetails"] : undefined;
       return { ...payment, shopDetails };
     }));
