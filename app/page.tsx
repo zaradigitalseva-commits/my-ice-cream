@@ -125,11 +125,7 @@ export default function HomePage() {
         return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
       }).map((product) => <Link href={"/shop/" + product.shopId + "?product=" + product.id} className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
         {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
-        <div className="shop-card-body"><span className="pill">{product.category || "Ice cream"}</span><h3>{product.name || "Ice cream treat"}</h3>
-          {product.description && <p>{product.description}</p>}<strong>₹{Number(product.price || 0).toFixed(2)}</strong>
-          {product.originalPrice && product.originalPrice > Number(product.price || 0) && <del className="admin-muted"> ₹{Number(product.originalPrice).toFixed(2)}</del>}
-          <p>🏪 {product.shopName} · {product.city || "Local shop"}</p><span className="admin-secondary">इस दुकान के सभी प्रोडक्ट देखें →</span>
-        </div></Link>)}</div>}
+        <div className="shop-card-body marketplace-product-summary"><h3>{product.name || "Ice cream treat"}</h3><strong>₹{Number(product.price || 0).toFixed(2)}</strong></div></Link>)}</div>}
     </section>
     <section id="shops" className="bottom-live-shops">
       
