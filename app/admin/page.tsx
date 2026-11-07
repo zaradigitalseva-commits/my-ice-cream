@@ -9,11 +9,14 @@ import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
 type Shop = { id: string; name?: string; shopName?: string; ownerName?: string; ownerEmail?: string; ownerUid?: string; status?: string; phone?: string; mobile?: string; mobileNumber?: string; city?: string; address?: string; fullAddress?: string; shopAddress?: string; location?: string; landmark?: string; description?: string; about?: string; createdAt?: Timestamp | Date | string };
+type AdminProduct = { id: string; shopId: string; shopName: string; name?: string; price?: number; category?: string; active?: boolean };
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [shops, setShops] = useState<Shop[]>([]);
+  const [shopProducts, setShopProducts] = useState<AdminProduct[]>([]);
+  const [productError, setProductError] = useState("");
   const [customers, setCustomers] = useState<{id:string;name?:string;phone?:string;email?:string;uid?:string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -46,7 +49,26 @@ export default function AdminPage() {
         throw new Error("Firebase token is not marked email-verified. Sign out and sign in again, then retry.");
       }
       const result = await getDocs(query(collection(db, "shops"), orderBy("createdAt", "desc")));
-      setShops(result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop)));
+      const loadedShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
+      setShops(loadedShops);
+      // Admin can inspect every shop's product records, including inactive products.
+      // A product-read issue is isolated so shop registration management still works.
+      try {
+        const productGroups = await Promise.all(loadedShops.map(async (shop) => {
+          const productsResult = await getDocs(collection(db, "shops", shop.id, "products"));
+          return productsResult.docs.map((item) => ({
+            id: item.id,
+            shopId: shop.id,
+            shopName: shop.name || shop.shopName || shop.id,
+            ...item.data(),
+          } as AdminProduct));
+        }));
+        setShopProducts(productGroups.flat());
+        setProductError("");
+      } catch (productLoadErr) {
+        setShopProducts([]);
+        setProductError(productLoadErr instanceof Error ? productLoadErr.message : "Product records could not be loaded.");
+      }
     } catch (err) {
       setError(err instanceof Error ? `Shops load failed: ${err.message}` : "Could not load shops. Check Firestore rules and database setup.");
       setLoading(false);
@@ -200,6 +222,7 @@ export default function AdminPage() {
     </section><section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>सभी ग्राहक रिकॉर्ड — ऐप से जुड़े और दुकानदार द्वारा बनाए गए।</p></div><span className="admin-count">{customerError ? "Unavailable" : `${customers.length} customers`}</span></div>{customerError && <p className="admin-error" role="alert">Customer records load नहीं हो पाए: {customerError}. Shop management अभी भी इस्तेमाल कर सकते हैं।</p>}<div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>नाम</th><th>मोबाइल</th><th>ईमेल</th><th>स्थिति</th></tr></thead><tbody>{customers.map((customer)=><tr key={customer.id}><td>{customer.name||"—"}</td><td>{customer.phone||customer.id}</td><td>{customer.email||"—"}</td><td>{customer.uid?"App account linked":"Shop-created record"}</td></tr>)}</tbody></table></div></section>
+    <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop products</h2><p>सभी दुकानों के प्रोडक्ट यहाँ दिखेंगे, चाहे वे active हों या inactive।</p></div><span className="admin-count">{shopProducts.length} products</span></div>{productError && <p className="admin-error" role="alert">Products load नहीं हुए: {productError}</p>}{!productError && shopProducts.length === 0 ? <p className="admin-muted">अभी किसी दुकान में प्रोडक्ट सेव नहीं हैं।</p> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Shop</th><th>Price</th><th>Visibility</th><th>Product ID</th></tr></thead><tbody>{shopProducts.map((product) => <tr key={product.shopId + "-" + product.id}><td><strong>{product.name || "Unnamed product"}</strong><small>{product.category || "Category not set"}</small></td><td>{product.shopName}<small>{product.shopId}</small></td><td>₹{Number(product.price || 0).toFixed(2)}</td><td><span className={`admin-status ${product.active === true ? "live" : "inactive"}`}>{product.active === true ? "Active · Public" : "Inactive · Hidden"}</span></td><td><small>{product.id}</small></td></tr>)}</tbody></table></div>}</section>
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>
       <div className="admin-filters"><label>Search shops<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Shop, owner, mobile, city or ID…" /></label><label>Filter by status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="live">Live</option><option value="inactive">Inactive</option><option value="rejected">Rejected</option></select></label></div>
       {loading ? <p className="admin-muted">Loading shops…</p> : shops.length === 0 ? <div className="admin-empty"><span>🏪</span><h3>No shop registrations yet</h3><p>When a shop registration is saved to the Firestore <code>shops</code> collection, it will appear here for review.</p></div> :
