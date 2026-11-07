@@ -40,6 +40,7 @@ export default function AdminPage() {
 
   async function loadShops() {
     if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
+    const firestore = db;
     setLoading(true); setError(""); setNotice("");
     try {
       // Refresh the Firebase ID token so Firestore Rules receive current
@@ -48,14 +49,14 @@ export default function AdminPage() {
       if (token.claims.email_verified !== true) {
         throw new Error("Firebase token is not marked email-verified. Sign out and sign in again, then retry.");
       }
-      const result = await getDocs(query(collection(db, "shops"), orderBy("createdAt", "desc")));
+      const result = await getDocs(query(collection(firestore, "shops"), orderBy("createdAt", "desc")));
       const loadedShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
       setShops(loadedShops);
       // Admin can inspect every shop's product records, including inactive products.
       // A product-read issue is isolated so shop registration management still works.
       try {
         const productGroups = await Promise.all(loadedShops.map(async (shop) => {
-          const productsResult = await getDocs(collection(db, "shops", shop.id, "products"));
+          const productsResult = await getDocs(collection(firestore, "shops", shop.id, "products"));
           return productsResult.docs.map((item) => ({
             id: item.id,
             shopId: shop.id,
