@@ -255,7 +255,6 @@ export default function ShopPage() {
         transaction.set(paymentRef, {
           ownerUid: user.uid,
           shopId: shop.id,
-          shopName: shop.name || shop.shopName || "",
           amount: subscriptionAmount,
           paymentType: firstListingPayment ? "initial_listing" : "monthly_renewal",
           utr: normalizedUtr,
