@@ -56,16 +56,10 @@ export default function HomePage() {
       if (!db) { setLoadingShops(false); return; }
       const firestore = db;
       try {
-        const statusFilter = where("status", "in", ["live", "LIVE", "Live"]);
-        // Current paid shops and previously Admin-activated legacy shops are both supported.
-        const [paidResult, legacyResult] = await Promise.all([
-          getDocs(query(collection(firestore, "shops"), statusFilter, where("subscriptionStatus", "==", "active"), where("subscriptionExpiresAt", ">", new Date()))),
-          getDocs(query(collection(firestore, "shops"), statusFilter, where("adminActivated", "==", true)))
-        ]);
+        // Admin-approved LIVE shops include legacy records without subscription metadata.
+        const liveResult = await getDocs(query(collection(firestore, "shops"), where("status", "in", ["live", "LIVE", "Live"])));
         if (active) {
-          const uniqueShops = new Map<string, (typeof paidResult.docs)[number]>();
-          [...paidResult.docs, ...legacyResult.docs].forEach((item) => uniqueShops.set(item.id, item));
-          const liveShops = [...uniqueShops.values()].map((item) => ({ id: item.id, ...item.data() } as Shop));
+          const liveShops = liveResult.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
           setShops(liveShops);
           const groups = await Promise.all(liveShops.map(async (shop) => {
             try {
