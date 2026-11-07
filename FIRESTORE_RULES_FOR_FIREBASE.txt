@@ -165,7 +165,7 @@ service cloud.firestore {
 
         allow read: if isAdmin()
           || ownsShop(shopId)
-          || (get(/databases/$(database)/documents/shops/$(shopId)).data.status == "live" && resource.data.active == true);
+          || (liveShop(shopId) && resource.data.active == true);
 
         allow create: if isAdmin()
           || (
