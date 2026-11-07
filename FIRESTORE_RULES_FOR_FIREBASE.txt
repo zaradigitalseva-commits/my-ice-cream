@@ -31,7 +31,10 @@ service cloud.firestore {
 
     function liveShop(shopId) {
       let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
-      return shop.status in ["live", "LIVE", "Live"] && validSubscription(shop);
+      // Backward compatibility: shops activated by Admin before subscription
+      // enforcement remain publicly visible. New shops still require a valid subscription.
+      return shop.status in ["live", "LIVE", "Live"]
+        && (validSubscription(shop) || shop.adminActivated == true);
     }
 
     function validOrderItem(shopId, item) {
@@ -103,7 +106,8 @@ service cloud.firestore {
 
       allow read: if isAdmin()
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || (resource.data.status in ["live", "LIVE", "Live"] && validSubscription(resource.data));
+        || (resource.data.status in ["live", "LIVE", "Live"]
+          && (validSubscription(resource.data) || resource.data.adminActivated == true));
 
       // A shop owner may register only a pending shop.
       // Subscription and admin-activation fields cannot be self-granted.
