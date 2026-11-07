@@ -224,21 +224,52 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .marketplace-3d .hero-scoop-title .scoop-line-three{background-image:linear-gradient(180deg,#ffd1f0 0%,#ff91d0 30%,#e85ab3 68%,#9c4dcc 100%)}
 @media(max-width:720px){.marketplace-3d .hero .hero-scoop-title{font-size:clamp(42px,11.5vw,58px);letter-spacing:-2px;gap:4px}.marketplace-3d .hero-scoop-title .scoop-line{padding-bottom:10px;-webkit-text-stroke:1px #fff;text-shadow:0 1px 0 #fff,0 3px 0 #f2d4fb,0 6px 0 #d4a5e1,0 9px 0 #ad76bd,0 13px 0 #78458f,0 17px 16px rgba(65,28,87,.32)}}
 
-/* Homepage: keep two product cards side-by-side on every mobile width. */
-@media(max-width:720px){
-  .marketplace-3d #discover .marketplace-product-grid{
-    display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:10px;
-    width:100%;
+
+/* FINAL MOBILE HOMEPAGE PRODUCT LAYOUT: exactly two cards per row. */
+@media screen and (max-width: 767px) {
+  html body main.marketplace-3d section#discover > .shop-grid.marketplace-product-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-flow: row !important;
+    gap: 12px !important;
+    align-items: start !important;
+    width: 100% !important;
   }
-  .marketplace-3d #discover .marketplace-product-grid>.customer-product-card{
-    min-width:0;
-    width:100%;
+  html body main.marketplace-3d section#discover > .shop-grid.marketplace-product-grid > a.customer-product-card {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    overflow: hidden !important;
   }
-  .marketplace-3d #discover .marketplace-product-grid>.customer-product-card .shop-banner{
-    width:100%;
-    height:108px;
-    object-fit:cover;
+  html body main.marketplace-3d section#discover > .shop-grid.marketplace-product-grid > a.customer-product-card > img.shop-banner,
+  html body main.marketplace-3d section#discover > .shop-grid.marketplace-product-grid > a.customer-product-card > .shop-banner {
+    display: block !important;
+    width: 100% !important;
+    height: 112px !important;
+    min-height: 112px !important;
+    object-fit: cover !important;
+  }
+  html body main.marketplace-3d section#discover > .shop-grid.marketplace-product-grid > a.customer-product-card > .marketplace-product-summary {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 9px 10px 11px !important;
+  }
+  html body main.marketplace-3d section#discover > .shop-grid.marketplace-product-grid > a.customer-product-card .marketplace-product-summary h3 {
+    margin: 0 !important;
+    font-size: 13px !important;
+    line-height: 1.25 !important;
+    overflow-wrap: anywhere !important;
+  }
+  html body main.marketplace-3d section#discover > .shop-grid.marketplace-product-grid > a.customer-product-card .marketplace-product-summary strong {
+    margin: 0 !important;
+    font-size: 14px !important;
+    line-height: 1.2 !important;
   }
 }
