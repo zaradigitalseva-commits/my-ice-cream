@@ -19,9 +19,9 @@ Create one responsive web app/PWA with role-based experiences for customers, sho
 
 ### Shopkeeper experience
 - Register a shop with name, logo/photo, address, and contact number.
-- Submit monthly subscription payment UTR for manual approval.
+- Submit first listing payment of ₹599 (includes the first 30 days), then ₹299 per 30-day renewal, using UPI UTR for manual approval.
 - See LIVE/inactive subscription status.
-- Manage shop profile, product categories, photos, prices, cost, stock, and expiry dates.
+- Manage shop profile, product categories, photos, prices, and descriptions. No inventory or stock tracking.
 - Manage incoming orders and customer requests.
 - Configure whether home delivery is available.
 - See only data belonging to the shop(s) the account is authorized to manage.
@@ -36,7 +36,7 @@ Create one responsive web app/PWA with role-based experiences for customers, sho
 ## Later releases
 - Favourites and opt-in offer notifications.
 - Ratings, reviews, complaints, digital bills, repeat orders, and order tracking.
-- Low-stock and expiry alerts; spoilage, supplier purchases, barcode support.
+- Advanced catalog presentation, product variations, and customer-facing menu improvements without inventory tracking.
 - Loyalty points, coupons, expenses, profit reports, and PDF/Excel exports.
 - Employee roles, multiple branches, offline billing with safe sync.
 - Customer rewards and richer promotional tools.
