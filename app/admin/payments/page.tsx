@@ -7,12 +7,14 @@ import { collection, doc, getDoc, getDocs, runTransaction } from "firebase/fires
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
-type Payment = { id: string; ownerUid?: string; shopId?: string; shopName?: string; amount?: number; paymentType?: "initial_listing" | "monthly_renewal"; utr?: string; status?: string; createdAt?: { toDate?: () => Date }; shopDetails?: { name?: string; shopName?: string; ownerName?: string; ownerEmail?: string; ownerUid?: string; phone?: string; city?: string; address?: string; description?: string; status?: string } };
+type ShopDetails = { id: string; name?: string; shopName?: string; ownerName?: string; ownerEmail?: string; ownerUid?: string; phone?: string; city?: string; address?: string; description?: string; status?: string; createdAt?: { toDate?: () => Date } };
+type Payment = { id: string; ownerUid?: string; shopId?: string; shopName?: string; amount?: number; paymentType?: "initial_listing" | "monthly_renewal"; utr?: string; status?: string; createdAt?: { toDate?: () => Date }; shopDetails?: ShopDetails };
 
 export default function AdminPaymentsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [items, setItems] = useState<Payment[]>([]);
+  const [shopsWithoutPayment, setShopsWithoutPayment] = useState<ShopDetails[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
@@ -21,14 +23,19 @@ export default function AdminPaymentsPage() {
   async function loadPayments() {
     if (!db) return;
     const firestore = db;
-    const result = await getDocs(collection(firestore, "subscriptionPayments"));
+    const [result, shopsResult] = await Promise.all([
+      getDocs(collection(firestore, "subscriptionPayments")),
+      getDocs(collection(firestore, "shops")),
+    ]);
+    const allShops = shopsResult.docs.map((item) => ({ id: item.id, ...item.data() } as ShopDetails));
     const payments = await Promise.all(result.docs.map(async (item) => {
       const payment = { id: item.id, ...item.data() } as Payment;
       if (!payment.shopId) return payment;
-      const shopSnap = await getDoc(doc(firestore, "shops", payment.shopId));
-      const shopDetails = shopSnap.exists() ? shopSnap.data() as Payment["shopDetails"] : undefined;
+      const shopDetails = allShops.find((shop) => shop.id === payment.shopId);
       return { ...payment, shopDetails };
     }));
+    const paymentShopIds = new Set(payments.map((payment) => payment.shopId).filter(Boolean));
+    setShopsWithoutPayment(allShops.filter((shop) => !paymentShopIds.has(shop.id) && ["pending", "rejected"].includes(String(shop.status || "pending").toLowerCase())));
     setItems(payments);
   }
 
@@ -112,7 +119,8 @@ export default function AdminPaymentsPage() {
       <p>पहली दुकान listing ₹599 (पहले 30 दिन शामिल), उसके बाद हर 30 दिन में ₹299 renewal। यहाँ दुकान की पूरी जानकारी और UTR देखकर ही payment verify करें।</p>
       <div className="admin-filters"><label>Payment status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option><option value="all">All payments</option></select></label><button className="admin-secondary" onClick={() => { setLoading(true); setError(""); loadPayments().catch((e) => setError(e instanceof Error ? e.message : "Payments could not be loaded.")).finally(() => setLoading(false)); }}>↻ Refresh history</button></div>
       {error && <p className="admin-error" role="alert">{error}</p>}
-      {loading ? <p>Loading…</p> : visibleItems.length === 0 ? <p className="admin-muted">इस filter में कोई payment record नहीं मिला।</p> : visibleItems.map((payment) => {
+      {loading ? <p>Loading…</p> : visibleItems.length === 0 && shopsWithoutPayment.length === 0 ? <p className="admin-muted">अभी कोई payment या pending shop registration नहीं मिली।</p> : <>
+      {visibleItems.map((payment) => {
         const initial = payment.paymentType === "initial_listing";
         return <article className="admin-panel" key={payment.id}>
           <h2>{payment.shopDetails?.name || payment.shopDetails?.shopName || payment.shopName || payment.shopId || "Shop payment"}</h2>
@@ -137,6 +145,25 @@ export default function AdminPaymentsPage() {
           </div>}
         </article>;
       })}
+      {(statusFilter === "pending" || statusFilter === "all") && shopsWithoutPayment.length > 0 && <section className="admin-panel">
+        <h2>Registered shops — UTR not submitted</h2>
+        <p>इन दुकानों की registration मिल गई है, लेकिन अभी subscription payment / UTR का record नहीं बना है। मालिक को Shop Dashboard में जाकर UTR submit करना होगा। UTR के बिना payment verify न करें।</p>
+        {shopsWithoutPayment.map((shop) => <article className="admin-panel" key={shop.id}>
+          <h3>{shop.name || shop.shopName || "Unnamed shop"}</h3>
+          <div className="admin-payment-details">
+            <p><b>Shop ID:</b> {shop.id}</p>
+            <p><b>Owner:</b> {shop.ownerName || "—"}</p>
+            <p><b>Email:</b> {shop.ownerEmail || "—"}</p>
+            <p><b>Mobile:</b> {shop.phone || "—"}</p>
+            <p><b>City:</b> {shop.city || "—"}</p>
+            <p><b>Address:</b> {shop.address || "—"}</p>
+            <p><b>Description:</b> {shop.description || "—"}</p>
+            <p><b>Registration status:</b> {(shop.status || "pending").toUpperCase()}</p>
+            <p><b>Payment:</b> UTR not submitted — waiting for shop owner</p>
+          </div>
+        </article>)}
+      </section>}
+      </>}
     </section>
   </main>;
 }
