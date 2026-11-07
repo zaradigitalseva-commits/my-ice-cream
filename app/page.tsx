@@ -123,7 +123,7 @@ export default function HomePage() {
       <div className="shop-grid marketplace-product-grid">{marketProducts.filter((product) => {
         const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
-      }).map((product) => <Link href={"/shop/" + product.shopId + "?product=" + product.id} className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
+      }).map((product) => <Link href={"/shop/" + product.shopId} className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
         {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
         <div className="shop-card-body marketplace-product-summary"><h3>{product.name || "Ice cream treat"}</h3><strong>₹{Number(product.price || 0).toFixed(2)}</strong></div></Link>)}</div>}
     </section>
