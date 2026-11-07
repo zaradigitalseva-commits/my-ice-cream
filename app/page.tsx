@@ -56,9 +56,10 @@ export default function HomePage() {
       if (!db) { setLoadingShops(false); return; }
       const firestore = db;
       try {
-        const result = await getDocs(query(collection(firestore, "shops"), where("status", "in", ["live", "LIVE", "Live"]), where("subscriptionStatus", "==", "active"), where("subscriptionExpiresAt", ">", new Date())));
+        // Admin-approved LIVE shops include legacy records without subscription metadata.
+        const liveResult = await getDocs(query(collection(firestore, "shops"), where("status", "in", ["live", "LIVE", "Live"])));
         if (active) {
-          const liveShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
+          const liveShops = liveResult.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
           setShops(liveShops);
           const groups = await Promise.all(liveShops.map(async (shop) => {
             try {
