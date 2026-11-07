@@ -7,7 +7,7 @@ import { collection, doc, getDocs, runTransaction } from "firebase/firestore/lit
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
-type ShopDetails = { id: string; name?: string; shopName?: string; ownerName?: string; ownerEmail?: string; ownerUid?: string; phone?: string; city?: string; address?: string; description?: string; status?: string; createdAt?: { toDate?: () => Date } };
+type ShopDetails = { id: string; name?: string; shopName?: string; ownerName?: string; ownerEmail?: string; ownerUid?: string; phone?: string; city?: string; address?: string; description?: string; status?: string; createdAt?: { toDate?: () => Date }; utr?: string; paymentId?: string };
 type Payment = { id: string; ownerUid?: string; shopId?: string; shopName?: string; amount?: number; paymentType?: "initial_listing" | "monthly_renewal"; utr?: string; status?: string; createdAt?: { toDate?: () => Date }; shopDetails?: ShopDetails };
 
 export default function AdminPaymentsPage() {
@@ -23,11 +23,13 @@ export default function AdminPaymentsPage() {
   async function loadPayments() {
     if (!db) return;
     const firestore = db;
-    const [result, shopsResult] = await Promise.all([
+    const [result, shopsResult, reservationsResult] = await Promise.all([
       getDocs(collection(firestore, "subscriptionPayments")),
       getDocs(collection(firestore, "shops")),
+      getDocs(collection(firestore, "utrReservations")),
     ]);
     const allShops = shopsResult.docs.map((item) => ({ id: item.id, ...item.data() } as ShopDetails));
+    const reservations = reservationsResult.docs.map((item) => ({ id: item.id, ...item.data() } as { id: string; shopId?: string; paymentId?: string }));
     const payments = await Promise.all(result.docs.map(async (item) => {
       const payment = { id: item.id, ...item.data() } as Payment;
       if (!payment.shopId) return payment;
@@ -35,7 +37,10 @@ export default function AdminPaymentsPage() {
       return { ...payment, shopDetails };
     }));
     const paymentShopIds = new Set(payments.map((payment) => payment.shopId).filter(Boolean));
-    setShopsWithoutPayment(allShops.filter((shop) => !paymentShopIds.has(shop.id) && ["pending", "rejected"].includes(String(shop.status || "pending").toLowerCase())));
+    setShopsWithoutPayment(allShops.filter((shop) => !paymentShopIds.has(shop.id) && ["pending", "rejected"].includes(String(shop.status || "pending").toLowerCase())).map((shop) => {
+      const reservation = reservations.find((item) => item.shopId === shop.id);
+      return { ...shop, utr: reservation?.id, paymentId: reservation?.paymentId };
+    }));
     setItems(payments);
   }
 
@@ -146,8 +151,8 @@ export default function AdminPaymentsPage() {
         </article>;
       })}
       {(statusFilter === "pending" || statusFilter === "all") && shopsWithoutPayment.length > 0 && <section className="admin-panel">
-        <h2>Registered shops — UTR not submitted</h2>
-        <p>इन दुकानों की registration मिल गई है, लेकिन अभी subscription payment / UTR का record नहीं बना है। मालिक को Shop Dashboard में जाकर UTR submit करना होगा। UTR के बिना payment verify न करें।</p>
+        <h2>Shop registrations — payment record needs checking</h2>
+        <p>इन दुकानों की registration मौजूद है, लेकिन subscription payment का record नहीं मिला। UTR reservation अलग से जाँची गई है। यदि UTR मौजूद है तो उसे नीचे देखें; payment document के बिना Verify न करें।</p>
         {shopsWithoutPayment.map((shop) => <article className="admin-panel" key={shop.id}>
           <h3>{shop.name || shop.shopName || "Unnamed shop"}</h3>
           <div className="admin-payment-details">
@@ -159,7 +164,9 @@ export default function AdminPaymentsPage() {
             <p><b>Address:</b> {shop.address || "—"}</p>
             <p><b>Description:</b> {shop.description || "—"}</p>
             <p><b>Registration status:</b> {(shop.status || "pending").toUpperCase()}</p>
-            <p><b>Payment:</b> UTR not submitted — waiting for shop owner</p>
+            <p><b>Submitted UTR:</b> <strong>{shop.utr || "No UTR reservation found"}</strong></p>
+            <p><b>Payment record ID:</b> {shop.paymentId || "Not found"}</p>
+            <p><b>Payment:</b> {shop.utr ? "UTR reservation found — payment record missing; admin investigation required" : "UTR not found — waiting for shop owner submission"}</p>
           </div>
         </article>)}
       </section>}
