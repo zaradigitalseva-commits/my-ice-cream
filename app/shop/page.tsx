@@ -269,6 +269,12 @@ export default function ShopPage() {
   const subscriptionAmount = firstListingPayment ? 599 : 299;
   const subscriptionExpiry = shop?.subscriptionExpiresAt && typeof (shop.subscriptionExpiresAt as { toDate?: () => Date }).toDate === "function" ? (shop.subscriptionExpiresAt as { toDate: () => Date }).toDate() : shop?.subscriptionExpiresAt instanceof Date ? shop.subscriptionExpiresAt : null;
   const subscriptionPaymentDue = firstListingPayment || Boolean(subscriptionExpiry && subscriptionExpiry.getTime() <= Date.now());
+  const subscriptionDaysRemaining = subscriptionExpiry
+    ? Math.ceil((new Date(subscriptionExpiry.getFullYear(), subscriptionExpiry.getMonth(), subscriptionExpiry.getDate()).getTime() - new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime()) / 86400000)
+    : null;
+  const subscriptionExpiryLabel = subscriptionExpiry
+    ? subscriptionExpiry.toLocaleDateString("hi-IN", { day: "numeric", month: "long", year: "numeric" })
+    : "";
 
   async function submitSubscription(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -439,7 +445,24 @@ export default function ShopPage() {
           {String(shop.status || "").toLowerCase() === "rejected" && <p>Registration reject हुई है। कृपया Admin से संपर्क करें और सही जानकारी अपडेट करें।</p>}
           {String(shop.status || "").toLowerCase() === "inactive" && <p>आपकी दुकान फिलहाल inactive है। दोबारा चालू करने के लिए Admin से संपर्क करें।</p>}
           {pendingPayment && <p><strong>Payment status: PENDING VERIFICATION</strong> · Admin आपके UTR की जाँच कर रहा है। कृपया दोबारा भुगतान न करें।</p>}
-          {String(shop.status || "").toLowerCase() === "live" && <p>आपकी दुकान Approved है और customers को दिखाई दे रही है।</p>}
+          {String(shop.status || "").toLowerCase() === "live" && <>
+            <p>आपकी दुकान Approved है और customers को दिखाई दे रही है।</p>
+            {subscriptionDaysRemaining === null ? <p className="admin-muted">अगली recharge तारीख अभी Admin ने सेट नहीं की है।</p> :
+              <div style={{marginTop:12,padding:14,borderRadius:12,border:"1px solid #f0c36d",background:subscriptionDaysRemaining <= 7 ? "#fff7e6" : "#f0faf3"}}>
+                <h3 style={{margin:"0 0 8px"}}>Subscription / Recharge</h3>
+                <p style={{margin:"4px 0"}}><strong>अगली recharge तारीख:</strong> {subscriptionExpiryLabel}</p>
+                {subscriptionDaysRemaining > 7
+                  ? <p style={{margin:"4px 0"}}>Recharge में <strong>{subscriptionDaysRemaining} दिन बाकी</strong> हैं।</p>
+                  : subscriptionDaysRemaining > 1
+                    ? <p style={{margin:"4px 0",color:"#9a5700"}}><strong>Reminder:</strong> आपकी recharge में केवल {subscriptionDaysRemaining} दिन बाकी हैं। समय रहते ₹299 recharge कर दें।</p>
+                    : subscriptionDaysRemaining === 1
+                      ? <p style={{margin:"4px 0",color:"#9a5700"}}><strong>Recharge reminder:</strong> कल आपकी subscription समाप्त हो रही है। आज ही ₹299 recharge करें।</p>
+                      : subscriptionDaysRemaining === 0
+                        ? <p style={{margin:"4px 0",color:"#b45309"}}><strong>आज recharge की आखिरी तारीख है!</strong> सेवा जारी रखने के लिए ₹299 recharge करें।</p>
+                        : <p style={{margin:"4px 0",color:"#b91c1c"}}><strong>Subscription समाप्त हो गई है।</strong> {Math.abs(subscriptionDaysRemaining)} दिन पहले expiry हो चुकी है। तुरंत ₹299 recharge करें।</p>}
+                {subscriptionPaymentDue && !pendingPayment && <button type="button" className="admin-primary" onClick={()=>document.getElementById("subscription-payment")?.scrollIntoView({behavior:"smooth",block:"start"})}>अभी Recharge करें</button>}
+              </div>}
+          </>}
         </section>
         {subscriptionPaymentDue && !pendingPayment && String(shop.status || "").toLowerCase() !== "rejected" && <section className="admin-panel" id="subscription-payment" style={{border:"2px solid #f0a43a",scrollMarginTop:24}}>
           <p className="admin-kicker">PAYMENT REQUIRED · UPI</p>
