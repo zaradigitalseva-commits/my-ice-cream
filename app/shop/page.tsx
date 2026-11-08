@@ -93,7 +93,7 @@ export default function ShopPage() {
           setShop(data);
           if (isLiveShop || window.location.hash === "#shop-profile") setShowShopDashboard(true);
           const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
-          setPendingPayment(lock.exists()); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
+          setPendingPayment(lock.exists() && !isLiveShop); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
           setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
           if (isLiveShop) {
             await loadProducts(data.id);
@@ -120,8 +120,8 @@ export default function ShopPage() {
         setShop(latest);
         const lock = await getDoc(doc(db, "paymentPendingLocks", latest.id));
         if (!active) return;
-        setPendingPayment(lock.exists());
         const isLive = ["live", "LIVE", "Live"].includes(String(latest.status || ""));
+        setPendingPayment(lock.exists() && !isLive);
         if (isLive) {
           await loadProducts(latest.id);
           const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", latest.id)));
