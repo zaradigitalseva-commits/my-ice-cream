@@ -261,7 +261,7 @@ export default function AdminPage() {
   });
 
   return <main className="admin-wrap">
-    <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>ADMIN</span></Link><div className="admin-user"><span>{user.email}</span><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></div></header>
+    <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>ADMIN</span></Link><div className="admin-user"><span>{user.email}</span><Link href="/" className="admin-secondary role-link">Home page</Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></div></header>
     <div className="admin-heading"><div><p className="admin-kicker">PLATFORM CONTROL</p><h1>Admin dashboard</h1><p>Review shop registrations and control which shops are visible to customers.</p></div><button className="admin-secondary" onClick={() => void loadShops()} disabled={loading}>↻ Refresh</button></div>
     <nav className="admin-panel" aria-label="Admin sections" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
       <button type="button" className={activeAdminSection === "overview" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("overview")}>Overview</button>
