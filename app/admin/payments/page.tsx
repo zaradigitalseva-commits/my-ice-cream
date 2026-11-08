@@ -87,7 +87,7 @@ export default function AdminPaymentsPage() {
         const expiry = new Date(base);
         expiry.setDate(expiry.getDate() + 30);
         tx.update(paymentRef, { status: "verified", verifiedAt: new Date(), verifiedBy: user.email });
-        tx.update(shopRef, { ...(initial ? { initialPaymentVerified: true } : {}), subscriptionStatus: "active", subscriptionExpiresAt: expiry, status: "live", updatedAt: new Date() });
+        tx.update(shopRef, { ...(initial ? { initialPaymentVerified: true } : {}), subscriptionStatus: "active", subscriptionExpiresAt: expiry, status: shop.status === "live" ? "live" : "pending", updatedAt: new Date() });
         tx.delete(lockRef);
       });
       setItems((current) => current.map((item) => item.id === payment.id ? { ...item, status: "verified" } : item));
