@@ -322,3 +322,11 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
  .marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-summary strong{font-size:13px;line-height:1.2}
  .marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-summary .admin-muted{font-size:10px}
 }
+
+
+/* Show the complete product photo without cropping it. */
+.marketplace-3d .marketplace-product-grid > .customer-product-card .shop-banner{
+  object-fit:contain !important;
+  object-position:center;
+  background:#fffaf4;
+}
