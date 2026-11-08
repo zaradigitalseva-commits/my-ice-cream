@@ -33,7 +33,7 @@ export default function AdminPage() {
   const [siteQr, setSiteQr] = useState("");
   const [pendingQrFile, setPendingQrFile] = useState<File | null>(null);
   const [qrBusy, setQrBusy] = useState(false);
-  const [activeAdminSection, setActiveAdminSection] = useState<"overview" | "logo" | "qr" | "customers" | "products" | "registrations">("registrations");
+  const [activeAdminSection, setActiveAdminSection] = useState<"overview" | "settings" | "customers" | "products" | "registrations">("registrations");
 
   useEffect(() => {
     if (!auth) { setAuthReady(true); setError("Firebase configuration is missing."); return; }
@@ -268,11 +268,10 @@ export default function AdminPage() {
       <button type="button" className={activeAdminSection === "registrations" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("registrations")}>Shop registrations</button>
       <button type="button" className={activeAdminSection === "products" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("products")}>Shop products</button>
       <button type="button" className={activeAdminSection === "customers" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("customers")}>Customers</button>
-      <button type="button" className={activeAdminSection === "logo" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("logo")}>Website logo</button>
-      <button type="button" className={activeAdminSection === "qr" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("qr")}>UPI QR Code</button>
+      <button type="button" className={activeAdminSection === "settings" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("settings")}>Settings</button>
       <Link href="/admin/payments" className="admin-secondary role-link">Subscription payments</Link>
     </nav>
-    {activeAdminSection === "logo" && <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Website logo</h2><p>यह लोगो वेबसाइट के नाम की जगह सभी ग्राहकों को दिखेगा।</p></div></div>{logoError && <p className="admin-error" role="alert">Logo settings load नहीं हो पाईं: {logoError}</p>}
+    {activeAdminSection === "settings" && <><section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Website logo</h2><p>यह लोगो वेबसाइट के नाम की जगह सभी ग्राहकों को दिखेगा।</p></div></div>{logoError && <p className="admin-error" role="alert">Logo settings load नहीं हो पाईं: {logoError}</p>}
       <div className="site-logo-editor">{siteLogo ? <img src={siteLogo} alt="Current website logo" /> : <div className="site-logo-empty">🍦 MY ICE CREAM</div>}
         <label className="admin-primary small">{pendingLogoFile ? "दूसरा लोगो चुनें" : "नया लोगो चुनें"}<input type="file" accept="image/*" disabled={logoBusy} hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) { setPendingLogoFile(file); setNotice(""); setError(""); } event.currentTarget.value = ""; }} /></label>
         {pendingLogoFile && <button className="admin-primary small" disabled={logoBusy} onClick={() => { void saveSiteLogo(pendingLogoFile).then(() => setPendingLogoFile(null)); }}>{logoBusy ? "सेव हो रहा है…" : "लोगो सेव करें"}</button>}
@@ -280,14 +279,14 @@ export default function AdminPage() {
         {siteLogo && <button className="admin-secondary small" disabled={logoBusy} onClick={() => { void saveSiteLogo().then(() => setPendingLogoFile(null)); }}>लोगो हटाएँ</button>}
       </div><small className="admin-muted">PNG, JPG या WebP image चुनें, फिर “लोगो सेव करें” दबाएँ। लोगो अपने-आप छोटा करके सेव होगा।</small>
     </section>}
-    {activeAdminSection === "qr" && <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Subscription UPI QR Code</h2><p>पहली listing ₹599 (पहला महीना शामिल) और उसके बाद renewal ₹299 प्रति माह के भुगतान के लिए यही QR दिखेगा।</p></div></div>
+    <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Subscription UPI QR Code</h2><p>पहली listing ₹599 (पहला महीना शामिल) और उसके बाद renewal ₹299 प्रति माह के भुगतान के लिए यही QR दिखेगा।</p></div></div>
       <div className="site-logo-editor">{siteQr ? <img src={siteQr} alt="Admin UPI payment QR code" /> : <div className="site-logo-empty">UPI QR अभी सेट नहीं है</div>}
         <label className="admin-primary small">{pendingQrFile ? "दूसरा QR चुनें" : "UPI QR फोटो चुनें"}<input type="file" accept="image/*" hidden disabled={qrBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) { setPendingQrFile(file); setNotice(""); setError(""); } event.currentTarget.value = ""; }} /></label>
         {pendingQrFile && <button className="admin-primary small" disabled={qrBusy} onClick={() => { void saveUpiQr(pendingQrFile).then(() => setPendingQrFile(null)); }}>{qrBusy ? "सेव हो रहा है…" : "QR Code सेव करें"}</button>}
         {pendingQrFile && <button className="admin-secondary small" disabled={qrBusy} onClick={() => setPendingQrFile(null)}>रद्द करें</button>}
         {siteQr && <button className="admin-secondary small" disabled={qrBusy} onClick={() => { void saveUpiQr().then(() => setPendingQrFile(null)); }}>QR हटाएँ</button>}
       </div><small className="admin-muted">साफ़ QR फोटो चुनें। फोटो अपने-आप WebP में छोटा करके सेव होगी। नया QR लगाने पर पुराना बदल जाएगा।</small>
-    </section>}
+    </section></>}
     {activeAdminSection === "overview" && <section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>}
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
     {activeAdminSection === "customers" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>Firestore में सेव ग्राहक रिकॉर्ड। यह Firebase Authentication की पूरी user-list नहीं है।</p></div><span className="admin-count">{customerError ? "Unavailable" : `${customers.length} customers`}</span></div>{customerError && <p className="admin-error" role="alert">Customer records load नहीं हो पाए: {customerError}. Shop management अभी भी इस्तेमाल कर सकते हैं।</p>}<div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>नाम</th><th>मोबाइल</th><th>ईमेल</th><th>स्थिति</th></tr></thead><tbody>{customers.map((customer)=><tr key={customer.id}><td>{customer.name||"—"}</td><td>{customer.phone||customer.id}</td><td>{customer.email||"—"}</td><td>{customer.uid?"App account linked":"Shop-created record"}</td></tr>)}</tbody></table></div></section>}
