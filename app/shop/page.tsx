@@ -368,6 +368,16 @@ export default function ShopPage() {
       <section className="admin-panel"><h1>Register your shop</h1><p>Shopkeeper access starts with a separate shop registration. Admin approval is required before your shop is LIVE.</p><Link href="/shop/register" className="admin-primary role-link">Register Shop</Link></section> :
       <>
         <section className="admin-heading"><div><p className="admin-kicker">SHOPKEEPER AREA</p><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""} · Status: <span className={"admin-status " + (shop.status || "pending")}>{(shop.status || "pending").toLowerCase() === "live" ? "APPROVED" : (shop.status || "pending").toUpperCase()}</span></p></div></section>
+        <section className="admin-panel" aria-live="polite">
+          <p className="admin-kicker">REGISTRATION TRACKING</p>
+          <h2>आपकी दुकान की स्थिति</h2>
+          <p><strong className={"admin-status " + String(shop.status || "pending").toLowerCase()}>{String(shop.status || "pending").toLowerCase() === "live" ? "APPROVED · दुकान LIVE है" : String(shop.status || "pending").toUpperCase()}</strong></p>
+          {String(shop.status || "pending").toLowerCase() === "pending" && <p>आपकी दुकान का registration Admin के review में है। Payment UTR जमा होने के बाद payment verification भी यहीं track होगी।</p>}
+          {String(shop.status || "").toLowerCase() === "rejected" && <p>Registration reject हुई है। कृपया Admin से संपर्क करें और सही जानकारी अपडेट करें।</p>}
+          {String(shop.status || "").toLowerCase() === "inactive" && <p>आपकी दुकान फिलहाल inactive है। दोबारा चालू करने के लिए Admin से संपर्क करें।</p>}
+          {pendingPayment && <p><strong>Payment status: PENDING VERIFICATION</strong> · Admin आपके UTR की जाँच कर रहा है। कृपया दोबारा भुगतान न करें।</p>}
+          {String(shop.status || "").toLowerCase() === "live" && <p>आपकी दुकान Approved है और customers को दिखाई दे रही है।</p>}
+        </section>
         {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
         <section className="admin-panel">
           <p className="admin-kicker">CUSTOMER DESK</p><h2>ग्राहक खोजें और बिल बनाएँ</h2>
