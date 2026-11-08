@@ -15,6 +15,7 @@ export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [shops, setShops] = useState<Shop[]>([]);
+  const [shopPayments, setShopPayments] = useState<Record<string, { utr?: string; amount?: number; status?: string; paymentType?: string }>>({});
   const [shopProducts, setShopProducts] = useState<AdminProduct[]>([]);
   const [productError, setProductError] = useState("");
   const [customers, setCustomers] = useState<{id:string;name?:string;phone?:string;email?:string;uid?:string}[]>([]);
@@ -52,6 +53,39 @@ export default function AdminPage() {
       const result = await getDocs(query(collection(firestore, "shops"), orderBy("createdAt", "desc")));
       const loadedShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
       setShops(loadedShops);
+      // Load payment records and UTR reservations for the main registrations table.
+      // Keep this separate so a payment-read issue does not hide shop registrations.
+      try {
+        const [paymentResult, reservationResult] = await Promise.all([
+          getDocs(collection(firestore, "subscriptionPayments")),
+          getDocs(collection(firestore, "utrReservations")),
+        ]);
+        const paymentMap: Record<string, { utr?: string; amount?: number; status?: string; paymentType?: string }> = {};
+        for (const paymentDoc of paymentResult.docs) {
+          const payment = paymentDoc.data();
+          if (typeof payment.shopId !== "string") continue;
+          paymentMap[payment.shopId] = {
+            utr: typeof payment.utr === "string" ? payment.utr : undefined,
+            amount: typeof payment.amount === "number" ? payment.amount : undefined,
+            status: typeof payment.status === "string" ? payment.status : "pending",
+            paymentType: typeof payment.paymentType === "string" ? payment.paymentType : undefined,
+          };
+        }
+        for (const reservationDoc of reservationResult.docs) {
+          const reservation = reservationDoc.data();
+          if (typeof reservation.shopId !== "string") continue;
+          const previous = paymentMap[reservation.shopId] || {};
+          paymentMap[reservation.shopId] = {
+            ...previous,
+            utr: previous.utr || reservationDoc.id,
+            status: previous.status || "UTR reserved · payment record missing",
+          };
+        }
+        setShopPayments(paymentMap);
+      } catch (paymentLoadErr) {
+        setShopPayments({});
+        setProductError(paymentLoadErr instanceof Error ? "Payment / UTR records could not be loaded: " + paymentLoadErr.message : "Payment / UTR records could not be loaded.");
+      }
       // Admin can inspect every shop's product records, including inactive products.
       // A product-read issue is isolated so shop registration management still works.
       try {
@@ -244,7 +278,7 @@ export default function AdminPage() {
     <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>
       <div className="admin-filters"><label>Search shops<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Shop, owner, mobile, city or ID…" /></label><label>Filter by status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="live">Live</option><option value="inactive">Inactive</option><option value="rejected">Rejected</option></select></label></div>
       {loading ? <p className="admin-muted">Loading shops…</p> : shops.length === 0 ? <div className="admin-empty"><span>🏪</span><h3>No shop registrations yet</h3><p>When a shop registration is saved to the Firestore <code>shops</code> collection, it will appear here for review.</p></div> :
-      visibleShops.length === 0 ? <div className="admin-empty"><span>🔎</span><h3>No matching shops</h3><p>Search ya status filter badal kar dobara dekhein.</p><button className="admin-secondary" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</button></div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Shop details</th><th>Owner details</th><th>Contact & address</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleShops.map((shop) => { const status = (shop.status || "pending").toLowerCase(); return <tr key={shop.id}><td><strong>{shop.name || shop.shopName || "Unnamed shop"}</strong><small>ID: {shop.id}</small><small>{shop.description || shop.about || "Shop description not provided"}</small></td><td><strong>{shop.ownerName || "Name not provided"}</strong><small>{shop.ownerEmail || "Email not provided"}</small><small>UID: {shop.ownerUid || "—"}</small></td><td className="admin-contact-cell"><strong>📱 {shop.phone || shop.mobile || shop.mobileNumber || "Mobile not provided"}</strong><div className="admin-address"><b>📍 Shop address</b><span>{[shop.address, shop.fullAddress, shop.shopAddress, shop.location].find((value) => value?.trim()) || "Full address not provided by shop owner"}</span><small>City: {shop.city || "Not provided"}{shop.landmark ? ` · Landmark: ${shop.landmark}` : ""}</small></div></td><td><span className={`admin-status ${status}`}>{status}</span></td><td className="admin-actions">{status === "inactive" && shop.subscriptionStatus === "active" && <button className="admin-primary small" onClick={() => void setShopStatus(shop, "live")}>Resume shop</button>}{status !== "live" && !(status === "inactive" && shop.subscriptionStatus === "active") && <Link href="/admin/payments" className="admin-primary small">Verify / renew payment</Link>}{status === "live" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "inactive")}>Pause shop</button>}{<button className="admin-secondary small" style={{color:"#b42318",borderColor:"#b42318"}} disabled={deletingShopId===shop.id} onClick={() => void deleteShopCompletely(shop)}>{deletingShopId===shop.id ? "Deleting…" : "Delete permanently"}</button>}{status === "pending" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "rejected")}>Reject</button>}</td></tr>; })}</tbody></table></div>}
+      visibleShops.length === 0 ? <div className="admin-empty"><span>🔎</span><h3>No matching shops</h3><p>Search ya status filter badal kar dobara dekhein.</p><button className="admin-secondary" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</button></div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Shop details</th><th>Owner details</th><th>Contact & address</th><th>UTR / Payment</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleShops.map((shop) => { const status = (shop.status || "pending").toLowerCase(); return <tr key={shop.id}><td><strong>{shop.name || shop.shopName || "Unnamed shop"}</strong><small>ID: {shop.id}</small><small>{shop.description || shop.about || "Shop description not provided"}</small></td><td><strong>{shop.ownerName || "Name not provided"}</strong><small>{shop.ownerEmail || "Email not provided"}</small><small>UID: {shop.ownerUid || "—"}</small></td><td className="admin-contact-cell"><strong>📱 {shop.phone || shop.mobile || shop.mobileNumber || "Mobile not provided"}</strong><div className="admin-address"><b>📍 Shop address</b><span>{[shop.address, shop.fullAddress, shop.shopAddress, shop.location].find((value) => value?.trim()) || "Full address not provided by shop owner"}</span><small>City: {shop.city || "Not provided"}{shop.landmark ? ` · Landmark: ${shop.landmark}` : ""}</small></div></td><td>{(() => { const payment = shopPayments[shop.id]; return <><strong>{payment?.utr || "UTR not submitted"}</strong><small>{payment?.amount ? `₹${payment.amount}` : "Amount —"} · {payment?.status || "No payment record"}</small></>; })()}</td><td><span className={`admin-status ${status}`}>{status === "live" ? "APPROVED" : status.toUpperCase()}</span></td><td className="admin-actions">{status === "inactive" && shop.subscriptionStatus === "active" && <button className="admin-primary small" onClick={() => void setShopStatus(shop, "live")}>Resume shop</button>}{status !== "live" && !(status === "inactive" && shop.subscriptionStatus === "active") && <Link href="/admin/payments" className="admin-primary small">Verify / renew payment</Link>}{status === "live" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "inactive")}>Pause shop</button>}{<button className="admin-secondary small" style={{color:"#b42318",borderColor:"#b42318"}} disabled={deletingShopId===shop.id} onClick={() => void deleteShopCompletely(shop)}>{deletingShopId===shop.id ? "Deleting…" : "Delete permanently"}</button>}{status === "pending" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "rejected")}>Reject</button>}</td></tr>; })}</tbody></table></div>}
     </section>
     <p className="admin-footnote">Signed in as verified admin · Approving a shop makes it eligible to appear to customers. Status changes are protected by Firestore security rules.</p>
   </main>;
