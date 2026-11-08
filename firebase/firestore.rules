@@ -456,7 +456,12 @@ service cloud.firestore {
     }
 
     match /utrReservations/{utr} {
-      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      // A shop owner must be able to check whether a UTR document ID is unused.
+      // Missing-document get is safe: it reveals no existing reservation data and does not allow listing.
+      allow get: if isAdmin()
+        || (signedIn() && !exists(/databases/$(database)/documents/utrReservations/$(utr)))
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow list: if isAdmin();
       allow create: if signedIn()
         && !exists(/databases/$(database)/documents/utrReservations/$(utr))
         && utr.matches('^[A-Z0-9]{6,40}$')
