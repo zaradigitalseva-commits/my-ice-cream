@@ -123,9 +123,15 @@ export default function HomePage() {
       <div className="shop-grid marketplace-product-grid">{marketProducts.filter((product) => {
         const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
-      }).map((product) => <Link href={"/shop/" + product.shopId} className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
-        {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
-        <div className="shop-card-body marketplace-product-summary"><h3>{product.name || "Ice cream treat"}</h3><strong>₹{Number(product.price || 0).toFixed(2)}</strong></div></Link>)}</div>}
+      }).map((product) => <article className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
+        <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="marketplace-product-open" aria-label={"Open " + (product.name || "product") + " in its shop"}>
+          {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
+          <div className="shop-card-body marketplace-product-summary"><h3>{product.name || "Ice cream treat"}</h3><strong>₹{Number(product.price || 0).toFixed(2)}</strong><span className="admin-muted">{product.shopName}</span></div>
+        </Link>
+        <div className="shop-card-body" style={{paddingTop:0}}>
+          <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="admin-primary customer-add-button">＋ Add to cart</Link>
+        </div>
+      </article>)}</div>}
     </section>
     <section id="shops" className="bottom-live-shops">
       
