@@ -23,6 +23,7 @@ export default function HomePage() {
   const [message, setMessage] = useState("");
   const [searchText, setSearchText] = useState("");
   const [shopSearchText, setShopSearchText] = useState("");
+  const [showLiveShops, setShowLiveShops] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All treats");
   const [siteLogo, setSiteLogo] = useState("");
 
@@ -135,18 +136,22 @@ export default function HomePage() {
       </article>)}</div>}
     </section>
     <section id="shops" className="bottom-live-shops">
-      
-      <label className="marketplace-search"><span>Search all shops</span><input value={shopSearchText} onChange={(e) => setShopSearchText(e.target.value)} placeholder="Enter shop name, city or address" /></label>
-      <div className="shop-list-heading"><h2>LIVE Ice Cream Shops</h2><span>{filteredBottomShops.length} shops</span></div>
-      {loadingShops ? <div className="empty-panel"><p>Loading live shops…</p></div> : shops.length === 0 ? <div className="empty-panel"><div className="empty-icon">🏪</div><h3>No LIVE shops yet</h3><p>Approved shops will appear here automatically. You can browse this website without signing in.</p></div> : filteredBottomShops.length === 0 ? <div className="empty-panel"><h3>No matching shops</h3><p>Try a different shop name, city or address.</p><button className="admin-secondary" onClick={() => setShopSearchText("")}>Clear search</button></div> :
-        <div className="shop-grid">{filteredBottomShops.map((shop) => <Link href={"/shop/" + shop.id} className="shop-card" key={shop.id}>
-          {shop.bannerUrl ? <img className="shop-banner" src={shop.bannerUrl} alt="" /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
-          <div className="shop-card-body"><div className="shop-card-title">{shop.logoUrl ? <img src={shop.logoUrl} alt="" /> : <span>🏪</span>}<h3>{shop.name || shop.shopName || "Ice Cream Shop"}</h3></div>
-            <p>{[shop.city, shop.address].filter(Boolean).join(" · ") || "Location not added"}</p>
-            {shop.description && <p className="shop-description">{shop.description}</p>}
-            {shop.category && <span className="pill">{shop.category}</span>}{shop.offerTitle && (!shop.offerExpiresAt || new Date(shop.offerExpiresAt + "T23:59:59").getTime() >= Date.now()) && <div className="shop-offer"><strong>🎉 {shop.offerTitle}</strong>{shop.offerDescription && <p>{shop.offerDescription}</p>}{shop.offerExpiresAt && <small>Offer valid until {shop.offerExpiresAt}</small>}</div>}
-          </div>
-        </Link>)}</div>}
+      <button type="button" className="live-shops-toggle" onClick={() => setShowLiveShops((open) => !open)} aria-expanded={showLiveShops}>
+        <span>🏪 LIVE Ice Cream Shops</span><span className="live-shops-toggle-count">{shops.length} shops</span><span className="live-shops-toggle-arrow">{showLiveShops ? "−" : "+"}</span>
+      </button>
+      {showLiveShops && <>
+        <label className="marketplace-search"><span>Search all shops</span><input value={shopSearchText} onChange={(e) => setShopSearchText(e.target.value)} placeholder="Enter shop name, city or address" /></label>
+        <div className="shop-list-heading"><h2>Browse LIVE Shops</h2><span>{filteredBottomShops.length} shops</span></div>
+        {loadingShops ? <div className="empty-panel"><p>Loading live shops…</p></div> : shops.length === 0 ? <div className="empty-panel"><div className="empty-icon">🏪</div><h3>No LIVE shops yet</h3><p>Approved shops will appear here automatically. You can browse this website without signing in.</p></div> : filteredBottomShops.length === 0 ? <div className="empty-panel"><h3>No matching shops</h3><p>Try a different shop name, city or address.</p><button className="admin-secondary" onClick={() => setShopSearchText("")}>Clear search</button></div> :
+          <div className="shop-grid">{filteredBottomShops.map((shop) => <Link href={"/shop/" + shop.id} className="shop-card" key={shop.id}>
+            {shop.bannerUrl ? <img className="shop-banner" src={shop.bannerUrl} alt="" /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
+            <div className="shop-card-body"><div className="shop-card-title">{shop.logoUrl ? <img src={shop.logoUrl} alt="" /> : <span>🏪</span>}<h3>{shop.name || shop.shopName || "Ice Cream Shop"}</h3></div>
+              <p>{[shop.city, shop.address].filter(Boolean).join(" · ") || "Location not added"}</p>
+              {shop.description && <p className="shop-description">{shop.description}</p>}
+              {shop.category && <span className="pill">{shop.category}</span>}{shop.offerTitle && (!shop.offerExpiresAt || new Date(shop.offerExpiresAt + "T23:59:59").getTime() >= Date.now()) && <div className="shop-offer"><strong>🎉 {shop.offerTitle}</strong>{shop.offerDescription && <p>{shop.offerDescription}</p>}{shop.offerExpiresAt && <small>Offer valid until {shop.offerExpiresAt}</small>}</div>}
+            </div>
+          </Link>)}</div>}
+      </>}
     </section>
     <section id="for-shops" className="shop-onboarding"><div><p className="eyebrow">For ice cream businesses</p><h2>Bring your shop to MY ICE CREAM</h2><p>First listing ₹599 includes the first 30 days. Submit your UPI UTR; Admin verifies payment before the shop goes LIVE. Renewal is ₹299 per month.</p></div><Link href="/shop/register" className="primary-button">Register your shop</Link></section>
     <footer className="footer" id="about"><span>© {new Date().getFullYear()} MY ICE CREAM</span><span>Unlimited shops · Sweet moments · Easy ordering</span></footer>
