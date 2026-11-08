@@ -73,6 +73,8 @@ export default function ShopPage() {
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
   const [whatsAppUrl, setWhatsAppUrl] = useState("");
   const [pendingPayment, setPendingPayment] = useState(false);
+  const [productsRefreshing, setProductsRefreshing] = useState(false);
+  const [productRefreshMessage, setProductRefreshMessage] = useState("");
 
   useEffect(() => {
     if (!activeShopSection) return;
@@ -95,6 +97,20 @@ export default function ShopPage() {
     if (!db) return;
     const result = await getDocs(query(collection(db, "shops", shopId, "products")));
     setProducts(result.docs.map((item) => ({ id: item.id, ...item.data() } as Product)));
+  }
+
+  async function refreshProducts() {
+    if (!shop || productsRefreshing) return;
+    setProductsRefreshing(true);
+    setProductRefreshMessage("");
+    try {
+      await loadProducts(shop.id);
+      setProductRefreshMessage("Product list successfully refresh ho gayi.");
+    } catch (refreshError) {
+      setProductRefreshMessage(refreshError instanceof Error ? refreshError.message : "Product list refresh nahi ho saki. Dobara try karein.");
+    } finally {
+      setProductsRefreshing(false);
+    }
   }
 
   useEffect(() => {
@@ -579,7 +595,8 @@ export default function ShopPage() {
                 <td className="admin-actions"><button type="button" className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setOriginalPrice(String(p.originalPrice??""));setProductCategory(p.category||"Ice cream");setImageUrl(p.imageUrl||"");setProductActive(p.active!==false);setActiveShopSection("products");}}>Edit</button><button type="button" className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td>
               </tr>)}
             </tbody></table></div>}
-          <button type="button" className="admin-secondary" onClick={()=>void loadProducts(shop.id)}>Refresh list</button>
+          <button type="button" className="admin-secondary" disabled={productsRefreshing} onClick={()=>void refreshProducts()}>{productsRefreshing ? "Refreshing…" : "Refresh list"}</button>
+          {productRefreshMessage && <p className="admin-muted" role="status">{productRefreshMessage}</p>}
         </section> : <section className="admin-panel"><h2>Approval pending</h2><p>My Products देखने और manage करने के लिए Admin approval के बाद दुकान LIVE होना जरूरी है।</p></section>)}
       </>
     }
