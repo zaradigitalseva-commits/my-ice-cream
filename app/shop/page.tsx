@@ -91,7 +91,7 @@ export default function ShopPage() {
           const data = { id: owned.id, ...owned.data() } as Shop;
           const isLiveShop = ["live", "LIVE", "Live"].includes(String(data.status || ""));
           setShop(data);
-          if (isLiveShop || window.location.hash === "#shop-profile" || new URLSearchParams(window.location.search).get("payment") === "1") setShowShopDashboard(true);
+          if (isLiveShop || window.location.hash === "#shop-profile") setShowShopDashboard(true);
           const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
           setPendingPayment(lock.exists()); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
           setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
@@ -383,7 +383,7 @@ export default function ShopPage() {
           {pendingPayment && <p><strong>Payment status: PENDING VERIFICATION</strong> · Admin आपके UTR की जाँच कर रहा है। कृपया दोबारा भुगतान न करें।</p>}
           {String(shop.status || "").toLowerCase() === "live" && <p>आपकी दुकान Approved है और customers को दिखाई दे रही है।</p>}
         </section>
-        {subscriptionPaymentDue && <section className="admin-panel" id="subscription-payment" style={{border:"2px solid #f0a43a",scrollMarginTop:24}}>
+        {subscriptionPaymentDue && !pendingPayment && <section className="admin-panel" id="subscription-payment" style={{border:"2px solid #f0a43a",scrollMarginTop:24}}>
           <p className="admin-kicker">PAYMENT REQUIRED · UPI</p>
           <h2>{firstListingPayment ? "पहली दुकान लिस्टिंग फीस · ₹599" : "मासिक रिन्यूअल · ₹299"}</h2>
           <p>{firstListingPayment ? "दुकान की पहली listing के लिए ₹599 जमा करें। UTR submit होने के बाद Admin payment verify करेगा; approval के बाद दुकान LIVE होगी।" : "आपकी अगली 30 दिन की subscription फीस ₹299 है।"}</p>
