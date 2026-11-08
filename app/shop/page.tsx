@@ -226,6 +226,7 @@ export default function ShopPage() {
   const firstListingPayment = Boolean(shop && shop.initialPaymentVerified !== true && !shop.subscriptionExpiresAt);
   const subscriptionAmount = firstListingPayment ? 599 : 299;
   const subscriptionExpiry = shop?.subscriptionExpiresAt && typeof (shop.subscriptionExpiresAt as { toDate?: () => Date }).toDate === "function" ? (shop.subscriptionExpiresAt as { toDate: () => Date }).toDate() : shop?.subscriptionExpiresAt instanceof Date ? shop.subscriptionExpiresAt : null;
+  const subscriptionPaymentDue = firstListingPayment || Boolean(subscriptionExpiry && subscriptionExpiry.getTime() <= Date.now());
 
   async function submitSubscription(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -376,18 +377,18 @@ export default function ShopPage() {
           <p className="admin-kicker">REGISTRATION TRACKING</p>
           <h2>आपकी दुकान की स्थिति</h2>
           <p><strong className={"admin-status " + String(shop.status || "pending").toLowerCase()}>{String(shop.status || "pending").toLowerCase() === "live" ? "APPROVED · दुकान LIVE है" : String(shop.status || "pending").toUpperCase()}</strong></p>
-          {String(shop.status || "pending").toLowerCase() === "pending" && <p>आपकी दुकान का registration Admin के review में है। Payment UTR जमा होने के बाद payment verification भी यहीं track होगी।</p>}
+          {String(shop.status || "pending").toLowerCase() === "pending" && <p>{pendingPayment ? "आपका UTR मिल गया है। Admin payment verify कर रहा है। कृपया दोबारा भुगतान या UTR submit न करें।" : shop.initialPaymentVerified === true && subscriptionExpiry && subscriptionExpiry.getTime() > Date.now() ? "आपका payment verify हो चुका है। अब Admin आपकी दुकान की अंतिम जाँच करके LIVE करेगा।" : "आपकी registration सेव है। पहले UPI से payment करें और payment के बाद मिला UTR यहाँ submit करें। Admin verification और shop approval के बाद दुकान LIVE होगी।"}</p>}
           {String(shop.status || "").toLowerCase() === "rejected" && <p>Registration reject हुई है। कृपया Admin से संपर्क करें और सही जानकारी अपडेट करें।</p>}
           {String(shop.status || "").toLowerCase() === "inactive" && <p>आपकी दुकान फिलहाल inactive है। दोबारा चालू करने के लिए Admin से संपर्क करें।</p>}
           {pendingPayment && <p><strong>Payment status: PENDING VERIFICATION</strong> · Admin आपके UTR की जाँच कर रहा है। कृपया दोबारा भुगतान न करें।</p>}
           {String(shop.status || "").toLowerCase() === "live" && <p>आपकी दुकान Approved है और customers को दिखाई दे रही है।</p>}
         </section>
-        {(!live || subscriptionExpiry) && <section className="admin-panel" id="subscription-payment" style={{border:"2px solid #f0a43a",scrollMarginTop:24}}>
+        {subscriptionPaymentDue && <section className="admin-panel" id="subscription-payment" style={{border:"2px solid #f0a43a",scrollMarginTop:24}}>
           <p className="admin-kicker">PAYMENT REQUIRED · UPI</p>
           <h2>{firstListingPayment ? "पहली दुकान लिस्टिंग फीस · ₹599" : "मासिक रिन्यूअल · ₹299"}</h2>
           <p>{firstListingPayment ? "दुकान की पहली listing के लिए ₹599 जमा करें। UTR submit होने के बाद Admin payment verify करेगा; approval के बाद दुकान LIVE होगी।" : "आपकी अगली 30 दिन की subscription फीस ₹299 है।"}</p>
           {adminUpiQr ? <div style={{textAlign:"center",margin:"12px auto",maxWidth:300}}><img src={adminUpiQr} alt="Admin UPI QR Code" style={{width:"100%",maxWidth:240,objectFit:"contain",borderRadius:12,border:"1px solid #ddd",padding:8,background:"#fff"}}/><p className="admin-muted">UPI QR · ₹{subscriptionAmount}</p></div> : <p className="admin-error">Admin ने अभी UPI QR सेट नहीं किया है। Admin से संपर्क करें।</p>}
-          <form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>{setUtr(e.target.value);setPaymentError("");}} placeholder="Enter UTR / transaction reference" /></label><button type="submit" className="admin-primary" disabled={busy||pendingPayment}>{busy?"UTR जमा हो रहा है…":`Submit ₹${subscriptionAmount} payment`}</button></form>
+          <form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>{setUtr(e.target.value.toUpperCase().replace(/\s+/g,""));setPaymentError("");}} placeholder="पहले payment करें, फिर UTR नंबर डालें" /></label>{utr.trim() && <button type="submit" className="admin-primary" disabled={busy||pendingPayment}>{busy?"UTR जमा हो रहा है…":`Submit ₹${subscriptionAmount} payment`}</button>}{!utr.trim() && <p className="admin-muted">पहले ऊपर दिए गए UPI QR से payment करें। Payment के बाद मिला UTR नंबर डालने पर ही Submit button दिखाई देगा।</p>}</form>
           {paymentError&&<p className="admin-error" role="alert" style={{marginTop:12}}>{paymentError}</p>}{paymentNotice&&<p className="admin-success" role="status">{paymentNotice}</p>}{pendingPayment&&<p className="admin-muted">Payment verification pending — कृपया दोबारा भुगतान न करें।</p>}
         </section>}
         {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
