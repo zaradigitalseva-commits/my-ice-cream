@@ -40,8 +40,9 @@ export default function HomePage() {
       try {
         const owned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
         if (!owned.empty) {
+          // Keep shop owners on the public customer homepage when they visit "/".
+          // Their dashboard remains available through the Shop Dashboard link.
           setShopOwner(true);
-          router.replace("/shop");
         }
       } catch {
         setShopOwner(false);
