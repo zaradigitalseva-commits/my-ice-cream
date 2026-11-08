@@ -125,7 +125,7 @@ export default function ShopRegisterPage() {
             : "Aapki shop registration save hai. Pehle ₹599 listing payment karein aur UTR submit karein; Admin payment verify karke final shop approval ke baad shop LIVE karega."}</p>
         <div className="register-status-actions">
           <Link href="/shop#shop-profile" className="admin-primary role-link">✏️ Edit registration details</Link>
-          <Link href="/shop?payment=1" className="admin-secondary role-link">Open payment & Shop Dashboard →</Link>
+          <Link href="/shop?payment=1" className="admin-secondary role-link">Open payment & registration status →</Link>
         </div>
       </div> :
       <form className="register-form register-form-color" onSubmit={submit}>
