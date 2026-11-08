@@ -296,3 +296,12 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
  .marketplace-3d .brand-3d-logo{max-width:min(150px,34vw)}
  .marketplace-3d .brand-logo-image{max-height:42px}
 }
+
+/* Compact Add to cart CTA on small homepage product cards. */
+@media(max-width:767px){
+ .marketplace-3d .marketplace-product-grid .customer-add-button{display:flex;align-items:center;justify-content:center;width:100%;min-height:30px;padding:6px 7px;font-size:10px;line-height:1.15;border-radius:9px;white-space:nowrap;box-shadow:0 2px 0 #9c529e,0 4px 8px #a65c9c20}
+ .marketplace-3d .marketplace-product-grid .shop-card-body{padding:7px 9px 9px}
+}
+@media(max-width:380px){
+ .marketplace-3d .marketplace-product-grid .customer-add-button{font-size:9px;padding:5px 4px;min-height:27px}
+}
