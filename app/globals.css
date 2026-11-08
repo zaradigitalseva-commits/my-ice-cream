@@ -330,3 +330,30 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
   object-position:center;
   background:#fffaf4;
 }
+
+
+/* Animated LED edge on every homepage product card. */
+@keyframes product-led-border{
+  to{--product-led-angle:360deg}
+}
+@property --product-led-angle{
+  syntax:"<angle>";
+  inherits:false;
+  initial-value:0deg;
+}
+.marketplace-3d .marketplace-product-grid > .customer-product-card{
+  position:relative;
+  isolation:isolate;
+  border:1px solid transparent;
+  background:
+    linear-gradient(145deg,#fff,#fff6fb) padding-box,
+    conic-gradient(from var(--product-led-angle),#ff4fa3,#ffe45c,#42e8ff,#9b65ff,#ff4fa3) border-box;
+  animation:product-led-border 4s linear infinite;
+  box-shadow:0 0 7px #ff69b433,0 8px 0 #ead3e7,0 17px 30px #76427b17;
+}
+.marketplace-3d .marketplace-product-grid > .customer-product-card:hover{
+  box-shadow:0 0 12px #ff69b477,0 0 22px #49dfff55,0 13px 0 #e5c6e1,0 25px 36px #76427b25;
+}
+@media(prefers-reduced-motion:reduce){
+  .marketplace-3d .marketplace-product-grid > .customer-product-card{animation:none}
+}
