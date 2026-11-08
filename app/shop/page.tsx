@@ -223,7 +223,8 @@ export default function ShopPage() {
     finally { setCustomerBusy(false); }
   }
 
-  const firstListingPayment = Boolean(shop && shop.initialPaymentVerified !== true && !shop.subscriptionExpiresAt);
+  const alreadyLiveShop = Boolean(shop && ["live", "LIVE", "Live"].includes(String(shop.status || "")));
+  const firstListingPayment = Boolean(shop && !alreadyLiveShop && shop.initialPaymentVerified !== true && !shop.subscriptionExpiresAt);
   const subscriptionAmount = firstListingPayment ? 599 : 299;
   const subscriptionExpiry = shop?.subscriptionExpiresAt && typeof (shop.subscriptionExpiresAt as { toDate?: () => Date }).toDate === "function" ? (shop.subscriptionExpiresAt as { toDate: () => Date }).toDate() : shop?.subscriptionExpiresAt instanceof Date ? shop.subscriptionExpiresAt : null;
   const subscriptionPaymentDue = firstListingPayment || Boolean(subscriptionExpiry && subscriptionExpiry.getTime() <= Date.now());
@@ -383,12 +384,12 @@ export default function ShopPage() {
           {pendingPayment && <p><strong>Payment status: PENDING VERIFICATION</strong> · Admin आपके UTR की जाँच कर रहा है। कृपया दोबारा भुगतान न करें।</p>}
           {String(shop.status || "").toLowerCase() === "live" && <p>आपकी दुकान Approved है और customers को दिखाई दे रही है।</p>}
         </section>
-        {subscriptionPaymentDue && !pendingPayment && <section className="admin-panel" id="subscription-payment" style={{border:"2px solid #f0a43a",scrollMarginTop:24}}>
+        {subscriptionPaymentDue && !pendingPayment && String(shop.status || "").toLowerCase() !== "rejected" && <section className="admin-panel" id="subscription-payment" style={{border:"2px solid #f0a43a",scrollMarginTop:24}}>
           <p className="admin-kicker">PAYMENT REQUIRED · UPI</p>
           <h2>{firstListingPayment ? "पहली दुकान लिस्टिंग फीस · ₹599" : "मासिक रिन्यूअल · ₹299"}</h2>
           <p>{firstListingPayment ? "दुकान की पहली listing के लिए ₹599 जमा करें। UTR submit होने के बाद Admin payment verify करेगा; approval के बाद दुकान LIVE होगी।" : "आपकी अगली 30 दिन की subscription फीस ₹299 है।"}</p>
           {adminUpiQr ? <div style={{textAlign:"center",margin:"12px auto",maxWidth:300}}><img src={adminUpiQr} alt="Admin UPI QR Code" style={{width:"100%",maxWidth:240,objectFit:"contain",borderRadius:12,border:"1px solid #ddd",padding:8,background:"#fff"}}/><p className="admin-muted">UPI QR · ₹{subscriptionAmount}</p></div> : <p className="admin-error">Admin ने अभी UPI QR सेट नहीं किया है। Admin से संपर्क करें।</p>}
-          <form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>{setUtr(e.target.value.toUpperCase().replace(/\s+/g,""));setPaymentError("");}} placeholder="पहले payment करें, फिर UTR नंबर डालें" /></label>{utr.trim() && <button type="submit" className="admin-primary" disabled={busy||pendingPayment}>{busy?"UTR जमा हो रहा है…":`Submit ₹${subscriptionAmount} payment`}</button>}{!utr.trim() && <p className="admin-muted">पहले ऊपर दिए गए UPI QR से payment करें। Payment के बाद मिला UTR नंबर डालने पर ही Submit button दिखाई देगा।</p>}</form>
+          {adminUpiQr ? <form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>{setUtr(e.target.value.toUpperCase().replace(/\s+/g,""));setPaymentError("");}} placeholder="पहले payment करें, फिर UTR नंबर डालें" /></label>{utr.trim() && <button type="submit" className="admin-primary" disabled={busy||pendingPayment}>{busy?"UTR जमा हो रहा है…":`Submit ₹${subscriptionAmount} payment`}</button>}{!utr.trim() && <p className="admin-muted">पहले ऊपर दिए गए UPI QR से payment करें। Payment के बाद मिला UTR नंबर डालने पर ही Submit button दिखाई देगा।</p>}</form> : <p className="admin-error">Payment अभी उपलब्ध नहीं है। Admin ने UPI QR सेट नहीं किया है। QR सेट होने तक भुगतान न करें।</p>}
           {paymentError&&<p className="admin-error" role="alert" style={{marginTop:12}}>{paymentError}</p>}{paymentNotice&&<p className="admin-success" role="status">{paymentNotice}</p>}{pendingPayment&&<p className="admin-muted">Payment verification pending — कृपया दोबारा भुगतान न करें।</p>}
         </section>}
         {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
