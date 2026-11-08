@@ -106,6 +106,7 @@ export default function HomePage() {
       <Link className="brand brand-3d-logo" href="/" aria-label="MY ICE CREAM home"><img className="brand-logo-image" src={siteLogo || "/my-ice-cream-logo.svg"} alt="MY ICE CREAM" /></Link>
       <nav className="navlinks" aria-label="Main navigation"><a href="#discover">Discover</a><a href="#shops">For shops</a><a href="#about">About</a></nav>
       <div className="top-actions">
+        <Link href="#shops" className="primary-button all-shops-header-button" onClick={() => setShowLiveShops(true)}>All Shop</Link>
         <Link href="/shop/register" className="primary-button">Register your shop</Link>
         {user && (adminAccount ? <Link className="account-link" href="/admin">Admin Dashboard</Link> : shopOwner ? <Link className="account-link" href="/shop">Shop Dashboard</Link> : <Link className="account-link" href="/customer">My Account</Link>)}
         <button className="login-button" onClick={handleAuth} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
@@ -136,9 +137,6 @@ export default function HomePage() {
       </article>)}</div>}
     </section>
     <section id="shops" className="bottom-live-shops">
-      <button type="button" className="live-shops-toggle" onClick={() => setShowLiveShops((open) => !open)} aria-expanded={showLiveShops}>
-        <span>🏪 LIVE Ice Cream Shops</span><span className="live-shops-toggle-count">{shops.length} shops</span><span className="live-shops-toggle-arrow">{showLiveShops ? "−" : "+"}</span>
-      </button>
       {showLiveShops && <>
         <label className="marketplace-search"><span>Search all shops</span><input value={shopSearchText} onChange={(e) => setShopSearchText(e.target.value)} placeholder="Enter shop name, city or address" /></label>
         <div className="shop-list-heading"><h2>Browse LIVE Shops</h2><span>{filteredBottomShops.length} shops</span></div>
