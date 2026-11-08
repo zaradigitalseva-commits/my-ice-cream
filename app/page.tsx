@@ -32,10 +32,8 @@ export default function HomePage() {
       setUser(nextUser);
       setShopOwner(false);
       if (!nextUser) return;
-      if (isAdminEmail(nextUser.email) && nextUser.emailVerified) {
-        router.replace("/admin");
-        return;
-      }
+      // Keep admins on the public marketplace when they visit "/".
+      // Their control panel remains available through the Admin Dashboard link.
       if (!db) return;
       try {
         const owned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
