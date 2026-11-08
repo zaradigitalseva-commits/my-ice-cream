@@ -53,6 +53,7 @@ export default function ShopPage() {
   const [imageBusy, setImageBusy] = useState(false);
   const [utr, setUtr] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
+  const [paymentError, setPaymentError] = useState("");
   const [adminUpiQr, setAdminUpiQr] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [newCustomerName, setNewCustomerName] = useState("");
@@ -228,8 +229,11 @@ export default function ShopPage() {
 
   async function submitSubscription(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!db || !shop || !user) return;
-    setBusy(true); setError(""); setPaymentNotice("");
+    if (!db || !shop || !user) {
+      setPaymentError("आपका लॉगिन या दुकान की जानकारी उपलब्ध नहीं है। कृपया पेज रीफ्रेश करके दोबारा लॉगिन करें।");
+      return;
+    }
+    setBusy(true); setError(""); setPaymentError(""); setPaymentNotice("");
     try {
       const normalizedUtr = utr.trim().toUpperCase().replace(/\s+/g, "");
       if (!/^[A-Z0-9]{6,40}$/.test(normalizedUtr)) {
@@ -265,7 +269,12 @@ export default function ShopPage() {
       setPaymentNotice(`₹${subscriptionAmount} ${firstListingPayment ? "first listing" : "monthly renewal"} payment details submitted. Admin verification is pending.`);
       setPendingPayment(true);
       setUtr("");
-    } catch (e) { setError(e instanceof Error ? e.message : "Payment details could not be submitted."); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Payment details could not be submitted.";
+      setPaymentError(message.toLowerCase().includes("permission")
+        ? "UTR जमा नहीं हुआ: Firebase permission की समस्या है। कृपया अभी दोबारा भुगतान न करें और Admin से संपर्क करें।"
+        : `UTR जमा नहीं हुआ: ${message}`);
+    }
     finally { setBusy(false); }
   }
 
@@ -389,8 +398,8 @@ export default function ShopPage() {
           <h2>{firstListingPayment ? "पहली दुकान लिस्टिंग फीस" : "मासिक रिन्यूअल"}</h2>
           <p>{firstListingPayment ? "₹599 में दुकान की listing review, Admin approval और पहला महीना शामिल है।" : "आपकी अगली 30 दिन की subscription फीस ₹299 है।"}</p>
           {adminUpiQr ? <div style={{textAlign:"center",margin:"12px auto",maxWidth:300}}><img src={adminUpiQr} alt="Admin UPI QR Code" style={{width:"100%",maxWidth:240,objectFit:"contain",borderRadius:12,border:"1px solid #ddd",padding:8,background:"#fff"}}/><p className="admin-muted">UPI QR · ₹{subscriptionAmount}</p></div> : <p className="admin-error">Admin ने अभी UPI QR सेट नहीं किया है।</p>}
-          <form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>setUtr(e.target.value)} placeholder="Enter UTR / transaction reference" /></label><button className="admin-primary" disabled={busy||!utr.trim()||pendingPayment}>Submit ₹{subscriptionAmount} payment</button></form>
-          {paymentNotice&&<p className="admin-success">{paymentNotice}</p>}{pendingPayment&&<p className="admin-muted">Payment verification pending — कृपया दोबारा भुगतान न करें।</p>}
+          <form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>{setUtr(e.target.value);setPaymentError("");}} placeholder="Enter UTR / transaction reference" /></label><button type="submit" className="admin-primary" disabled={busy||!utr.trim()||pendingPayment}>{busy?"UTR जमा हो रहा है…":`Submit ₹${subscriptionAmount} payment`}</button></form>
+          {paymentError&&<p className="admin-error" role="alert" style={{marginTop:12}}>{paymentError}</p>}{paymentNotice&&<p className="admin-success" role="status">{paymentNotice}</p>}{pendingPayment&&<p className="admin-muted">Payment verification pending — कृपया दोबारा भुगतान न करें।</p>}
         </section>}
         <section className="admin-panel"><h2>Business overview</h2><div className="admin-stats"><div><strong>{orders.length}</strong><span>Total orders</span></div><div><strong>₹{orders.filter(o=>o.paymentStatus==="paid").reduce((s,o)=>s+Number(o.total||0),0).toFixed(0)}</strong><span>Paid sales</span></div><div><strong>{orders.filter(o=>["placed","accepted","preparing","ready"].includes(o.status||"")).length}</strong><span>Open orders</span></div></div></section><section className="admin-panel"><h2>Orders & customers</h2><p>View orders from customers who purchased from your shop.</p><Link href="/shop/orders" className="admin-primary role-link">Open orders</Link></section><section className="admin-panel" id="shop-profile"><h2>Shop profile / Registration details</h2><p>Apni registration ki details yahan update karein. Changes save karne ke baad Admin ko updated details dikhengi.</p><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
