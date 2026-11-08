@@ -68,7 +68,7 @@ export default function ShopPage() {
   const [discountValue, setDiscountValue] = useState("0");
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
   const [salePayment, setSalePayment] = useState<"paid" | "unpaid">("paid");
-  const [activeShopSection, setActiveShopSection] = useState<"profile" | "payments" | "products" | "">("");
+  const [activeShopSection, setActiveShopSection] = useState<"profile" | "payments" | "products" | "myProducts" | "">("");
   const [paymentHistory, setPaymentHistory] = useState<SubscriptionPayment[]>([]);
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
   const [whatsAppUrl, setWhatsAppUrl] = useState("");
@@ -502,7 +502,8 @@ export default function ShopPage() {
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
             <button type="button" className={activeShopSection === "profile" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "profile" ? "" : "profile")}>Shop Reg. Details</button>
             <button type="button" className={activeShopSection === "payments" ? "admin-primary" : "admin-secondary"} onClick={()=>{if(activeShopSection === "payments")setActiveShopSection("");else void openPaymentHistory();}}>Payment History</button>
-            <button type="button" className={activeShopSection === "products" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "products" ? "" : "products")}>Add Product</button>
+            <button type="button" className={activeShopSection === "products" ? "admin-primary" : "admin-secondary"} onClick={()=>{resetProduct();setActiveShopSection(activeShopSection === "products" ? "" : "products");}}>Add Product</button>
+            <button type="button" className={activeShopSection === "myProducts" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "myProducts" ? "" : "myProducts")}>My Products</button>
           </div>
         </section>
         {activeShopSection === "payments" && <section className="admin-panel"><h2>Payment History</h2><p>आपकी दुकान की subscription payments और verification status.</p>
@@ -548,11 +549,21 @@ export default function ShopPage() {
             <label>Product photo (auto-compressed to WebP)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProductImage(file);}} /></label>{imageUrl && <div><img src={imageUrl} alt="Product preview" style={{maxWidth:140,maxHeight:100,borderRadius:12}}/><button type="button" className="admin-secondary small" onClick={()=>setImageUrl("")}>Remove photo</button></div>}{imageBusy && <p className="admin-muted">Compressing image…</p>}
             <div><button type="submit" className="admin-primary" disabled={busy||imageBusy}>{busy ? "Saving product…" : productId ? "Update product" : "Add product"}</button>{productId && <button type="button" className="admin-secondary" onClick={resetProduct}>Cancel edit</button>}</div>
           </form>
-          <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Price</th><th>Visibility</th><th>Actions</th></tr></thead><tbody>
-            {products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.description || ""}</small></td><td>₹{Number(p.price || 0).toFixed(2)}{p.originalPrice && p.originalPrice>Number(p.price||0) ? <small><s>₹{Number(p.originalPrice).toFixed(2)}</s></small> : null}</td><td><span className={"admin-status "+(p.active===false?"inactive":"live")}>{p.active===false?"Hidden":"Visible"}</span></td><td className="admin-actions"><button className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setOriginalPrice(String(p.originalPrice??""));setProductCategory(p.category||"Ice cream");setImageUrl(p.imageUrl||"");setProductActive(p.active!==false);}}>Edit</button><button className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td></tr>)}
-            {products.length===0 && <tr><td colSpan={4}>No products added yet.</td></tr>}
-          </tbody></table></div>
         </section> : <section className="admin-panel"><h2>Approval pending</h2><p>Product management unlocks after Admin approves your shop and changes its status to LIVE.</p></section>)}
+        {activeShopSection === "myProducts" && (live ? <section className="admin-panel"><p className="admin-kicker">PRODUCT INVENTORY</p><h2>My Products · आपके सभी प्रोडक्ट</h2><p>यहाँ आपकी दुकान में जोड़े गए सभी प्रोडक्ट दिखेंगे। आप किसी भी प्रोडक्ट को Edit या Delete कर सकते हैं।</p>
+          <p><strong>Total products: {products.length}</strong> · Visible: {products.filter(p=>p.active!==false).length} · Hidden: {products.filter(p=>p.active===false).length}</p>
+          {products.length===0 ? <p className="admin-muted">अभी कोई प्रोडक्ट नहीं जोड़ा गया है। Add Product बटन से पहला प्रोडक्ट जोड़ें।</p> :
+            <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Photo</th><th>Product details</th><th>Price</th><th>Visibility</th><th>Actions</th></tr></thead><tbody>
+              {products.map(p=><tr key={p.id}>
+                <td>{p.imageUrl ? <img src={p.imageUrl} alt={p.name || "Product"} style={{width:64,height:64,objectFit:"cover",borderRadius:10}}/> : "—"}</td>
+                <td><strong>{p.name || "Unnamed product"}</strong><small>{p.category || "Other"}{p.description ? " · "+p.description : ""}</small></td>
+                <td>₹{Number(p.price||0).toFixed(2)}{p.originalPrice && p.originalPrice>Number(p.price||0) ? <small><s>₹{Number(p.originalPrice).toFixed(2)}</s></small> : null}</td>
+                <td><span className={"admin-status "+(p.active===false?"inactive":"live")}>{p.active===false?"Hidden":"Visible"}</span></td>
+                <td className="admin-actions"><button type="button" className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setOriginalPrice(String(p.originalPrice??""));setProductCategory(p.category||"Ice cream");setImageUrl(p.imageUrl||"");setProductActive(p.active!==false);setActiveShopSection("products");}}>Edit</button><button type="button" className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td>
+              </tr>)}
+            </tbody></table></div>}
+          <button type="button" className="admin-secondary" onClick={()=>void loadProducts(shop.id)}>Refresh list</button>
+        </section> : <section className="admin-panel"><h2>Approval pending</h2><p>My Products देखने और manage करने के लिए Admin approval के बाद दुकान LIVE होना जरूरी है।</p></section>)}
       </>
     }
     {user && <p className="admin-muted">Signed in as {user.email}</p>}
