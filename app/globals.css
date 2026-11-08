@@ -305,3 +305,20 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 @media(max-width:380px){
  .marketplace-3d .marketplace-product-grid .customer-add-button{font-size:9px;padding:5px 4px;min-height:27px}
 }
+
+
+/* Fix homepage product card spacing and reduce oversized product photos. */
+.marketplace-3d .marketplace-product-grid > .customer-product-card{min-width:0;overflow:hidden}
+.marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-open{display:flex;flex-direction:column;min-width:0}
+.marketplace-3d .marketplace-product-grid > .customer-product-card .shop-banner{display:block;width:100%;height:132px;min-height:132px;object-fit:cover}
+.marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-summary{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:6px;min-width:0;padding:10px 12px 8px}
+.marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-summary h3{display:block;width:100%;margin:0;font-size:14px;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
+.marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-summary strong{display:block;width:100%;margin:0;font-size:14px;line-height:1.25;white-space:normal}
+.marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-summary .admin-muted{display:block;width:100%;font-size:11px;line-height:1.3}
+@media(max-width:767px){
+ .marketplace-3d .marketplace-product-grid > .customer-product-card .shop-banner{height:88px;min-height:88px}
+ .marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-summary{gap:5px;padding:8px 9px 7px}
+ .marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-summary h3{font-size:12px;line-height:1.25}
+ .marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-summary strong{font-size:13px;line-height:1.2}
+ .marketplace-3d .marketplace-product-grid > .customer-product-card .marketplace-product-summary .admin-muted{font-size:10px}
+}
