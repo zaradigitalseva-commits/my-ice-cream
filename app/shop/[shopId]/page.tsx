@@ -29,15 +29,15 @@ export default function ShopDetailsPage(){
   const items=products.filter(p=>(cart[p.id]||0)>0).map(p=>({name:p.name||"Product",price:Number(p.price||0),quantity:cart[p.id]}));
   if(!items.length){setMessage("पहले cart में products जोड़ें।");return;}
   if(items.length>20){setMessage("एक ऑर्डर में अधिकतम 20 अलग-अलग products चुनें।");return;}
-  const cleanPhone=phone.replace(/\\D/g,"");
-  if(!/^\\d{10}$/.test(cleanPhone)){setMessage("अपना 10 अंकों का मोबाइल नंबर दर्ज करें।");return;}
+  const cleanPhone=phone.replace(/\D/g,"");
+  if(!/^\d{10}$/.test(cleanPhone)){setMessage("अपना 10 अंकों का मोबाइल नंबर दर्ज करें।");return;}
   const cleanCustomerName=customerName.trim();
   if(!cleanCustomerName){setMessage("ऑर्डर के लिए अपना नाम दर्ज करें।");return;}
   if(!shopOpen){setMessage("दुकान अभी बंद है। कृपया खुलने के समय ऑर्डर करें।");return;}
   if(fulfillmentType==="delivery"&&(!shop.deliveryAvailable||!address.trim())){setMessage("डिलीवरी के लिए पूरा पता दर्ज करें।");return;}
   if(subtotal<Number(shop.minimumOrder||0)){setMessage("Minimum order ₹"+Number(shop.minimumOrder||0).toFixed(2)+" है।");return;}
   if(fulfillmentType==="pickup"&&shop.pickupAvailable===false){setMessage("Shop pickup उपलब्ध नहीं है।");return;}
-  const registeredNumber=String(shop.phone||"").replace(/\\D/g,"");
+  const registeredNumber=String(shop.phone||"").replace(/\D/g,"");
   const whatsappNumber=registeredNumber.length===10?"91"+registeredNumber:registeredNumber.length===12&&registeredNumber.startsWith("91")?registeredNumber:"";
   if(!whatsappNumber){setMessage("दुकान का WhatsApp नंबर सही तरीके से सेट नहीं है। कृपया दुकान से संपर्क करें।");return;}
   const orderLines=items.map((item,index)=>String(index+1)+". "+item.name+" × "+item.quantity+" = ₹"+(item.price*item.quantity).toFixed(2));
@@ -60,7 +60,7 @@ export default function ShopDetailsPage(){
     "",
     "Payment: Unpaid - payment will be coordinated directly with the shop.",
     "Please confirm this order."
-  ].join("\\n");
+  ].join("\n");
   const whatsappUrl="https://wa.me/"+whatsappNumber+"?text="+encodeURIComponent(orderMessage);
   setMessage("WhatsApp खुल रहा है। वहाँ Send दबाकर अपना ऑर्डर दुकान को भेजें।");
   window.location.href=whatsappUrl;
