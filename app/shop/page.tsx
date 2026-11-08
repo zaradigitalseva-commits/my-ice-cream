@@ -110,21 +110,23 @@ export default function ShopPage() {
   // Admin changes are made from a separate session, so a one-time page load can otherwise stay stale.
   useEffect(() => {
     if (!db || !user || !shop) return;
+    const firestore = db;
+    const ownerUid = user.uid;
     let active = true;
     const refreshApprovalState = async () => {
       try {
-        const result = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid)));
+        const result = await getDocs(query(collection(firestore, "shops"), where("ownerUid", "==", ownerUid)));
         const owned = result.docs[0];
         if (!owned || !active) return;
         const latest = { id: owned.id, ...owned.data() } as Shop;
         setShop(latest);
-        const lock = await getDoc(doc(db, "paymentPendingLocks", latest.id));
+        const lock = await getDoc(doc(firestore, "paymentPendingLocks", latest.id));
         if (!active) return;
         const isLive = ["live", "LIVE", "Live"].includes(String(latest.status || ""));
         setPendingPayment(lock.exists() && !isLive);
         if (isLive) {
           await loadProducts(latest.id);
-          const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", latest.id)));
+          const orderResult = await getDocs(query(collection(firestore, "orders"), where("shopId", "==", latest.id)));
           if (active) setOrders(orderResult.docs.map(item => ({ id: item.id, ...item.data() } as Order)));
           setShowShopDashboard(true);
         }
