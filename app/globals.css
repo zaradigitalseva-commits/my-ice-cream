@@ -357,3 +357,12 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 @media(prefers-reduced-motion:reduce){
   .marketplace-3d .marketplace-product-grid > .customer-product-card{animation:none}
 }
+
+/* Collapsible button for the LIVE shop directory on the homepage. */
+.bottom-live-shops{max-width:1280px;margin:36px auto 24px}
+.live-shops-toggle{width:min(100%,560px);margin:0 auto 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border:1px solid #e8c6e7;border-radius:16px;background:linear-gradient(110deg,#e95e9b,#9e65d6,#48bfe8);color:#fff;font:inherit;font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 5px 0 #8750a9,0 12px 24px #9b65df30;transition:transform .2s,box-shadow .2s}
+.live-shops-toggle:hover{transform:translateY(-2px);box-shadow:0 7px 0 #8750a9,0 16px 28px #9b65df40}
+.live-shops-toggle-count{margin-left:auto;padding:5px 9px;border-radius:999px;background:#ffffff30;font-size:11px}
+.live-shops-toggle-arrow{width:25px;height:25px;display:grid;place-items:center;border-radius:50%;background:#ffffff35;font-size:20px;line-height:1}
+.bottom-live-shops>.marketplace-search{margin:22px auto 0}
+@media(max-width:560px){.live-shops-toggle{padding:13px 14px;font-size:13px;border-radius:13px}}
