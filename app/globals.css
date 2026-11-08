@@ -283,3 +283,16 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .customer-store-hero.has-shop-banner p{color:#fff;text-shadow:0 1px 6px #000b}
 .customer-store-hero.has-shop-banner .admin-kicker{color:#ffe4a8}
 @media(max-width:640px){.customer-store-hero.has-shop-banner{min-height:260px}.customer-store-banner-image{object-position:center}}
+
+/* Compact homepage header actions, especially on phones. */
+.marketplace-3d .topbar .top-actions .primary-button,
+.marketplace-3d .topbar .top-actions .login-button{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-size:12px;line-height:1.2;padding:9px 13px;box-shadow:0 3px 0 #9c529e,0 6px 12px #a65c9c25}
+@media(max-width:560px){
+ .marketplace-3d .topbar{gap:8px}
+ .marketplace-3d .topbar .top-actions{gap:5px;flex-shrink:0}
+ .marketplace-3d .topbar .top-actions .primary-button,
+ .marketplace-3d .topbar .top-actions .login-button{font-size:10px;padding:7px 9px;border-radius:999px;box-shadow:0 2px 0 #9c529e,0 4px 8px #a65c9c20}
+ .marketplace-3d .topbar .top-actions .account-link{font-size:9px}
+ .marketplace-3d .brand-3d-logo{max-width:min(150px,34vw)}
+ .marketplace-3d .brand-logo-image{max-height:42px}
+}
