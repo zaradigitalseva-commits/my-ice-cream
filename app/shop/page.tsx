@@ -74,6 +74,23 @@ export default function ShopPage() {
   const [whatsAppUrl, setWhatsAppUrl] = useState("");
   const [pendingPayment, setPendingPayment] = useState(false);
 
+  useEffect(() => {
+    if (!activeShopSection) return;
+    const sectionIds: Record<string, string> = {
+      profile: "shop-profile",
+      payments: "shop-payments",
+      products: "shop-add-product",
+      myProducts: "shop-my-products",
+    };
+    const timer = window.setTimeout(() => {
+      document.getElementById(sectionIds[activeShopSection])?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [activeShopSection]);
+
   async function loadProducts(shopId: string) {
     if (!db) return;
     const result = await getDocs(query(collection(db, "shops", shopId, "products")));
@@ -506,14 +523,14 @@ export default function ShopPage() {
             <button type="button" className={activeShopSection === "myProducts" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "myProducts" ? "" : "myProducts")}>My Products</button>
           </div>
         </section>
-        {activeShopSection === "payments" && <section className="admin-panel"><h2>Payment History</h2><p>आपकी दुकान की subscription payments और verification status.</p>
+        {activeShopSection === "payments" && <section className="admin-panel" id="shop-payments" style={{scrollMarginTop:20}}><h2>Payment History</h2><p>आपकी दुकान की subscription payments और verification status.</p>
           {paymentHistoryLoading ? <p className="admin-muted">Payment history लोड हो रही है…</p> : paymentHistory.length === 0 ? <p className="admin-muted">अभी कोई payment record नहीं मिला।</p> :
             <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Date</th><th>Amount</th><th>Payment</th><th>UTR</th><th>Status</th></tr></thead><tbody>
               {paymentHistory.map(p=><tr key={p.id}><td>{p.createdAt?.toDate ? p.createdAt.toDate().toLocaleString("en-IN") : "—"}</td><td>₹{Number(p.amount||0).toFixed(2)}</td><td>{p.paymentType === "initial_listing" ? "First listing" : p.paymentType === "monthly_renewal" ? "Renewal" : p.paymentType || "Subscription"}</td><td>{p.utr || "—"}</td><td><span className={"admin-status " + String(p.status||"pending").toLowerCase()}>{String(p.status||"pending").toUpperCase()}</span></td></tr>)}
             </tbody></table></div>}
           <button type="button" className="admin-secondary" onClick={()=>void openPaymentHistory()}>Refresh history</button>
         </section>}
-        {activeShopSection === "profile" && <section className="admin-panel" id="shop-profile"><h2>Shop profile / Registration details</h2><p>Apni registration ki details yahan update karein. Changes save karne ke baad Admin ko updated details dikhengi.</p><form className="register-form" onSubmit={saveProfile}>
+        {activeShopSection === "profile" && <section className="admin-panel" id="shop-profile" style={{scrollMarginTop:20}}><h2>Shop profile / Registration details</h2><p>Apni registration ki details yahan update karein. Changes save karne ke baad Admin ko updated details dikhengi.</p><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
           <label>Mobile number<input required value={phone} onChange={e=>setPhone(e.target.value)} /></label>
           <label>City<input required value={city} onChange={e=>setCity(e.target.value)} /></label>
@@ -538,7 +555,7 @@ export default function ShopPage() {
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
         </form></section>}
         
-        {activeShopSection === "products" && (live ? <section className="admin-panel"><h2>Add Product</h2><p>Add your products with price and photo. Only active LIVE shops are visible to customers.</p>
+        {activeShopSection === "products" && (live ? <section className="admin-panel" id="shop-add-product" style={{scrollMarginTop:20}}><h2>Add Product</h2><p>Add your products with price and photo. Only active LIVE shops are visible to customers.</p>
           <form className="register-form" onSubmit={saveProduct}>
             <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>
             <label>Description<input value={productDescription} onChange={e=>setProductDescription(e.target.value)} /></label>
@@ -550,7 +567,7 @@ export default function ShopPage() {
             <div><button type="submit" className="admin-primary" disabled={busy||imageBusy}>{busy ? "Saving product…" : productId ? "Update product" : "Add product"}</button>{productId && <button type="button" className="admin-secondary" onClick={resetProduct}>Cancel edit</button>}</div>
           </form>
         </section> : <section className="admin-panel"><h2>Approval pending</h2><p>Product management unlocks after Admin approves your shop and changes its status to LIVE.</p></section>)}
-        {activeShopSection === "myProducts" && (live ? <section className="admin-panel"><p className="admin-kicker">PRODUCT INVENTORY</p><h2>My Products · आपके सभी प्रोडक्ट</h2><p>यहाँ आपकी दुकान में जोड़े गए सभी प्रोडक्ट दिखेंगे। आप किसी भी प्रोडक्ट को Edit या Delete कर सकते हैं।</p>
+        {activeShopSection === "myProducts" && (live ? <section className="admin-panel" id="shop-my-products" style={{scrollMarginTop:20}}><p className="admin-kicker">PRODUCT INVENTORY</p><h2>My Products · आपके सभी प्रोडक्ट</h2><p>यहाँ आपकी दुकान में जोड़े गए सभी प्रोडक्ट दिखेंगे। आप किसी भी प्रोडक्ट को Edit या Delete कर सकते हैं।</p>
           <p><strong>Total products: {products.length}</strong> · Visible: {products.filter(p=>p.active!==false).length} · Hidden: {products.filter(p=>p.active===false).length}</p>
           {products.length===0 ? <p className="admin-muted">अभी कोई प्रोडक्ट नहीं जोड़ा गया है। Add Product बटन से पहला प्रोडक्ट जोड़ें।</p> :
             <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Photo</th><th>Product details</th><th>Price</th><th>Visibility</th><th>Actions</th></tr></thead><tbody>
