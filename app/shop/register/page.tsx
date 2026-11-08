@@ -142,8 +142,8 @@ export default function ShopRegisterPage() {
             <small>Images automatically WebP mein compress hongi. Logo max 90 KB aur banner max 220 KB. Firebase Storage ki zaroorat nahi.</small>
           </div>
         </div>
-        <button className="register-submit" disabled={busy || !!imageBusy}>{busy ? "Submitting…" : "Submit for Admin Approval  →"}</button>
-        <p className="register-approval-note">🔒 Your shop will be visible to customers only after Admin approval.</p>
+        <button className="register-submit" disabled={busy || !!imageBusy}>{busy ? "Submitting…" : "Register & Continue to Payment  →"}</button>
+        <p className="register-approval-note">🔒 Registration के बाद ₹599 payment करें। UTR submit और Admin verification के बाद shop approval होगा; तभी दुकान LIVE होगी.</p>
       </form>}
       {message && <p className="admin-success register-message" role="status">{message}</p>}
     </section>
