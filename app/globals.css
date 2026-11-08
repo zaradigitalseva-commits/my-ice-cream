@@ -273,3 +273,13 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
     line-height: 1.2 !important;
   }
 }
+
+
+.customer-store-hero.has-shop-banner{isolation:isolate;display:flex;flex-direction:column;justify-content:center;min-height:300px;background:#35233f!important;overflow:hidden}
+.customer-store-hero.has-shop-banner:before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(90deg,rgba(20,12,28,.82),rgba(20,12,28,.52) 58%,rgba(20,12,28,.18))}
+.customer-store-hero.has-shop-banner:after{display:none}
+.customer-store-banner-image{position:absolute;inset:0;z-index:-1;width:100%;height:100%;object-fit:cover}
+.customer-store-hero.has-shop-banner h1{color:#fff;text-shadow:0 2px 12px #0009}
+.customer-store-hero.has-shop-banner p{color:#fff;text-shadow:0 1px 6px #000b}
+.customer-store-hero.has-shop-banner .admin-kicker{color:#ffe4a8}
+@media(max-width:640px){.customer-store-hero.has-shop-banner{min-height:260px}.customer-store-banner-image{object-position:center}}
