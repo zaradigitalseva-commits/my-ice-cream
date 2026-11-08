@@ -233,9 +233,13 @@ export default function ShopPage() {
       setPaymentError("आपका लॉगिन या दुकान की जानकारी उपलब्ध नहीं है। कृपया पेज रीफ्रेश करके दोबारा लॉगिन करें।");
       return;
     }
+    const normalizedUtr = utr.trim().toUpperCase().replace(/\s+/g, "");
+    if (!normalizedUtr) {
+      setPaymentError("पहले payment करें और payment के बाद मिला UTR नंबर यहाँ डालें।");
+      return;
+    }
     setBusy(true); setError(""); setPaymentError(""); setPaymentNotice("");
     try {
-      const normalizedUtr = utr.trim().toUpperCase().replace(/\s+/g, "");
       if (!/^[A-Z0-9]{6,40}$/.test(normalizedUtr)) {
         throw new Error("Please enter a valid UTR (6–40 letters or numbers).");
       }
@@ -383,7 +387,7 @@ export default function ShopPage() {
           <h2>{firstListingPayment ? "पहली दुकान लिस्टिंग फीस · ₹599" : "मासिक रिन्यूअल · ₹299"}</h2>
           <p>{firstListingPayment ? "दुकान की पहली listing के लिए ₹599 जमा करें। UTR submit होने के बाद Admin payment verify करेगा; approval के बाद दुकान LIVE होगी।" : "आपकी अगली 30 दिन की subscription फीस ₹299 है।"}</p>
           {adminUpiQr ? <div style={{textAlign:"center",margin:"12px auto",maxWidth:300}}><img src={adminUpiQr} alt="Admin UPI QR Code" style={{width:"100%",maxWidth:240,objectFit:"contain",borderRadius:12,border:"1px solid #ddd",padding:8,background:"#fff"}}/><p className="admin-muted">UPI QR · ₹{subscriptionAmount}</p></div> : <p className="admin-error">Admin ने अभी UPI QR सेट नहीं किया है। Admin से संपर्क करें।</p>}
-          <form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>{setUtr(e.target.value);setPaymentError("");}} placeholder="Enter UTR / transaction reference" /></label><button type="submit" className="admin-primary" disabled={busy||!utr.trim()||pendingPayment}>{busy?"UTR जमा हो रहा है…":`Submit ₹${subscriptionAmount} payment`}</button></form>
+          <form className="register-form" onSubmit={submitSubscription}><label>UPI transaction UTR<input required value={utr} onChange={e=>{setUtr(e.target.value);setPaymentError("");}} placeholder="Enter UTR / transaction reference" /></label><button type="submit" className="admin-primary" disabled={busy||pendingPayment}>{busy?"UTR जमा हो रहा है…":`Submit ₹${subscriptionAmount} payment`}</button></form>
           {paymentError&&<p className="admin-error" role="alert" style={{marginTop:12}}>{paymentError}</p>}{paymentNotice&&<p className="admin-success" role="status">{paymentNotice}</p>}{pendingPayment&&<p className="admin-muted">Payment verification pending — कृपया दोबारा भुगतान न करें।</p>}
         </section>}
         {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
