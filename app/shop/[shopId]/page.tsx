@@ -35,7 +35,6 @@ export default function ShopDetailsPage(){
   if(!cleanCustomerName){setMessage("ऑर्डर के लिए अपना नाम दर्ज करें।");return;}
   if(!shopOpen){setMessage("दुकान अभी बंद है। कृपया खुलने के समय ऑर्डर करें।");return;}
   if(fulfillmentType==="delivery"&&(!shop.deliveryAvailable||!address.trim())){setMessage("डिलीवरी के लिए पूरा पता दर्ज करें।");return;}
-  if(subtotal<Number(shop.minimumOrder||0)){setMessage("Minimum order ₹"+Number(shop.minimumOrder||0).toFixed(2)+" है।");return;}
   if(fulfillmentType==="pickup"&&shop.pickupAvailable===false){setMessage("Shop pickup उपलब्ध नहीं है।");return;}
   const registeredNumber=String(shop.phone||"").replace(/\D/g,"");
   const whatsappNumber=registeredNumber.length===10?"91"+registeredNumber:registeredNumber.length===12&&registeredNumber.startsWith("91")?registeredNumber:"";
