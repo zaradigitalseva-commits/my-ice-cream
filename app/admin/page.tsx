@@ -278,7 +278,7 @@ export default function AdminPage() {
         {pendingLogoFile && <button className="admin-secondary small" disabled={logoBusy} onClick={() => setPendingLogoFile(null)}>रद्द करें</button>}
         {siteLogo && <button className="admin-secondary small" disabled={logoBusy} onClick={() => { void saveSiteLogo().then(() => setPendingLogoFile(null)); }}>लोगो हटाएँ</button>}
       </div><small className="admin-muted">PNG, JPG या WebP image चुनें, फिर “लोगो सेव करें” दबाएँ। लोगो अपने-आप छोटा करके सेव होगा।</small>
-    </section>}
+    </section>
     <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Subscription UPI QR Code</h2><p>पहली listing ₹599 (पहला महीना शामिल) और उसके बाद renewal ₹299 प्रति माह के भुगतान के लिए यही QR दिखेगा।</p></div></div>
       <div className="site-logo-editor">{siteQr ? <img src={siteQr} alt="Admin UPI payment QR code" /> : <div className="site-logo-empty">UPI QR अभी सेट नहीं है</div>}
         <label className="admin-primary small">{pendingQrFile ? "दूसरा QR चुनें" : "UPI QR फोटो चुनें"}<input type="file" accept="image/*" hidden disabled={qrBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) { setPendingQrFile(file); setNotice(""); setError(""); } event.currentTarget.value = ""; }} /></label>
