@@ -13,6 +13,7 @@ type Order = { id: string; total?: number; status?: string; paymentStatus?: stri
 type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
+type SubscriptionPayment = { id: string; amount?: number; paymentType?: string; utr?: string; status?: string; createdAt?: { toDate?: () => Date } };
 
 export default function ShopPage() {
   const router = useRouter();
@@ -67,7 +68,9 @@ export default function ShopPage() {
   const [discountValue, setDiscountValue] = useState("0");
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
   const [salePayment, setSalePayment] = useState<"paid" | "unpaid">("paid");
-  const [showShopDashboard, setShowShopDashboard] = useState(false);
+  const [activeShopSection, setActiveShopSection] = useState<"profile" | "payments" | "products" | "">("");
+  const [paymentHistory, setPaymentHistory] = useState<SubscriptionPayment[]>([]);
+  const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
   const [whatsAppUrl, setWhatsAppUrl] = useState("");
   const [pendingPayment, setPendingPayment] = useState(false);
 
@@ -91,7 +94,7 @@ export default function ShopPage() {
           const data = { id: owned.id, ...owned.data() } as Shop;
           const isLiveShop = ["live", "LIVE", "Live"].includes(String(data.status || ""));
           setShop(data);
-          if (isLiveShop || window.location.hash === "#shop-profile") setShowShopDashboard(true);
+          if (window.location.hash === "#shop-profile") setActiveShopSection("profile");
           const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
           setPendingPayment(lock.exists() && !isLiveShop); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
           setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
@@ -128,7 +131,7 @@ export default function ShopPage() {
           await loadProducts(latest.id);
           const orderResult = await getDocs(query(collection(firestore, "orders"), where("shopId", "==", latest.id)));
           if (active) setOrders(orderResult.docs.map(item => ({ id: item.id, ...item.data() } as Order)));
-          setShowShopDashboard(true);
+          // Keep sections closed until the shopkeeper selects one.
         }
       } catch (refreshError) {
         if (active) setError(refreshError instanceof Error ? refreshError.message : "Shop status refresh नहीं हो पाया।");
@@ -322,6 +325,22 @@ export default function ShopPage() {
     finally { setBusy(false); }
   }
 
+  async function openPaymentHistory() {
+    setActiveShopSection("payments");
+    if (!db || !shop || !user) return;
+    setPaymentHistoryLoading(true);
+    try {
+      const result = await getDocs(query(collection(db, "subscriptionPayments"), where("shopId", "==", shop.id), where("ownerUid", "==", user.uid)));
+      const rows = result.docs.map(item => ({ id: item.id, ...item.data() } as SubscriptionPayment));
+      rows.sort((a, b) => (b.createdAt?.toDate?.().getTime() || 0) - (a.createdAt?.toDate?.().getTime() || 0));
+      setPaymentHistory(rows);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Payment history load नहीं हो सकी।");
+    } finally {
+      setPaymentHistoryLoading(false);
+    }
+  }
+
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!db || !shop) return;
@@ -454,9 +473,23 @@ export default function ShopPage() {
             </div>
           </>}
         </section>
-        <div className="admin-panel" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}><div><p className="admin-kicker">SHOP MANAGEMENT</p><h2 style={{margin:0}}>दुकान का डैशबोर्ड</h2><p style={{margin:"6px 0 0"}}>प्रोडक्ट, ऑर्डर, दुकान की जानकारी और पेमेंट मैनेज करें।</p></div><button type="button" className="admin-primary" onClick={()=>setShowShopDashboard(v=>!v)}>{showShopDashboard?"डैशबोर्ड बंद करें":"दुकान का डैशबोर्ड खोलें"}</button></div>
-        {showShopDashboard && <>
-                <section className="admin-panel"><h2>Business overview</h2><div className="admin-stats"><div><strong>{orders.length}</strong><span>Total orders</span></div><div><strong>₹{orders.filter(o=>o.paymentStatus==="paid").reduce((s,o)=>s+Number(o.total||0),0).toFixed(0)}</strong><span>Paid sales</span></div><div><strong>{orders.filter(o=>["placed","accepted","preparing","ready"].includes(o.status||"")).length}</strong><span>Open orders</span></div></div></section><section className="admin-panel"><h2>Orders & customers</h2><p>View orders from customers who purchased from your shop.</p><Link href="/shop/orders" className="admin-primary role-link">Open orders</Link></section><section className="admin-panel" id="shop-profile"><h2>Shop profile / Registration details</h2><p>Apni registration ki details yahan update karein. Changes save karne ke baad Admin ko updated details dikhengi.</p><form className="register-form" onSubmit={saveProfile}>
+        <section className="admin-panel">
+          <p className="admin-kicker">SHOP MANAGEMENT</p><h2>Shopkeeper menu</h2>
+          <p>Har option par click karke uski details alag se kholen.</p>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            <button type="button" className={activeShopSection === "profile" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "profile" ? "" : "profile")}>Shop Reg. Details</button>
+            <button type="button" className={activeShopSection === "payments" ? "admin-primary" : "admin-secondary"} onClick={()=>{if(activeShopSection === "payments")setActiveShopSection("");else void openPaymentHistory();}}>Payment History</button>
+            <button type="button" className={activeShopSection === "products" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "products" ? "" : "products")}>Add Product</button>
+          </div>
+        </section>
+        {activeShopSection === "payments" && <section className="admin-panel"><h2>Payment History</h2><p>आपकी दुकान की subscription payments और verification status.</p>
+          {paymentHistoryLoading ? <p className="admin-muted">Payment history लोड हो रही है…</p> : paymentHistory.length === 0 ? <p className="admin-muted">अभी कोई payment record नहीं मिला।</p> :
+            <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Date</th><th>Amount</th><th>Payment</th><th>UTR</th><th>Status</th></tr></thead><tbody>
+              {paymentHistory.map(p=><tr key={p.id}><td>{p.createdAt?.toDate ? p.createdAt.toDate().toLocaleString("en-IN") : "—"}</td><td>₹{Number(p.amount||0).toFixed(2)}</td><td>{p.paymentType === "initial_listing" ? "First listing" : p.paymentType === "monthly_renewal" ? "Renewal" : p.paymentType || "Subscription"}</td><td>{p.utr || "—"}</td><td><span className={"admin-status " + String(p.status||"pending").toLowerCase()}>{String(p.status||"pending").toUpperCase()}</span></td></tr>)}
+            </tbody></table></div>}
+          <button type="button" className="admin-secondary" onClick={()=>void openPaymentHistory()}>Refresh history</button>
+        </section>}
+        {activeShopSection === "profile" && <section className="admin-panel" id="shop-profile"><h2>Shop profile / Registration details</h2><p>Apni registration ki details yahan update karein. Changes save karne ke baad Admin ko updated details dikhengi.</p><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
           <label>Mobile number<input required value={phone} onChange={e=>setPhone(e.target.value)} /></label>
           <label>City<input required value={city} onChange={e=>setCity(e.target.value)} /></label>
@@ -479,9 +512,9 @@ export default function ShopPage() {
           <label>Shop logo (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"logo");}} /></label>{logoUrl&&<img src={logoUrl} alt="Shop logo preview" style={{width:80,height:80,objectFit:"cover",borderRadius:14}}/>}
           <label>Shop banner (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"banner");}} /></label>{bannerUrl&&<img src={bannerUrl} alt="Shop banner preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:14}}/>}
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
-        </form></section>
+        </form></section>}
         
-        {live ? <section className="admin-panel"><h2>Products</h2><p>Add your products with price and photo. Only active LIVE shops are visible to customers.</p>
+        {activeShopSection === "products" && (live ? <section className="admin-panel"><h2>Add Product</h2><p>Add your products with price and photo. Only active LIVE shops are visible to customers.</p>
           <form className="register-form" onSubmit={saveProduct}>
             <label>Product name<input required value={productName} onChange={e=>setProductName(e.target.value)} placeholder="e.g. Chocolate Sundae" /></label>
             <label>Description<input value={productDescription} onChange={e=>setProductDescription(e.target.value)} /></label>
@@ -496,8 +529,7 @@ export default function ShopPage() {
             {products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.description || ""}</small></td><td>₹{Number(p.price || 0).toFixed(2)}{p.originalPrice && p.originalPrice>Number(p.price||0) ? <small><s>₹{Number(p.originalPrice).toFixed(2)}</s></small> : null}</td><td><span className={"admin-status "+(p.active===false?"inactive":"live")}>{p.active===false?"Hidden":"Visible"}</span></td><td className="admin-actions"><button className="admin-secondary small" onClick={()=>{setProductId(p.id);setProductName(p.name||"");setProductDescription(p.description||"");setPrice(String(p.price??""));setOriginalPrice(String(p.originalPrice??""));setProductCategory(p.category||"Ice cream");setImageUrl(p.imageUrl||"");setProductActive(p.active!==false);}}>Edit</button><button className="admin-secondary small" onClick={()=>void removeProduct(p.id)}>Delete</button></td></tr>)}
             {products.length===0 && <tr><td colSpan={4}>No products added yet.</td></tr>}
           </tbody></table></div>
-        </section> : <section className="admin-panel"><h2>Approval pending</h2><p>Your shop profile can be updated, but product management unlocks after Admin approves your shop and changes its status to LIVE.</p></section>}
-        </>}
+        </section> : <section className="admin-panel"><h2>Approval pending</h2><p>Product management unlocks after Admin approves your shop and changes its status to LIVE.</p></section>)}
       </>
     }
     {user && <p className="admin-muted">Signed in as {user.email}</p>}
