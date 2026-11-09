@@ -479,6 +479,31 @@ service cloud.firestore {
       allow write: if isAdmin() && settingId == "branding";
     }
 
+    // Each signed-in customer can register and manage only their own browser FCM tokens.
+    // Server-side notification delivery reads this collection with a private service account.
+    match /pushSubscriptions/{subscriptionId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["uid", "token", "platform", "createdAt", "updatedAt"])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.token is string
+        && request.resource.data.token.size() > 20
+        && request.resource.data.token.size() <= 4096
+        && request.resource.data.platform is string
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(["uid", "token", "platform", "createdAt", "updatedAt"])
+        && request.resource.data.token is string
+        && request.resource.data.token.size() > 20
+        && request.resource.data.token.size() <= 4096
+        && request.resource.data.platform is string
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
