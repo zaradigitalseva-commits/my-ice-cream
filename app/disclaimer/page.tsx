@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalPage } from "../legal-pages";
 
 export const metadata: Metadata = {
-  title: "Disclaimer | MY ICE CREAM",
+  title: "Disclaimer",
   description: "Important information about independent shop listings, product details, prices, offers, orders and third-party links on MY ICE CREAM.",
   alternates: { canonical: "/disclaimer" }
 };
