@@ -377,3 +377,41 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
   .marketplace-3d #discover .marketplace-tools{margin-bottom:5px!important}
   .marketplace-3d #discover .marketplace-product-grid{margin-top:5px!important}
 }
+
+
+/* MY ICE CREAM information footer and readable policy pages. */
+.marketplace-footer{display:block!important;margin-top:38px!important;padding:28px clamp(16px,4vw,48px) 18px!important;background:linear-gradient(135deg,#fff8f0,#fff0f8)!important;border-top:1px solid #f0d9e9;color:#49354a!important}
+.marketplace-footer .footer-main{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:1.1fr 1.5fr 1fr;gap:26px;align-items:start}
+.marketplace-footer .footer-main strong{font-size:16px;font-weight:900}
+.marketplace-footer .footer-main p{margin:9px 0 0;color:#766579;font-size:13px;line-height:1.6}
+.marketplace-footer .footer-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px}
+.marketplace-footer a{color:#71417e;text-decoration:none;font-size:13px;font-weight:700}
+.marketplace-footer a:hover{text-decoration:underline;color:#d34d91}
+.marketplace-footer .footer-contact{display:flex;flex-direction:column;gap:10px}
+.marketplace-footer .footer-copy{max-width:1280px;margin:24px auto 0;padding-top:14px;border-top:1px solid #ead7e6;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#806f81;font-size:11px}
+.legal-shell{min-height:100vh;background:linear-gradient(145deg,#fff8ef,#fff1f8 55%,#effaff);padding:18px clamp(14px,4vw,44px) 34px;color:#49364c}
+.legal-top{max-width:920px;margin:0 auto 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.legal-brand{font-weight:950;font-size:18px;color:#9d4b91;text-decoration:none}
+.legal-back{font-size:13px;font-weight:800;color:#75447e;text-decoration:none}
+.legal-card{max-width:920px;margin:0 auto;padding:clamp(22px,4vw,42px);background:#ffffffed;border:1px solid #f0ddec;border-radius:22px;box-shadow:0 16px 45px #70466e12}
+.legal-eyebrow{margin:0 0 8px;color:#cf5b9a;font-size:11px;font-weight:900;letter-spacing:.14em}
+.legal-card h1{margin:0;color:#492e53;font-size:clamp(28px,5vw,42px);line-height:1.15}
+.legal-intro{margin:14px 0 28px;color:#725f75;font-size:16px;line-height:1.75}
+.legal-section{margin:25px 0}
+.legal-section h2{margin:0 0 9px;color:#78417d;font-size:18px}
+.legal-section p,.legal-section li{color:#554b59;font-size:14px;line-height:1.8;overflow-wrap:anywhere}
+.legal-section p{margin:8px 0}
+.legal-section ul{padding-left:22px;margin:8px 0}
+.legal-updated{margin:30px 0 0;padding-top:16px;border-top:1px solid #f0e4ef;color:#8a7b8c;font-size:12px}
+.legal-bottom{max-width:920px;margin:18px auto 0;display:flex;justify-content:center;gap:12px 22px;flex-wrap:wrap}
+.legal-bottom a{font-size:12px;font-weight:800;color:#78417d;text-decoration:none}
+@media(max-width:700px){
+ .marketplace-footer .footer-main{grid-template-columns:1fr;gap:20px}
+ .marketplace-footer .footer-links{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .marketplace-footer .footer-copy{font-size:10px}
+ .legal-card{border-radius:16px}
+ .legal-top{align-items:flex-start}
+ .legal-intro{font-size:14px}
+ .legal-section h2{font-size:16px}
+ .legal-section p,.legal-section li{font-size:13px}
+}
