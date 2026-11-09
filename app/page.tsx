@@ -158,6 +158,6 @@ export default function HomePage() {
       </>}
     </section>
     <section id="for-shops" className="shop-onboarding"><div><p className="eyebrow">For ice cream businesses</p><h2>Bring your shop to MY ICE CREAM</h2><p>First listing ₹599 includes the first 30 days. Submit your UPI UTR; Admin verifies payment before the shop goes LIVE. Renewal is ₹299 per month.</p></div><Link href="/shop/register" className="primary-button">Register your shop</Link></section>
-    <footer className="footer" id="about"><span>© {new Date().getFullYear()} MY ICE CREAM</span><span>Unlimited shops · Sweet moments · Easy ordering</span></footer>
+    <footer className="footer marketplace-footer" id="about"><div className="footer-main"><div><strong>🍦 MY ICE CREAM</strong><p>Discover local ice-cream shops, flavours and offers.</p></div><div className="footer-links" aria-label="Website information"><Link href="/about">About Us</Link><Link href="/contact">Contact Us</Link><Link href="/privacy-policy">Privacy Policy</Link><Link href="/terms">Terms &amp; Conditions</Link><Link href="/disclaimer">Disclaimer</Link><Link href="/cookie-policy">Cookie Policy</Link></div><div className="footer-contact"><strong>Contact</strong><a href="mailto:ngogrant454@gmail.com">ngogrant454@gmail.com</a><a href="tel:+917517260192">+91 7517260192</a></div></div><div className="footer-copy"><span>© {new Date().getFullYear()} MY ICE CREAM. All rights reserved.</span><span>Local shops · Sweet moments · Easy discovery</span></div></footer>
   </main>;
 }
