@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalPage } from "../legal-pages";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions | MY ICE CREAM",
+  title: "Terms & Conditions",
   description: "Read the terms for using the MY ICE CREAM local ice cream shop discovery and listing marketplace.",
   alternates: { canonical: "/terms" }
 };
