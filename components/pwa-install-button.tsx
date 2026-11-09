@@ -23,8 +23,24 @@ export default function PwaInstallButton() {
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
+    // Chrome may open the website in a normal tab from Google Search even when
+    // the PWA is already installed. Remember installation across browser tabs.
+    const installMarker = "my-ice-cream-pwa-installed";
+    let wasInstalled = false;
+    try {
+      wasInstalled = window.localStorage.getItem(installMarker) === "yes";
+    } catch {
+      // Storage can be unavailable in restricted browsing modes.
+    }
+
     const standalone = isStandalone();
     if (standalone) {
+      wasInstalled = true;
+      try {
+        window.localStorage.setItem(installMarker, "yes");
+      } catch {
+        // The standalone display-mode check still hides the button in this session.
+      }
       setInstalled(true);
       if ("Notification" in window) {
         setNotificationPermission(Notification.permission);
@@ -32,18 +48,34 @@ export default function PwaInstallButton() {
       } else {
         setNotificationPermission("unsupported");
       }
-    } else if ("Notification" in window) {
-      setNotificationPermission(Notification.permission);
     } else {
-      setNotificationPermission("unsupported");
+      if (wasInstalled) setInstalled(true);
+      if ("Notification" in window) {
+        setNotificationPermission(Notification.permission);
+      } else {
+        setNotificationPermission("unsupported");
+      }
     }
     setReady(true);
 
     const onBeforeInstall = (event: Event) => {
       event.preventDefault();
-      setInstallPrompt(event as InstallPromptEvent);
+      let alreadyInstalled = false;
+      try {
+        alreadyInstalled = window.localStorage.getItem(installMarker) === "yes";
+      } catch {
+        // Continue with the browser install prompt when storage is unavailable.
+      }
+      if (!alreadyInstalled && !isStandalone()) {
+        setInstallPrompt(event as InstallPromptEvent);
+      }
     };
     const onInstalled = () => {
+      try {
+        window.localStorage.setItem(installMarker, "yes");
+      } catch {
+        // The appinstalled state is still applied for the current page.
+      }
       setInstalled(true);
       setShowHelp(false);
       setInstallPrompt(null);
