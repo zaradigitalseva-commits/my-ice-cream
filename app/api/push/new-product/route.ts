@@ -153,7 +153,7 @@ async function writeEvent(projectId: string, eventId: string, accessToken: strin
   });
 }
 
-async function removeInvalidSubscription(projectId: string, documentName: string, accessToken: string): Promise<void> {
+async function removeInvalidSubscription(documentName: string, accessToken: string): Promise<void> {
   if (!documentName) return;
   const response = await fetch("https://firestore.googleapis.com/v1/" + documentName, {
     method: "DELETE",
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await Promise.all(stale.map((name) => removeInvalidSubscription(projectId, name, accessToken)));
+    await Promise.all(stale.map((name) => removeInvalidSubscription(name, accessToken)));
     await writeEvent(projectId, eventId, accessToken, {
       state: "sent", sentCount: sent, failedCount: failed, updatedAt: { timestamp: new Date().toISOString() }
     }, false);
