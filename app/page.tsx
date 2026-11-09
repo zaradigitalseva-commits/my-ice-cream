@@ -125,10 +125,6 @@ export default function HomePage() {
     <section id="discover">
       <div className="marketplace-tools"><label className="marketplace-search"><span>Search products</span><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search ice cream, kulfi, cones…" /></label></div>
 
-      <div className="shop-list-heading"><h2>All Products</h2><span>{marketProducts.filter((product) => {
-        const haystack = [product.name, product.description, product.category].filter(Boolean).join(" ").toLowerCase();
-        return haystack.includes(searchText.trim().toLowerCase());
-      }).length} products</span></div>
       {productLoadError && <p className="admin-error" role="alert">{productLoadError}</p>}{loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : marketProducts.filter((product) => {
         const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
