@@ -1,0 +1,23 @@
+{
+  "id": "/",
+  "name": "MY ICE CREAM",
+  "short_name": "MY ICE CREAM",
+  "description": "Discover local ice-cream shops, flavours and offers.",
+  "lang": "en-IN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#fff7ed",
+  "theme_color": "#fff7ed",
+  "categories": ["food", "shopping"],
+  "icons": [
+    {
+      "src": "/my-ice-cream-app.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
