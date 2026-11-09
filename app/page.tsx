@@ -122,6 +122,14 @@ export default function HomePage() {
         <button className="login-button" onClick={handleAuth} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
       </div>
     </header>
+    <section className="shop-onboarding marketplace-seo-intro" aria-labelledby="marketplace-seo-title">
+      <div>
+        <p className="eyebrow">LOCAL ICE CREAM MARKETPLACE</p>
+        <h1 id="marketplace-seo-title">Discover Ice Cream Shops, Kulfi &amp; Sweet Treats Near You</h1>
+        <p>Explore local ice cream shops, browse cones and family packs, compare listed prices, and discover the latest offers. Shop owners can also register their business and reach more local customers through MY ICE CREAM.</p>
+      </div>
+      <Link href="#shops" className="primary-button" onClick={() => setShowLiveShops(true)}>Explore local shops</Link>
+    </section>
     <section id="discover">
       <div className="marketplace-tools"><label className="marketplace-search"><span>Search products</span><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search ice cream, kulfi, cones…" /></label></div>
 
