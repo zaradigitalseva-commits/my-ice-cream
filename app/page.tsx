@@ -8,7 +8,7 @@ import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
 type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };
-type MarketplaceProduct = { id: string; shopId: string; shopName: string; city?: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string };
+type MarketplaceProduct = { id: string; shopId: string; shopName: string; city?: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; createdAt?: { toDate?: () => Date } | Date | string | number };
 const categories = ["All treats", "Ice cream", "Kulfi", "Cones", "Family packs", "Party orders"];
 
 export default function HomePage() {
@@ -70,7 +70,17 @@ export default function HomePage() {
             }
           }));
           if (active) {
-            setMarketProducts(groups.flatMap((group) => group.products));
+            const newestFirst = groups.flatMap((group) => group.products).sort((a, b) => {
+              const getTime = (value: MarketplaceProduct["createdAt"]): number => {
+                if (value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function") return value.toDate().getTime();
+                if (value instanceof Date) return value.getTime();
+                if (typeof value === "number") return value;
+                if (typeof value === "string") { const parsed = new Date(value).getTime(); return Number.isNaN(parsed) ? 0 : parsed; }
+                return 0;
+              };
+              return getTime(b.createdAt) - getTime(a.createdAt);
+            });
+            setMarketProducts(newestFirst);
             const failedShops = groups.filter((group) => group.error).map((group) => group.error);
             setProductLoadError(failedShops.length ? "Product read permission issue for: " + failedShops.join(", ") + ". Firebase Console mein firebase/firestore.rules publish karein." : "");
           }
