@@ -1,5 +1,3 @@
-const SW_VERSION = "my-ice-cream-pwa-v1";
-
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
