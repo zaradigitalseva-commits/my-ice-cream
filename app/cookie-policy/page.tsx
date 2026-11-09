@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
 import { LegalPage } from "../legal-pages";
+
+export const metadata: Metadata = {
+  title: "Cookie Policy | MY ICE CREAM",
+  description: "Learn how MY ICE CREAM and its service providers may use essential cookies, analytics and advertising technologies.",
+  alternates: { canonical: "/cookie-policy" }
+};
+
 export default function CookiePolicyPage(){return <LegalPage title="Cookie Policy" intro="This page describes cookies and similar technologies that may be used on MY ICE CREAM." sections={[
 {heading:"What cookies are",paragraphs:["Cookies are small text files stored by your browser. Similar technologies may store or read information on your device to support website functions, security, measurement or advertising."]},
 {heading:"How they may be used",paragraphs:[],bullets:["Essential functions such as security, navigation and remembering preferences.","Analytics, if enabled, to understand how visitors use the website.","Advertising, if enabled, to measure ad performance, limit repeated ads or personalize ads where permitted."]},
