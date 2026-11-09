@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
 import { LegalPage } from "../legal-pages";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy | MY ICE CREAM",
+  description: "Read how MY ICE CREAM handles account details, shop listings, cookies, analytics, advertising and privacy requests.",
+  alternates: { canonical: "/privacy-policy" }
+};
+
 export default function PrivacyPage(){return <LegalPage title="Privacy Policy" intro="This policy explains how MY ICE CREAM handles information when you browse or use our marketplace." sections={[
 {heading:"Information we may collect",paragraphs:["Depending on how you use the website, information may include account details provided through Google sign-in, contact details submitted in shop registration or enquiries, shop and product listing information, and information you send to us when requesting support.","The website and its hosting or security services may also process technical information such as browser type, device information, IP address, and basic usage or diagnostic logs."]},
 {heading:"How information is used",paragraphs:[],bullets:["Operate and maintain the marketplace and user accounts.","Review shop registration requests and manage shop listings.","Respond to enquiries and provide support.","Protect the website, prevent misuse, and troubleshoot technical issues.","Understand website performance and improve the service."]},
