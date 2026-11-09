@@ -366,3 +366,14 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .live-shops-toggle-arrow{width:25px;height:25px;display:grid;place-items:center;border-radius:50%;background:#ffffff35;font-size:20px;line-height:1}
 .bottom-live-shops>.marketplace-search{margin:22px auto 0}
 @media(max-width:560px){.live-shops-toggle{padding:13px 14px;font-size:13px;border-radius:13px}}
+
+
+/* Tighten the space above the homepage product list. */
+.marketplace-3d #discover{padding-top:10px!important}
+.marketplace-3d #discover .marketplace-tools{margin-bottom:8px!important}
+.marketplace-3d #discover .marketplace-product-grid{margin-top:8px!important}
+@media(max-width:720px){
+  .marketplace-3d #discover{padding-top:6px!important}
+  .marketplace-3d #discover .marketplace-tools{margin-bottom:5px!important}
+  .marketplace-3d #discover .marketplace-product-grid{margin-top:5px!important}
+}
