@@ -441,11 +441,38 @@ export default function ShopPage() {
     }
     setBusy(true);
     setNotice("Product save ho raha hai…");
+    const isNewProduct = !productId;
     const data = { shopId: shop.id, ownerUid: user.uid, name: cleanName, description: productDescription.trim(), price: sellingPrice, originalPrice: comparePrice, category: productCategory, imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
     try {
-      if (productId) await updateDoc(doc(db, "shops", shop.id, "products", productId), data);
-      else await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
-      await loadProducts(shop.id); resetProduct(); setNotice(productId ? "Product updated." : "Product added successfully.");
+      if (productId) {
+        await updateDoc(doc(db, "shops", shop.id, "products", productId), data);
+      } else {
+        const createdProduct = await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
+        if (productActive) {
+          try {
+            const idToken = await user.getIdToken();
+            const response = await fetch("/api/push/new-product", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken },
+              body: JSON.stringify({ shopId: shop.id, productId: createdProduct.id })
+            });
+            const result = await response.json().catch(() => ({})) as { sent?: number; error?: string; duplicate?: boolean };
+            if (response.ok && typeof result.sent === "number") {
+              setNotice(result.sent > 0
+                ? "Product added successfully. " + result.sent + " customer device(s) notified."
+                : "Product added successfully. Customers who enable notifications will receive future product alerts.");
+            } else {
+              setNotice("Product added successfully. Push notification setup is pending; please check the server settings.");
+            }
+          } catch {
+            setNotice("Product added successfully. Push notification could not be sent right now.");
+          }
+        }
+      }
+      await loadProducts(shop.id);
+      resetProduct();
+      if (!isNewProduct) setNotice("Product updated.");
+      else if (!productActive) setNotice("Product added successfully. It is inactive, so no customer notification was sent.");
     } catch (e) {
       const detail = e instanceof Error ? e.message : "Unknown error";
       setError(detail.includes("permission") || detail.includes("Permission")
