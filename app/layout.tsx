@@ -47,6 +47,9 @@ export const metadata: Metadata = {
     title: "MY ICE CREAM | Discover Local Ice Cream Shops",
     description: "Find local ice cream shops, kulfi, cones, family packs and offers."
   },
+  verification: {
+    google: "Isof27UWPVj_BNN0jVE_U6wP6ywM_ojnYi43v3uhKlI"
+  },
   robots: {
     index: true,
     follow: true,
@@ -66,7 +69,7 @@ export const viewport: Viewport = {
   initialScale: 1
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode> }) {
   return (
     <html lang="en">
       <body>
