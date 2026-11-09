@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalPage } from "../legal-pages";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | MY ICE CREAM",
+  title: "Privacy Policy",
   description: "Read how MY ICE CREAM handles account details, shop listings, cookies, analytics, advertising and privacy requests.",
   alternates: { canonical: "/privacy-policy" }
 };
