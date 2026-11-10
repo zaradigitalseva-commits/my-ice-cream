@@ -400,10 +400,21 @@ export default function ShopPage() {
     }
     setBusy(true); setError(""); setNotice("");
     try {
+      const isFirstPublication = !shop.offerTitle?.trim() && Boolean(offerTitle.trim() || offerDescription.trim());
       const offer = { offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt, updatedAt: serverTimestamp() };
       await updateDoc(doc(db, "shops", shop.id), offer);
       setShop({ ...shop, offerTitle: offer.offerTitle, offerDescription: offer.offerDescription, offerExpiresAt });
-      setNotice("Offer customer page पर सेव हो गया।");
+      if (isFirstPublication) {
+        try {
+          await setDoc(doc(db, "notifications", `${shop.id}_offer_`${Date.now()}`), {
+            type: "offer", shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop",
+            title: offer.offerTitle || "New shop offer",
+            body: offer.offerDescription || "इस दुकान पर नया ऑफर आया है।",
+            createdAt: serverTimestamp()
+          });
+        } catch { /* Notification failure must not undo a saved offer. */ }
+      }
+      setNotice(isFirstPublication ? "नया Offer सेव हो गया। ग्राहकों को सूचना दिखाई देगी।" : "Offer customer page पर अपडेट हो गया।");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Offer save नहीं हो सका।");
     } finally { setBusy(false); }
@@ -473,8 +484,21 @@ export default function ShopPage() {
     setNotice("Product save ho raha hai…");
     const data = { shopId: shop.id, ownerUid: user.uid, name: cleanName, description: productDescription.trim(), price: sellingPrice, originalPrice: comparePrice, category: productCategory, imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
     try {
-      if (productId) await updateDoc(doc(db, "shops", shop.id, "products", productId), data);
-      else await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
+      if (productId) {
+        await updateDoc(doc(db, "shops", shop.id, "products", productId), data);
+      } else {
+        const createdProduct = await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
+        if (productActive) {
+          try {
+            await setDoc(doc(db, "notifications", `product_`${shop.id}`_`${createdProduct.id}`), {
+              type: "product", shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop",
+              productId: createdProduct.id, title: `नया प्रोडक्ट: `${cleanName}`,
+              body: `${shop.name || shop.shopName || 'दुकान'}` में नया प्रोडक्ट जुड़ा है। कीमत ₹`${sellingPrice}`,
+              createdAt: serverTimestamp()
+            });
+          } catch { /* Notification failure must not undo a saved product. */ }
+        }
+      }
       await loadProducts(shop.id); resetProduct(); setNotice(productId ? "Product updated." : "Product added successfully.");
     } catch (e) {
       const detail = e instanceof Error ? e.message : "Unknown error";
