@@ -150,6 +150,19 @@ export default function HomePage() {
         </div>
       </article>)}</div>}
     </section>
+    <section className="location-discovery" aria-labelledby="location-discovery-title">
+      <div className="location-discovery-heading">
+        <p className="eyebrow">Explore by area</p>
+        <h2 id="location-discovery-title">Find Ice Cream Shops by Location</h2>
+        <p>Browse location guides for participating ice cream shops and published products. Listings depend on the shops that have joined MY ICE CREAM.</p>
+      </div>
+      <nav className="location-discovery-links" aria-label="Ice cream shop locations">
+        <Link href="/locations/nalasopara">Ice Cream Shops in Nalasopara <span aria-hidden="true">→</span></Link>
+        <Link href="/locations/vasai-virar">Ice Cream Shops in Vasai–Virar <span aria-hidden="true">→</span></Link>
+        <Link href="/locations/mumbai">Ice Cream Shops in Mumbai <span aria-hidden="true">→</span></Link>
+        <Link href="/locations/maharashtra">Ice Cream Shops in Maharashtra <span aria-hidden="true">→</span></Link>
+      </nav>
+    </section>
     <section id="shops" className="bottom-live-shops">
       {showLiveShops && <>
         <label className="marketplace-search"><span>Search all shops</span><input value={shopSearchText} onChange={(e) => setShopSearchText(e.target.value)} placeholder="Enter shop name, city or address" /></label>
