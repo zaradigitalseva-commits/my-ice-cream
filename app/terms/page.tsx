@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import { LegalPage } from "../legal-pages";
+
+export const metadata: Metadata = {
+  title: "Terms & Conditions",
+  description: "Read the terms for using MY ICE CREAM, browsing independent shop listings and submitting a shop registration.",
+  alternates: { canonical: "/terms" }
+};
 export default function TermsPage(){return <LegalPage title="Terms & Conditions" intro="By accessing MY ICE CREAM, you agree to use the website responsibly and in accordance with these terms." sections={[
 {heading:"Marketplace role",paragraphs:["MY ICE CREAM provides an online discovery and listing platform for participating ice-cream shops. Unless a page expressly says otherwise, the platform is not the seller of products listed by independent shops. Orders, fulfilment, product quality, pricing, availability, refunds and delivery are handled by the relevant shop."]},
 {heading:"Website use",paragraphs:[],bullets:["Use the website only for lawful purposes.","Do not attempt to disrupt, damage, probe or gain unauthorized access to the website or its data.","Do not submit misleading, unlawful, infringing or harmful content.","Provide accurate information when submitting an account, enquiry or shop registration."]},
