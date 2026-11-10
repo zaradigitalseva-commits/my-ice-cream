@@ -6,6 +6,9 @@ export const metadata: Metadata = {
   title: "MY ICE CREAM",
   description: "Discover local ice-cream shops, flavours and offers.",
   applicationName: "MY ICE CREAM",
+  verification: {
+    google: "Isof27UWPVj_BNN0jVE_U6wP6ywM_ojnYi43v3uhKlI"
+  },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
