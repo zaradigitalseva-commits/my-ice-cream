@@ -3,12 +3,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore/lite";
+import { collection, getDocs, query, where, doc, getDoc, orderBy, limit } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
 type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };
 type MarketplaceProduct = { id: string; shopId: string; shopName: string; city?: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; createdAt?: { toDate?: () => Date } | Date | string | number };
+type CustomerNotice = { id: string; type?: string; shopId?: string; shopName?: string; productId?: string; title?: string; body?: string; createdAt?: { toDate?: () => Date } };
 const categories = ["All treats", "Ice cream", "Kulfi", "Cones", "Family packs", "Party orders"];
 
 export default function HomePage() {
@@ -17,6 +18,7 @@ export default function HomePage() {
   const [shopOwner, setShopOwner] = useState(false);
   const [shops, setShops] = useState<Shop[]>([]);
   const [marketProducts, setMarketProducts] = useState<MarketplaceProduct[]>([]);
+  const [customerNotices, setCustomerNotices] = useState<CustomerNotice[]>([]);
   const [productLoadError, setProductLoadError] = useState("");
   const [loadingShops, setLoadingShops] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -92,6 +94,13 @@ export default function HomePage() {
       }
     }
     void loadLiveShops();
+    if (db) {
+      getDocs(query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(20)))
+        .then((snapshot) => {
+          if (active) setCustomerNotices(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CustomerNotice)));
+        })
+        .catch(() => { if (active) setCustomerNotices([]); });
+    }
     return () => { active = false; };
   }, []);
 
@@ -141,6 +150,22 @@ export default function HomePage() {
           <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="admin-primary customer-add-button">＋ Add to cart</Link>
         </div>
       </article>)}</div>}
+    </section>
+    <section className="customer-notifications" aria-label="Latest shop updates" style={{margin:"22px 0",padding:"18px",borderRadius:18,background:"#fff7ed",border:"1px solid #fed7aa"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+        <div><p className="eyebrow" style={{marginBottom:4}}>CUSTOMER UPDATES</p><h2 style={{margin:0}}>🔔 नए प्रोडक्ट और ऑफर</h2></div>
+        <span className="pill">{customerNotices.length} नई सूचनाएँ</span>
+      </div>
+      {customerNotices.length === 0 ? <p className="admin-muted">नई दुकान सूचना यहाँ दिखाई देगी।</p> : <div style={{display:"grid",gap:10,marginTop:14}}>
+        {customerNotices.map((notice) => <article key={notice.id} style={{padding:12,borderRadius:12,background:"#fff",border:"1px solid #ffedd5"}}>
+          <strong>{notice.type === "offer" ? "🎉 " : "🍦 "}{notice.title || "दुकान की नई सूचना"}</strong>
+          <p style={{margin:"5px 0"}}>{notice.body || ""}</p>
+          <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+            <small className="admin-muted">{notice.shopName || "MY ICE CREAM Shop"}{notice.createdAt?.toDate ? " · " + notice.createdAt.toDate().toLocaleString("hi-IN") : ""}</small>
+            {notice.shopId && <Link className="account-link" href={notice.productId ? "/shop/" + notice.shopId + "?product=" + encodeURIComponent(notice.productId) : "/shop/" + notice.shopId}>देखें</Link>}
+          </div>
+        </article>)}
+      </div>}
     </section>
     <section id="shops" className="bottom-live-shops">
       {showLiveShops && <>
