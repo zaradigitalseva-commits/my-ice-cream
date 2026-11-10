@@ -10,6 +10,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${siteUrl}/privacy-policy`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${siteUrl}/terms`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${siteUrl}/disclaimer`, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${siteUrl}/cookie-policy`, changeFrequency: "yearly", priority: 0.3 }
+    { url: `${siteUrl}/cookie-policy`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${siteUrl}/locations/nalasopara`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${siteUrl}/locations/vasai-virar`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${siteUrl}/locations/mumbai`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${siteUrl}/locations/maharashtra`, changeFrequency: "weekly", priority: 0.7 }
   ];
 }
