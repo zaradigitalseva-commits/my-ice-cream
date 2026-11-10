@@ -122,14 +122,6 @@ export default function HomePage() {
         <button className="login-button" onClick={handleAuth} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
       </div>
     </header>
-    <section className="shop-onboarding marketplace-seo-intro" aria-labelledby="marketplace-seo-title">
-      <div>
-        <p className="eyebrow">LOCAL ICE CREAM MARKETPLACE</p>
-        <h1 id="marketplace-seo-title">Discover Ice Cream Shops, Kulfi &amp; Sweet Treats</h1>
-        <p>Explore participating local ice cream shops, browse cones and family packs, compare listed prices, and discover current shop offers. Looking for an ice cream shop near me, a Nalasopara ice cream shop, a Vasai Virar ice cream shop, a Mumbai ice cream shop or an ice cream shop in Maharashtra? Search participating listings by shop name and location. Find MY ICE CREAM, look for Zara Ice Cream Shop, explore kulfi and other ice cream products, or register your shop to reach nearby customers.</p>
-      </div>
-      <Link href="#shops" className="primary-button" onClick={() => setShowLiveShops(true)}>Explore local shops</Link>
-    </section>
     <section id="discover">
       <div className="marketplace-tools"><label className="marketplace-search"><span>Search products</span><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search ice cream, kulfi, cones…" /></label></div>
 
@@ -149,19 +141,6 @@ export default function HomePage() {
           <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="admin-primary customer-add-button">＋ Add to cart</Link>
         </div>
       </article>)}</div>}
-    </section>
-    <section className="location-discovery" aria-labelledby="location-discovery-title">
-      <div className="location-discovery-heading">
-        <p className="eyebrow">Explore by area</p>
-        <h2 id="location-discovery-title">Find Ice Cream Shops by Location</h2>
-        <p>Browse location guides for participating ice cream shops and published products. Listings depend on the shops that have joined MY ICE CREAM.</p>
-      </div>
-      <nav className="location-discovery-links" aria-label="Ice cream shop locations">
-        <Link href="/locations/nalasopara">Ice Cream Shops in Nalasopara <span aria-hidden="true">→</span></Link>
-        <Link href="/locations/vasai-virar">Ice Cream Shops in Vasai–Virar <span aria-hidden="true">→</span></Link>
-        <Link href="/locations/mumbai">Ice Cream Shops in Mumbai <span aria-hidden="true">→</span></Link>
-        <Link href="/locations/maharashtra">Ice Cream Shops in Maharashtra <span aria-hidden="true">→</span></Link>
-      </nav>
     </section>
     <section id="shops" className="bottom-live-shops">
       {showLiveShops && <>
