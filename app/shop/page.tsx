@@ -392,6 +392,36 @@ export default function ShopPage() {
     finally { setBusy(false); }
   }
 
+  async function saveOffer() {
+    if (!db || !shop) return;
+    if (!offerTitle.trim() && !offerDescription.trim()) {
+      setError("Offer title ya details likhein. Offer hatane ke liye नीचे हटाएँ बटन दबाएँ।");
+      return;
+    }
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const offer = { offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt, updatedAt: serverTimestamp() };
+      await updateDoc(doc(db, "shops", shop.id), offer);
+      setShop({ ...shop, offerTitle: offer.offerTitle, offerDescription: offer.offerDescription, offerExpiresAt });
+      setNotice("Offer customer page पर सेव हो गया।");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Offer save नहीं हो सका।");
+    } finally { setBusy(false); }
+  }
+
+  async function deleteOffer() {
+    if (!db || !shop) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await updateDoc(doc(db, "shops", shop.id), { offerTitle: "", offerDescription: "", offerExpiresAt: "", updatedAt: serverTimestamp() });
+      setOfferTitle(""); setOfferDescription(""); setOfferExpiresAt("");
+      setShop({ ...shop, offerTitle: "", offerDescription: "", offerExpiresAt: "" });
+      setNotice("Offer हटा दिया गया। अब customers को नहीं दिखेगा।");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Offer हटाया नहीं जा सका।");
+    } finally { setBusy(false); }
+  }
+
   async function compressProductImage(file: File) {
     setImageBusy(true); setError("");
     try {
@@ -566,6 +596,11 @@ export default function ShopPage() {
           <label>Offer title<input maxLength={60} value={offerTitle} onChange={e=>setOfferTitle(e.target.value)} placeholder="e.g. Buy 2 get 1 free" /></label>
           <label>Offer details<textarea rows={2} maxLength={240} value={offerDescription} onChange={e=>setOfferDescription(e.target.value)} placeholder="Add offer terms or eligible products" /></label>
           <label>Offer valid until<input type="date" value={offerExpiresAt} onChange={e=>setOfferExpiresAt(e.target.value)} /></label>
+          <div className="admin-actions" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            <button type="button" className="admin-primary" disabled={busy} onClick={()=>void saveOffer()}>{busy ? "सेव हो रहा है…" : "Offer सेव करें"}</button>
+            <button type="button" className="admin-secondary" disabled={busy||(!offerTitle&&!offerDescription&&!offerExpiresAt)} onClick={()=>void deleteOffer()}>Offer हटाएँ</button>
+          </div>
+          <p className="admin-muted">Offer को बदलकर Offer सेव करें। हटाने पर customer page से तुरंत हट जाएगा।</p>
           <label>Shop logo (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"logo");}} /></label>{logoUrl&&<img src={logoUrl} alt="Shop logo preview" style={{width:80,height:80,objectFit:"cover",borderRadius:14}}/>}
           <label>Shop banner (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"banner");}} /></label>{bannerUrl&&<img src={bannerUrl} alt="Shop banner preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:14}}/>}
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
