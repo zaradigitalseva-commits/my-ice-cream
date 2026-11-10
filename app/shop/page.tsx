@@ -600,7 +600,7 @@ export default function ShopPage() {
             <button type="button" className="admin-primary" disabled={busy} onClick={()=>void saveOffer()}>{busy ? "सेव हो रहा है…" : "Offer सेव करें"}</button>
             <button type="button" className="admin-secondary" disabled={busy||(!offerTitle&&!offerDescription&&!offerExpiresAt)} onClick={()=>void deleteOffer()}>Offer हटाएँ</button>
           </div>
-          <p className="admin-muted">Offer को बदलकर Offer सेव करें। हटाने पर customer page से तुरंत हट जाएगा।
+          <p className="admin-muted">Offer को बदलकर Offer सेव करें। हटाने पर customer page से तुरंत हट जाएगा।</p>
           <label>Shop logo (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"logo");}} /></label>{logoUrl&&<img src={logoUrl} alt="Shop logo preview" style={{width:80,height:80,objectFit:"cover",borderRadius:14}}/>}
           <label>Shop banner (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"banner");}} /></label>{bannerUrl&&<img src={bannerUrl} alt="Shop banner preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:14}}/>}
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
