@@ -406,7 +406,7 @@ export default function ShopPage() {
       setShop({ ...shop, offerTitle: offer.offerTitle, offerDescription: offer.offerDescription, offerExpiresAt });
       if (isFirstPublication) {
         try {
-          await setDoc(doc(db, "notifications", `${shop.id}_offer_`${Date.now()}`), {
+          await setDoc(doc(db, "notifications", shop.id + "_offer_" + Date.now()), {
             type: "offer", shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop",
             title: offer.offerTitle || "New shop offer",
             body: offer.offerDescription || "इस दुकान पर नया ऑफर आया है।",
@@ -490,16 +490,16 @@ export default function ShopPage() {
         const createdProduct = await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
         if (productActive) {
           try {
-            await setDoc(doc(db, "notifications", `product_`${shop.id}`_`${createdProduct.id}`), {
+            await setDoc(doc(db, "notifications", "product_" + shop.id + "_" + createdProduct.id), {
               type: "product", shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop",
-              productId: createdProduct.id, title: `नया प्रोडक्ट: `${cleanName}`,
-              body: `${shop.name || shop.shopName || 'दुकान'}` में नया प्रोडक्ट जुड़ा है। कीमत ₹`${sellingPrice}`,
+              productId: createdProduct.id, title: "नया प्रोडक्ट: " + cleanName,
+              body: (shop.name || shop.shopName || "दुकान") + " में नया प्रोडक्ट जुड़ा है। कीमत ₹" + sellingPrice,
               createdAt: serverTimestamp()
             });
           } catch { /* Notification failure must not undo a saved product. */ }
         }
       }
-      await loadProducts(shop.id); resetProduct(); setNotice(productId ? "Product updated." : "Product added successfully.");
+      await loadProducts(shop.id); resetProduct(); setNotice(productId ? "Product updated." : "Product added successfully. Customers can see the new-product notice.");
     } catch (e) {
       const detail = e instanceof Error ? e.message : "Unknown error";
       setError(detail.includes("permission") || detail.includes("Permission")
