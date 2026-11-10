@@ -6,7 +6,7 @@ import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
-type Shop={id:string;name?:string;shopName?:string;city?:string;address?:string;phone?:string;description?:string;bannerUrl?:string;logoUrl?:string;status?:string;pickupAvailable?:boolean;deliveryAvailable?:boolean;openingTime?:string;closingTime?:string;closedDays?:string[];manualClosed?:boolean;deliveryFee?:number;minimumOrder?:number};
+type Shop={id:string;name?:string;shopName?:string;city?:string;address?:string;phone?:string;description?:string;offerTitle?:string;offerDescription?:string;offerExpiresAt?:string;bannerUrl?:string;logoUrl?:string;status?:string;pickupAvailable?:boolean;deliveryAvailable?:boolean;openingTime?:string;closingTime?:string;closedDays?:string[];manualClosed?:boolean;deliveryFee?:number;minimumOrder?:number};
 type Product={id:string;name?:string;description?:string;price?:number;originalPrice?:number;category?:string;imageUrl?:string;active?:boolean};
 export default function ShopDetailsPage(){
  const params=useParams<{shopId:string}>(); const searchParams=useSearchParams(); const selectedProductId=searchParams.get("product"); const shopId=params.shopId;
