@@ -126,7 +126,7 @@ export default function HomePage() {
       <div>
         <p className="eyebrow">LOCAL ICE CREAM MARKETPLACE</p>
         <h1 id="marketplace-seo-title">Discover Ice Cream Shops, Kulfi &amp; Sweet Treats</h1>
-        <p>Explore participating local ice cream shops, browse cones and family packs, compare listed prices, and discover current shop offers. Shop owners can register their business to create a public listing and help nearby customers find their products.</p>
+        <p>Explore participating local ice cream shops, browse cones and family packs, compare listed prices, and discover current shop offers. Looking for an ice cream shop near me, a Nalasopara ice cream shop, a Vasai Virar ice cream shop, a Mumbai ice cream shop or an ice cream shop in Maharashtra? Search participating listings by shop name and location. Find MY ICE CREAM, look for Zara Ice Cream Shop, explore kulfi and other ice cream products, or register your shop to reach nearby customers.</p>
       </div>
       <Link href="#shops" className="primary-button" onClick={() => setShowLiveShops(true)}>Explore local shops</Link>
     </section>
