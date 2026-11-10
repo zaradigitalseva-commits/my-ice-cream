@@ -385,7 +385,18 @@ export default function ShopPage() {
     if (!db || !shop) return;
     setBusy(true); setError(""); setNotice("");
     try {
+      const isFirstOfferPublication = !(shop.offerTitle?.trim() || shop.offerDescription?.trim()) && Boolean(offerTitle.trim() || offerDescription.trim());
       await updateDoc(doc(db, "shops", shop.id), { name: name.trim(), shopName: name.trim(), phone: phone.trim(), city: city.trim(), address: address.trim(), description: description.trim(), logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt, updatedAt: serverTimestamp() });
+      if (isFirstOfferPublication) {
+        try {
+          await setDoc(doc(db, "notifications", shop.id + "_offer_" + Date.now()), {
+            type: "offer", shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop",
+            title: offerTitle.trim() || "New shop offer",
+            body: offerDescription.trim() || "इस दुकान पर नया ऑफर आया है।",
+            createdAt: serverTimestamp()
+          });
+        } catch { /* Notification failure must not undo a saved profile. */ }
+      }
       setShop({ ...shop, name: name.trim(), shopName: name.trim(), phone, city, address, description, logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt });
       setNotice("सेव हो गया। दुकान की जानकारी सफलतापूर्वक अपडेट हो गई है।");
     } catch (e) { setError(e instanceof Error ? e.message : "Profile update failed."); }
