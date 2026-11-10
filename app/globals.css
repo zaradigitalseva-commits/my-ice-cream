@@ -415,3 +415,27 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
  .legal-section h2{font-size:16px}
  .legal-section p,.legal-section li{font-size:13px}
 }
+
+
+/* Subtle internal links to the local SEO landing pages. */
+.marketplace-3d .location-discovery{
+  max-width:1280px;
+  margin:28px auto 34px;
+  padding:clamp(20px,3vw,30px);
+  border:1px solid #f0d9eb;
+  border-radius:24px;
+  background:linear-gradient(120deg,#fffaf4,#fff4fa 58%,#f4f5ff);
+  box-shadow:0 6px 0 #ead8e9,0 14px 28px #9a579012;
+}
+.location-discovery-heading{max-width:720px;margin-bottom:16px}
+.location-discovery-heading h2{margin:8px 0;color:#542c69;font-family:"Playfair Display",Georgia,serif;font-size:clamp(22px,3vw,29px)}
+.location-discovery-heading>p:last-child{margin:0;color:#806b8b;font-size:13px;line-height:1.65}
+.location-discovery-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.location-discovery-links a{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:12px 15px;border:1px solid #efdaeb;border-radius:14px;background:#ffffffd9;color:#70417c;font-size:13px;font-weight:800;line-height:1.4;transition:transform .18s,border-color .18s}
+.location-discovery-links a:hover{transform:translateY(-2px);border-color:#d79acb}
+.location-discovery-links a span{flex:none;color:#d34d91;font-size:18px}
+@media(max-width:560px){
+ .marketplace-3d .location-discovery{margin:22px auto 28px;padding:17px;border-radius:18px}
+ .location-discovery-links{grid-template-columns:1fr;gap:8px}
+ .location-discovery-links a{padding:11px 13px;font-size:12px}
+}
