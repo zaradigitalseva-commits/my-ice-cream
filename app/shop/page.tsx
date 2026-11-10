@@ -400,7 +400,7 @@ export default function ShopPage() {
     }
     setBusy(true); setError(""); setNotice("");
     try {
-      const isFirstPublication = !shop.offerTitle?.trim() && Boolean(offerTitle.trim() || offerDescription.trim());
+      const isFirstPublication = !(shop.offerTitle?.trim() || shop.offerDescription?.trim()) && Boolean(offerTitle.trim() || offerDescription.trim());
       const offer = { offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt, updatedAt: serverTimestamp() };
       await updateDoc(doc(db, "shops", shop.id), offer);
       setShop({ ...shop, offerTitle: offer.offerTitle, offerDescription: offer.offerDescription, offerExpiresAt });
