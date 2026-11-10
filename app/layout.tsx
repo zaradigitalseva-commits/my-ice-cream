@@ -24,9 +24,6 @@ export const metadata: Metadata = {
     "ice cream shop online",
     "register ice cream shop"
   ],
-  alternates: {
-    canonical: siteUrl
-  },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
