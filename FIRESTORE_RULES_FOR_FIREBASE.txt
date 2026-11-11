@@ -456,7 +456,12 @@ service cloud.firestore {
     }
 
     match /utrReservations/{utr} {
-      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      // A shop owner must be able to check whether a UTR document ID is unused.
+      // Missing-document get is safe: it reveals no existing reservation data and does not allow listing.
+      allow get: if isAdmin()
+        || (signedIn() && !exists(/databases/$(database)/documents/utrReservations/$(utr)))
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow list: if isAdmin();
       allow create: if signedIn()
         && !exists(/databases/$(database)/documents/utrReservations/$(utr))
         && utr.matches('^[A-Z0-9]{6,40}$')
@@ -469,9 +474,79 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Public, non-sensitive marketplace announcements only.
+    // Shop owners can publish notices for a real LIVE product or their currently saved offer.
+    match /notifications/{notificationId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          "type", "shopId", "shopName", "productId", "title", "body", "createdAt"
+        ])
+        && request.resource.data.shopId is string
+        && ownsShop(request.resource.data.shopId)
+        && liveShop(request.resource.data.shopId)
+        && request.resource.data.shopName is string
+        && request.resource.data.shopName.size() <= 120
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 300
+        && request.resource.data.createdAt is timestamp
+        && (
+          (
+            request.resource.data.type == "product"
+            && request.resource.data.productId is string
+            && exists(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId))
+            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.ownerUid == request.auth.uid
+            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.active == true
+            && request.resource.data.title == "नया प्रोडक्ट: " + get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.name
+          )
+          || (
+            request.resource.data.type == "offer"
+            && !("productId" in request.resource.data)
+            && (
+              request.resource.data.title == get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.offerTitle
+              || (get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.offerTitle == "" && request.resource.data.title == "New shop offer")
+            )
+            && request.resource.data.body == (
+              get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.offerDescription == ""
+                ? "इस दुकान पर नया ऑफर आया है।"
+                : get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.offerDescription
+            )
+          )
+        );
+      allow update, delete: if isAdmin();
+    }
+
     match /siteSettings/{settingId} {
       allow read: if settingId == "branding";
       allow write: if isAdmin() && settingId == "branding";
+    }
+
+    // Each signed-in customer can manage only their own browser FCM token records.
+    // Server-side notification delivery uses a private service account.
+    match /pushSubscriptions/{subscriptionId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["uid", "token", "platform", "createdAt", "updatedAt"])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.token is string
+        && request.resource.data.token.size() > 20
+        && request.resource.data.token.size() <= 4096
+        && request.resource.data.platform is string
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(["uid", "token", "platform", "createdAt", "updatedAt"])
+        && request.resource.data.token is string
+        && request.resource.data.token.size() > 20
+        && request.resource.data.token.size() <= 4096
+        && request.resource.data.platform is string
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     match /{document=**} {
