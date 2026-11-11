@@ -33,7 +33,10 @@ export default function AdminPage() {
   const [siteQr, setSiteQr] = useState("");
   const [pendingQrFile, setPendingQrFile] = useState<File | null>(null);
   const [qrBusy, setQrBusy] = useState(false);
-  const [activeAdminSection, setActiveAdminSection] = useState<"overview" | "settings" | "customers" | "products" | "registrations">("registrations");
+  const [activeAdminSection, setActiveAdminSection] = useState<"overview" | "settings" | "customers" | "products" | "registrations" | "announcements">("registrations");
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementBody, setAnnouncementBody] = useState("");
+  const [announcementBusy, setAnnouncementBusy] = useState(false);
 
   useEffect(() => {
     if (!auth) { setAuthReady(true); setError("Firebase configuration is missing."); return; }
@@ -244,6 +247,20 @@ export default function AdminPage() {
     } finally { setDeletingShopId(""); }
   }
 
+  async function publishAnnouncement() {
+    if (!user || !announcementTitle.trim() || !announcementBody.trim()) { setError("पोस्ट का Title और Message दोनों लिखें।"); return; }
+    setAnnouncementBusy(true); setError(""); setNotice("");
+    try {
+      const idToken = await user.getIdToken(true);
+      const response = await fetch("/api/push/admin-announcement", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken }, body: JSON.stringify({ title: announcementTitle.trim(), body: announcementBody.trim() }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "पोस्ट भेजी नहीं जा सकी।");
+      setNotice("पोस्ट वेबसाइट पर प्रकाशित हो गई। " + Number(result.sent || 0) + " फोन पर Push Notification भेजा गया।" + (Number(result.failed || 0) ? " " + Number(result.failed) + " डिवाइस पर समस्या आई।" : ""));
+      setAnnouncementTitle(""); setAnnouncementBody("");
+    } catch (err) { setError(err instanceof Error ? err.message : "पोस्ट प्रकाशित नहीं हो पाई।"); }
+    finally { setAnnouncementBusy(false); }
+  }
+
   if (!authReady) return <main className="admin-wrap"><p>Checking admin access…</p></main>;
   if (!user) return <main className="admin-wrap"><Link href="/" className="admin-back">← Back to home</Link><section className="admin-panel"><h1>Admin sign in</h1><p>Sign in with an authorized admin Google account to continue.</p><button className="admin-primary" onClick={() => auth && signInWithPopup(auth, googleProvider).catch((err) => setError(err.message))}>Continue with Google</button>{error && <p className="admin-error">{error}</p>}</section></main>;
   if (!isAdminEmail(user.email) || !user.emailVerified) return <main className="admin-wrap"><Link href="/" className="admin-back">← Back to home</Link><section className="admin-panel"><h1>Access not allowed</h1><p>This Google account is not on the verified admin allowlist.</p><p className="admin-muted">{user.email}</p><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></section></main>;
@@ -267,6 +284,7 @@ export default function AdminPage() {
       <button type="button" className={activeAdminSection === "overview" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("overview")}>Overview</button>
       <button type="button" className={activeAdminSection === "registrations" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("registrations")}>Shop registrations</button>
       <button type="button" className={activeAdminSection === "products" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("products")}>Shop products</button>
+      <button type="button" className={activeAdminSection === "announcements" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("announcements")}>📢 पोस्ट और नोटिफिकेशन</button>
       <button type="button" className={activeAdminSection === "customers" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("customers")}>Customers</button>
       <button type="button" className={activeAdminSection === "settings" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("settings")}>Settings</button>
       <Link href="/admin/payments" className="admin-secondary role-link">Subscription payments</Link>
@@ -289,6 +307,7 @@ export default function AdminPage() {
     </section></>}
     {activeAdminSection === "overview" && <section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>}
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
+    {activeAdminSection === "announcements" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>📢 Official post और Push Notification</h2><p>यह पोस्ट वेबसाइट के Customer Updates में दिखेगी और जिन डिवाइसों ने Push चालू किया है, उन पर भेजी जाएगी।</p></div></div><label>पोस्ट का Title<input value={announcementTitle} onChange={(event) => setAnnouncementTitle(event.target.value)} maxLength={120} placeholder="जैसे: नया ऑफर या जरूरी सूचना" /></label><label>Message<textarea value={announcementBody} onChange={(event) => setAnnouncementBody(event.target.value)} maxLength={300} rows={4} placeholder="अपनी सूचना यहाँ लिखें…" /></label><div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}><small className="admin-muted">{announcementTitle.length}/120 · {announcementBody.length}/300 अक्षर</small><button className="admin-primary" disabled={announcementBusy || !announcementTitle.trim() || !announcementBody.trim()} onClick={() => void publishAnnouncement()}>{announcementBusy ? "भेजा जा रहा है…" : "📢 पोस्ट प्रकाशित करें और Notification भेजें"}</button></div><p className="admin-muted">जिन फोन में अनुमति और Push Registration चालू है, उन्हीं पर Notification पहुँचेगा।</p></section>}
     {activeAdminSection === "customers" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>Firestore में सेव ग्राहक रिकॉर्ड। यह Firebase Authentication की पूरी user-list नहीं है।</p></div><span className="admin-count">{customerError ? "Unavailable" : `${customers.length} customers`}</span></div>{customerError && <p className="admin-error" role="alert">Customer records load नहीं हो पाए: {customerError}. Shop management अभी भी इस्तेमाल कर सकते हैं।</p>}<div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>नाम</th><th>मोबाइल</th><th>ईमेल</th><th>स्थिति</th></tr></thead><tbody>{customers.map((customer)=><tr key={customer.id}><td>{customer.name||"—"}</td><td>{customer.phone||customer.id}</td><td>{customer.email||"—"}</td><td>{customer.uid?"App account linked":"Shop-created record"}</td></tr>)}</tbody></table></div></section>}
     {activeAdminSection === "products" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop products</h2><p>सभी दुकानों के प्रोडक्ट यहाँ दिखेंगे, चाहे वे active हों या inactive।</p></div><span className="admin-count">{shopProducts.length} products</span></div>{productError && <p className="admin-error" role="alert">Products load नहीं हुए: {productError}</p>}{!productError && shopProducts.length === 0 ? <p className="admin-muted">अभी किसी दुकान में प्रोडक्ट सेव नहीं हैं।</p> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Shop</th><th>Price</th><th>Visibility</th><th>Product ID</th></tr></thead><tbody>{shopProducts.map((product) => <tr key={product.shopId + "-" + product.id}><td><strong>{product.name || "Unnamed product"}</strong><small>{product.category || "Category not set"}</small></td><td>{product.shopName}<small>{product.shopId}</small></td><td>₹{Number(product.price || 0).toFixed(2)}</td><td><span className={`admin-status ${product.active === true ? "live" : "inactive"}`}>{product.active === true ? "Active · Public" : "Inactive · Hidden"}</span><button className="admin-secondary small" onClick={() => void toggleProductVisibility(product)}>{product.active === true ? "Hide product" : "Show product"}</button></td><td><small>{product.id}</small></td></tr>)}</tbody></table></div>}</section>}
     {activeAdminSection === "registrations" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>

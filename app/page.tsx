@@ -172,10 +172,10 @@ export default function HomePage() {
       </div>
       {customerNotices.length === 0 ? <p className="admin-muted">नई दुकान सूचना यहाँ दिखाई देगी।</p> : <div style={{display:"grid",gap:10,marginTop:14}}>
         {customerNotices.map((notice) => <article key={notice.id} style={{padding:12,borderRadius:12,background:"#fff",border:"1px solid #ffedd5"}}>
-          <strong>{notice.type === "offer" ? "🎉 " : "🍦 "}{notice.title || "दुकान की नई सूचना"}</strong>
+          <strong>{notice.type === "admin" ? "📢 " : notice.type === "offer" ? "🎉 " : "🍦 "}{notice.title || "दुकान की नई सूचना"}</strong>
           <p style={{margin:"5px 0"}}>{notice.body || ""}</p>
           <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-            <small className="admin-muted">{notice.shopName || "MY ICE CREAM Shop"}{notice.createdAt?.toDate ? " · " + notice.createdAt.toDate().toLocaleString("hi-IN") : ""}</small>
+            <small className="admin-muted">{notice.type === "admin" ? "MY ICE CREAM · Official Update" : notice.shopName || "MY ICE CREAM Shop"}{notice.createdAt?.toDate ? " · " + notice.createdAt.toDate().toLocaleString("hi-IN") : ""}</small>
             {notice.shopId && <Link className="account-link" href={notice.productId ? "/shop/" + notice.shopId + "?product=" + encodeURIComponent(notice.productId) : "/shop/" + notice.shopId}>देखें</Link>}
           </div>
         </article>)}
