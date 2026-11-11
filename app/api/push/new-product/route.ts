@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
   }
 
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const serviceAccountText = process.env.FCM_SERVICE_ACCOUNT_JSON;
+  const serviceAccountText = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FCM_SERVICE_ACCOUNT_JSON;
   if (!projectId || !serviceAccountText) {
     return jsonError("Push service is not configured yet. Add FCM service-account settings to the hosting environment.", 503);
   }
