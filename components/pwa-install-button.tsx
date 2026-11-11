@@ -52,7 +52,14 @@ export default function PwaInstallButton() {
         setNotificationPermission("unsupported");
       }
     } else {
-      if (wasInstalled) setInstalled(true);
+      if (wasInstalled) {
+        setInstalled(true);
+        // Some browsers do not fire appinstalled for manual home-screen installs.
+        // If this browser has an install marker, offer notification opt-in on its next open too.
+        if ("Notification" in window && Notification.permission === "default") {
+          setShowNotificationPrompt(true);
+        }
+      }
       if ("Notification" in window) {
         setNotificationPermission(Notification.permission);
       } else {
@@ -105,8 +112,8 @@ export default function PwaInstallButton() {
     };
   }, []);
 
-  // Re-register this browser's FCM token whenever a signed-in customer opens the app.
-  // This also restores delivery after the customer grants permission and signs in later.
+  // Re-register this device's FCM token whenever any signed-in app user opens the app.
+  // This covers shop admins and customers, including users who sign in after granting permission.
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, async (currentUser) => {
