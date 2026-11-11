@@ -502,12 +502,13 @@ service cloud.firestore {
         && request.resource.data.createdAt is timestamp
       ) || (signedIn()
         && request.resource.data.keys().hasOnly([
-          "type", "shopId", "shopName", "productId", "title", "body", "createdAt"
+          "type", "shopId", "shopName", "ownerUid", "productId", "title", "body", "createdAt"
         ])
         && request.resource.data.shopId is string
         && ownsShop(request.resource.data.shopId)
         && liveShop(request.resource.data.shopId)
         && request.resource.data.shopName is string
+        && request.resource.data.shopName.size() > 0
         && request.resource.data.shopName.size() <= 120
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
@@ -525,6 +526,16 @@ service cloud.firestore {
             && request.resource.data.title == "नया प्रोडक्ट: " + get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.name
           )
           || (
+            request.resource.data.type == "shopkeeper"
+            && !("productId" in request.resource.data)
+            && request.resource.data.ownerUid == request.auth.uid
+            && (
+              request.resource.data.shopName == get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.name
+              || request.resource.data.shopName == get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.shopName
+            )
+            && request.resource.data.body.size() > 0
+          )
+          || (
             request.resource.data.type == "offer"
             && !("productId" in request.resource.data)
             && (
@@ -538,7 +549,11 @@ service cloud.firestore {
             )
           )
         ));
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (signedIn()
+        && resource.data.type == "shopkeeper"
+        && resource.data.ownerUid == request.auth.uid
+        && ownsShop(resource.data.shopId));
     }
 
     match /siteSettings/{settingId} {
