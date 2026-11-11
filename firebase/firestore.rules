@@ -37,6 +37,18 @@ service cloud.firestore {
       return shop.status in ["live", "LIVE", "Live"];
     }
 
+    // Match the shop name stored on the shop document without failing when
+    // one of the supported name fields is absent.
+    function validShopkeeperNoticeName(shopId, submittedName) {
+      let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
+      let canonicalName = shop.get("name", "") != ""
+        ? shop.get("name", "")
+        : shop.get("shopName", "");
+      return canonicalName is string
+        && canonicalName.size() > 0
+        && submittedName == canonicalName;
+    }
+
     function validOrderItem(shopId, item) {
       return item is map
         && item.keys().hasOnly(["productId", "name", "price", "quantity"])
@@ -529,10 +541,7 @@ service cloud.firestore {
             request.resource.data.type == "shopkeeper"
             && !("productId" in request.resource.data)
             && request.resource.data.ownerUid == request.auth.uid
-            && (
-              request.resource.data.shopName == get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.name
-              || request.resource.data.shopName == get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.shopName
-            )
+            && validShopkeeperNoticeName(request.resource.data.shopId, request.resource.data.shopName)
             && request.resource.data.body.size() > 0
           )
           || (
