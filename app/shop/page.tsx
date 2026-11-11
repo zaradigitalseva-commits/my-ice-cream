@@ -500,17 +500,41 @@ export default function ShopPage() {
       } else {
         const createdProduct = await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
         if (productActive) {
+          let homepageNoticeSaved = false;
+          let pushStatus = "";
           try {
             await setDoc(doc(db, "notifications", "product_" + shop.id + "_" + createdProduct.id), { type: "product", shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop", productId: createdProduct.id, title: "नया प्रोडक्ट: " + cleanName, body: (shop.name || shop.shopName || "दुकान") + " में नया प्रोडक्ट जुड़ा है। कीमत ₹" + sellingPrice, createdAt: serverTimestamp() });
-          } catch { /* Notification failure must not undo a saved product. */ }
+            homepageNoticeSaved = true;
+          } catch (noticeError) {
+            homepageNoticeSaved = false;
+            pushStatus = "Homepage notice save नहीं हुआ: " + (noticeError instanceof Error ? noticeError.message : "Firestore error");
+          }
           try {
             const idToken = await user.getIdToken();
             const response = await fetch("/api/push/new-product", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken }, body: JSON.stringify({ shopId: shop.id, productId: createdProduct.id }) });
-            if (!response.ok) setNotice("Product added successfully. Homepage notice is saved; device push setup needs attention.");
-          } catch { setNotice("Product added successfully. Homepage notice is saved; device push could not be sent right now."); }
+            const result = await response.json().catch(() => ({})) as { sent?: number; failed?: number; subscribers?: number; message?: string; error?: string; failures?: { code?: string; message?: string }[] };
+            if (!response.ok) {
+              pushStatus = "Device push नहीं भेजा गया: " + (result.error || "HTTP " + response.status);
+            } else if ((result.sent || 0) > 0) {
+              pushStatus = "Push notification " + result.sent + " device(s) पर भेजा गया।";
+            } else if ((result.subscribers || 0) === 0) {
+              pushStatus = "कोई customer device notification के लिए registered नहीं है।";
+            } else {
+              const reason = result.failures?.[0]?.code || result.message || "FCM delivery failed";
+              pushStatus = "FCM ने " + (result.failed || 0) + " device(s) को स्वीकार नहीं किया: " + reason;
+            }
+          } catch (pushError) {
+            pushStatus = "Device push नहीं भेजा जा सका: " + (pushError instanceof Error ? pushError.message : "Network error");
+          }
+          if (!pushStatus) pushStatus = "Product notice और device push की प्रक्रिया पूरी हुई।";
+          if (!homepageNoticeSaved) pushStatus = "Homepage notice भी save नहीं हुआ। " + pushStatus;
+          else pushStatus = "Homepage notice save हो गया। " + pushStatus;
+          // Keep this result after the product list refresh; don't overwrite a delivery failure with a success message.
+          await loadProducts(shop.id); resetProduct(); setNotice("Product successfully added. " + pushStatus);
+          return;
         }
       }
-      await loadProducts(shop.id); resetProduct(); setNotice(productId ? "Product updated." : "Product added successfully. Customers can see the new-product notice.");
+      await loadProducts(shop.id); resetProduct(); setNotice(productId ? "Product updated." : "Product added successfully.");
     } catch (e) {
       const detail = e instanceof Error ? e.message : "Unknown error";
       setError(detail.includes("permission") || detail.includes("Permission")
