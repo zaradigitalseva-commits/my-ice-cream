@@ -113,6 +113,32 @@ export default function PwaInstallButton() {
     };
   }, []);
 
+  // Keep the in-app Allow button in sync if the user changes site permission
+  // in browser settings while MY ICE CREAM is open or returns to the app later.
+  useEffect(() => {
+    const syncPermission = () => {
+      if (!("Notification" in window)) {
+        setNotificationPermission("unsupported");
+        setShowNotificationPrompt(false);
+        return;
+      }
+      const permission = Notification.permission;
+      setNotificationPermission(permission);
+      // Once permission is granted (or denied), never show the Allow button.
+      setShowNotificationPrompt(permission === "default" && installed);
+    };
+
+    window.addEventListener("focus", syncPermission);
+    window.addEventListener("pageshow", syncPermission);
+    document.addEventListener("visibilitychange", syncPermission);
+    syncPermission();
+    return () => {
+      window.removeEventListener("focus", syncPermission);
+      window.removeEventListener("pageshow", syncPermission);
+      document.removeEventListener("visibilitychange", syncPermission);
+    };
+  }, [installed]);
+
   // Re-register this device's FCM token whenever any signed-in app user opens the app.
   // This covers shop admins and customers, including users who sign in after granting permission.
   useEffect(() => {
@@ -209,7 +235,7 @@ export default function PwaInstallButton() {
 
   return (
     <div className="ice-install-root">
-      {showNotificationPrompt && installed && notificationPermission === "default" && (
+      {showNotificationPrompt && installed && notificationPermission === "default" && "Notification" in window && Notification.permission === "default" && (
         <section className="ice-notification-card" role="dialog" aria-labelledby="ice-notification-title">
           <button
             className="ice-install-close"
