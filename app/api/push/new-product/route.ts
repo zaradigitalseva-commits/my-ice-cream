@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
             }
           })
         });
-        if (response.ok) return { sent: true, stale: false, documentName };
+        if (response.ok) return { sent: true, stale: false, documentName, code: "", message: "" };
         const error = await response.json().catch(() => ({})) as JsonMap;
         const detail = JSON.stringify(error);
         const fcmError = (error.error || {}) as JsonMap;
@@ -288,10 +288,8 @@ export async function POST(request: NextRequest) {
         else {
           failed++;
           if (result.stale) stale.push(result.documentName);
-          if ("code" in result) {
-            const failure = { code: result.code, message: result.message };
-            if (!failures.some((item) => item.code === failure.code)) failures.push(failure);
-          }
+          const failure = { code: result.code || "UNKNOWN", message: result.message || "FCM request failed" };
+          if (!failures.some((item) => item.code === failure.code)) failures.push(failure);
         }
       }
     }
