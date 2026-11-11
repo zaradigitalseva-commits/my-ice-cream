@@ -478,7 +478,14 @@ service cloud.firestore {
     // Shop owners can publish notices for a real LIVE product or their currently saved offer.
     match /notifications/{notificationId} {
       allow read: if true;
-      allow create: if signedIn()
+      allow create: if (isAdmin()
+        && request.resource.data.keys().hasOnly(["type", "shopName", "title", "body", "createdAt"])
+        && request.resource.data.type == "admin"
+        && request.resource.data.shopName == "MY ICE CREAM"
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 300
+        && request.resource.data.createdAt is timestamp
+      ) || (signedIn()
         && request.resource.data.keys().hasOnly([
           "type", "shopId", "shopName", "productId", "title", "body", "createdAt"
         ])
@@ -515,7 +522,7 @@ service cloud.firestore {
                 : get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.offerDescription
             )
           )
-        );
+        ));
       allow update, delete: if isAdmin();
     }
 
