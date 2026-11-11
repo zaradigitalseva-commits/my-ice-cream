@@ -122,40 +122,6 @@ export default function PwaInstallButton() {
     }
   };
 
-  const enableNotifications = async () => {
-    if (!("Notification" in window)) {
-      setNotificationPermission("unsupported");
-      setNotificationMessage("इस browser में notifications उपलब्ध नहीं हैं।");
-      return;
-    }
-
-    try {
-      const permission = await Notification.requestPermission();
-      setNotificationPermission(permission);
-      if (permission === "granted") {
-        setShowNotificationPrompt(false);
-        if (auth?.currentUser) {
-          try {
-            await registerPushSubscription(auth.currentUser.uid);
-            setNotificationMessage("Notifications चालू हो गई हैं। नए products के alerts मिलेंगे।");
-          } catch (error) {
-            setNotificationMessage(error instanceof Error
-              ? "Permission मिल गई, लेकिन registration पूरा नहीं हुआ: " + error.message
-              : "Permission मिल गई, लेकिन notification registration पूरा नहीं हुआ।");
-          }
-        } else {
-          setNotificationMessage("Permission मिल गई है। सभी product alerts पाने के लिए Google sign-in करें।");
-        }
-      } else if (permission === "denied") {
-        setNotificationMessage("Notifications बंद हैं। इन्हें browser या phone Settings में जाकर चालू करें।");
-      } else {
-        setNotificationMessage("आपने अभी अनुमति नहीं दी। आप बाद में browser settings से इसे चालू कर सकते हैं।");
-      }
-    } catch {
-      setNotificationMessage("अभी अनुमति नहीं मिल सकी। कृपया browser settings जाँचें।");
-    }
-  };
-
   if (!ready) return null;
 
   return (
