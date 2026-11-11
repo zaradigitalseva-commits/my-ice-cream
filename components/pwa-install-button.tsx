@@ -20,6 +20,7 @@ export default function PwaInstallButton() {
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>("default");
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false);
 
   useEffect(() => {
     const isStandalone = () =>
@@ -118,13 +119,42 @@ export default function PwaInstallButton() {
     if (!auth) return;
     return onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser || typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return;
+      setIsRegistering(true);
       try {
         await registerPushSubscription(currentUser.uid);
-      } catch {
-        // Product browsing remains available if push setup is incomplete.
+        setNotificationMessage("इस मोबाइल पर Notifications सफलतापूर्वक Register हो गए हैं।");
+      } catch (error) {
+        setNotificationMessage(error instanceof Error
+          ? "इस मोबाइल का Notification Registration पूरा नहीं हुआ: " + error.message
+          : "इस मोबाइल का Notification Registration पूरा नहीं हुआ। कृपया दोबारा प्रयास करें।");
+      } finally {
+        setIsRegistering(false);
       }
     });
   }, []);
+
+  const handleRegisterDevice = async () => {
+    const currentUser = auth?.currentUser;
+    if (!currentUser) {
+      setNotificationMessage("पहले Google Sign in करें, फिर इस मोबाइल को Register करें।");
+      return;
+    }
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      setNotificationMessage("मोबाइल की Site Notifications Settings में Allow करें।");
+      return;
+    }
+    setIsRegistering(true);
+    try {
+      await registerPushSubscription(currentUser.uid);
+      setNotificationMessage("इस मोबाइल का Notification Registration सफल हुआ।");
+    } catch (error) {
+      setNotificationMessage(error instanceof Error
+        ? "Registration असफल: " + error.message
+        : "Registration असफल। कृपया दोबारा प्रयास करें।");
+    } finally {
+      setIsRegistering(false);
+    }
+  };
 
   const handleInstall = async () => {
     if (!installPrompt) {
@@ -206,6 +236,17 @@ export default function PwaInstallButton() {
           <span>{notificationMessage}</span>
           <button type="button" aria-label="Close message" onClick={() => setNotificationMessage("")}>×</button>
         </div>
+      )}
+      {"Notification" in window && Notification.permission === "granted" && auth?.currentUser && (
+        <button
+          type="button"
+          className="ice-notification-allow"
+          onClick={handleRegisterDevice}
+          disabled={isRegistering}
+          aria-label="Register this device for notifications"
+        >
+          {isRegistering ? "Registering..." : "🔔 इस मोबाइल को Notification के लिए Register करें"}
+        </button>
       )}
 
       {!installed && showHelp && (
