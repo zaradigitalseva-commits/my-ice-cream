@@ -22,8 +22,11 @@ export async function registerPushSubscription(uid: string): Promise<void> {
   if (!vapidKey) throw new Error("Firebase Web Push VAPID public key is not configured.");
 
   const registration = await navigator.serviceWorker.register("/sw.js");
+  // Wait until this phone's service worker is active before asking FCM for its token.
+  await navigator.serviceWorker.ready;
+  const activeRegistration = await navigator.serviceWorker.getRegistration("/") || registration;
   const messaging = getMessaging(firebaseApp);
-  const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
+  const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: activeRegistration });
   if (!token) throw new Error("A push subscription could not be created.");
 
   const tokenHash = await hashToken(token);
