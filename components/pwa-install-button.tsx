@@ -90,15 +90,7 @@ export default function PwaInstallButton() {
     if (!auth) return;
     return onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser || typeof window === "undefined" || !("Notification" in window)) return;
-      let permission = Notification.permission;
-      if (permission === "default") {
-        try {
-          permission = await Notification.requestPermission();
-        } catch {
-          return;
-        }
-      }
-      if (permission !== "granted") return;
+      if (Notification.permission !== "granted") return;
       try {
         await registerPushSubscription(currentUser.uid);
       } catch (error) {
