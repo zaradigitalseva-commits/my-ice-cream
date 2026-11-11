@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore/lite";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, orderBy, limit } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
@@ -14,6 +14,7 @@ type Customer = { id: string; phone: string; uid: string; name?: string; created
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
 type SubscriptionPayment = { id: string; amount?: number; paymentType?: string; utr?: string; status?: string; createdAt?: { toDate?: () => Date } };
+type ShopAdminNotice = { id: string; title?: string; body?: string; createdAt?: { toDate?: () => Date } };
 
 export default function ShopPage() {
   const router = useRouter();
@@ -75,6 +76,7 @@ export default function ShopPage() {
   const [pendingPayment, setPendingPayment] = useState(false);
   const [productsRefreshing, setProductsRefreshing] = useState(false);
   const [productRefreshMessage, setProductRefreshMessage] = useState("");
+  const [adminNotices, setAdminNotices] = useState<ShopAdminNotice[]>([]);
 
   useEffect(() => {
     if (!activeShopSection) return;
@@ -92,6 +94,16 @@ export default function ShopPage() {
     }, 80);
     return () => window.clearTimeout(timer);
   }, [activeShopSection]);
+
+  async function loadShopAdminNotices(shopId: string) {
+    if (!db) return;
+    try {
+      const result = await getDocs(query(collection(db, "shops", shopId, "adminNotices"), orderBy("createdAt", "desc"), limit(20)));
+      setAdminNotices(result.docs.map((item) => ({ id: item.id, ...item.data() } as ShopAdminNotice)));
+    } catch (err) {
+      setError(err instanceof Error ? "Admin की सूचना लोड नहीं हुई: " + (err instanceof Error ? err.message : "") : "Admin की सूचना लोड नहीं हुई।");
+    }
+  }
 
   async function loadProducts(shopId: string) {
     if (!db) return;
@@ -127,6 +139,7 @@ export default function ShopPage() {
           const data = { id: owned.id, ...owned.data() } as Shop;
           const isLiveShop = ["live", "LIVE", "Live"].includes(String(data.status || ""));
           setShop(data);
+          await loadShopAdminNotices(data.id);
           if (window.location.hash === "#shop-profile") setActiveShopSection("profile");
           const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
           setPendingPayment(lock.exists() && !isLiveShop); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
@@ -156,6 +169,7 @@ export default function ShopPage() {
         if (!owned || !active) return;
         const latest = { id: owned.id, ...owned.data() } as Shop;
         setShop(latest);
+        await loadShopAdminNotices(latest.id);
         const lock = await getDoc(doc(firestore, "paymentPendingLocks", latest.id));
         if (!active) return;
         const isLive = ["live", "LIVE", "Live"].includes(String(latest.status || ""));
@@ -559,6 +573,8 @@ export default function ShopPage() {
       <section className="admin-panel"><h1>Register your shop</h1><p>Shopkeeper access starts with a separate shop registration. Admin approval is required before your shop is LIVE.</p><Link href="/shop/register" className="admin-primary role-link">Register Shop</Link></section> :
       <>
         <section className="admin-heading"><div><p className="admin-kicker">SHOPKEEPER AREA</p><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""} · Status: <span className={"admin-status " + (shop.status || "pending")}>{(shop.status || "pending").toLowerCase() === "live" ? "APPROVED" : (shop.status || "pending").toUpperCase()}</span></p></div></section>
+        {adminNotices.length > 0 && <section className="admin-panel" aria-label="Admin की निजी Shopkeeper सूचना" style={{border:"2px solid #f0b64d",background:"linear-gradient(135deg,#fff9e8,#fff1f2)"}}><p className="admin-kicker">🔔 ADMIN NOTICE · केवल SHOPKEEPER के लिए</p><h2 style={{marginTop:0}}>दुकान के लिए जरूरी सूचना</h2>{adminNotices.map((item) => <article key={item.id} style={{padding:"12px 0",borderTop:"1px solid #f2d9a6"}}><h3 style={{margin:"0 0 6px"}}>{item.title || "Admin सूचना"}</h3><p style={{whiteSpace:"pre-wrap",margin:"0 0 6px"}}>{item.body || ""}</p><small className="admin-muted">{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString("hi-IN") : ""}</small></article>)}</section>}
+
         <section className="admin-panel" aria-live="polite">
           <p className="admin-kicker">REGISTRATION TRACKING</p>
           <h2>आपकी दुकान की स्थिति</h2>
