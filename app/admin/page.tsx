@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc, where, writeBatch, deleteDoc, limit } from "firebase/firestore/lite";
+import { collection, collectionGroup, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc, where, writeBatch, deleteDoc, limit } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
@@ -11,6 +11,7 @@ import { compressImageToWebP } from "@/lib/image-compression";
 type Shop = { id: string; name?: string; shopName?: string; ownerName?: string; ownerEmail?: string; ownerUid?: string; status?: string; subscriptionStatus?: string; subscriptionExpiresAt?: Timestamp | Date | string; phone?: string; mobile?: string; mobileNumber?: string; city?: string; address?: string; fullAddress?: string; shopAddress?: string; location?: string; landmark?: string; description?: string; about?: string; createdAt?: Timestamp | Date | string };
 type AdminProduct = { id: string; shopId: string; shopName: string; name?: string; price?: number; category?: string; active?: boolean };
 type AdminAnnouncement = { id: string; title?: string; body?: string; type?: string; createdAt?: Timestamp };
+type ShopDashboardNotice = { id: string; shopId: string; title?: string; body?: string; createdAt?: Timestamp };
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -34,16 +35,21 @@ export default function AdminPage() {
   const [siteQr, setSiteQr] = useState("");
   const [pendingQrFile, setPendingQrFile] = useState<File | null>(null);
   const [qrBusy, setQrBusy] = useState(false);
-  const [activeAdminSection, setActiveAdminSection] = useState<"overview" | "settings" | "customers" | "products" | "registrations" | "announcements">("registrations");
+  const [activeAdminSection, setActiveAdminSection] = useState<"overview" | "settings" | "customers" | "products" | "registrations" | "announcements" | "shopNotices">("registrations");
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementBody, setAnnouncementBody] = useState("");
   const [announcementBusy, setAnnouncementBusy] = useState(false);
   const [adminAnnouncements, setAdminAnnouncements] = useState<AdminAnnouncement[]>([]);
   const [deletingAnnouncementId, setDeletingAnnouncementId] = useState("");
+  const [shopNoticeTitle, setShopNoticeTitle] = useState("");
+  const [shopNoticeBody, setShopNoticeBody] = useState("");
+  const [shopNoticeBusy, setShopNoticeBusy] = useState(false);
+  const [shopDashboardNotices, setShopDashboardNotices] = useState<ShopDashboardNotice[]>([]);
+  const [deletingShopNoticeId, setDeletingShopNoticeId] = useState("");
 
   useEffect(() => {
     if (!auth) { setAuthReady(true); setError("Firebase configuration is missing."); return; }
-    return onAuthStateChanged(auth, (nextUser) => { setUser(nextUser); setAuthReady(true); if (nextUser && isAdminEmail(nextUser.email) && nextUser.emailVerified) void loadAdminAnnouncements(); });
+    return onAuthStateChanged(auth, (nextUser) => { setUser(nextUser); setAuthReady(true); if (nextUser && isAdminEmail(nextUser.email) && nextUser.emailVerified) { void loadAdminAnnouncements(); void loadShopDashboardNotices(); } });
   }, []);
 
   async function loadAdminAnnouncements() {
@@ -272,6 +278,50 @@ export default function AdminPage() {
     } finally { setDeletingShopId(""); }
   }
 
+  async function loadShopDashboardNotices() {
+    if (!db) return;
+    try {
+      const result = await getDocs(query(collectionGroup(db, "adminNotices"), orderBy("createdAt", "desc"), limit(200)));
+      setShopDashboardNotices(result.docs.map((item) => ({ id: item.id, shopId: item.ref.parent.parent?.id || "", ...item.data() } as ShopDashboardNotice)));
+    } catch (err) {
+      setError(err instanceof Error ? "Shopkeeper सूचना सूची लोड नहीं हुई: " + (err instanceof Error ? err.message : "") : "Shopkeeper सूचना सूची लोड नहीं हुई।");
+    }
+  }
+
+  async function publishShopDashboardNotice() {
+    if (!db || !shopNoticeTitle.trim() || !shopNoticeBody.trim()) { setError("सूचना का Title और Message दोनों लिखें।"); return; }
+    if (!shops.length) { setError("दुकानों की सूची उपलब्ध नहीं है। Refresh करके फिर कोशिश करें।"); return; }
+    setShopNoticeBusy(true); setError(""); setNotice("");
+    try {
+      const firestore = db;
+      for (let start = 0; start < shops.length; start += 400) {
+        const batch = writeBatch(firestore);
+        for (const shop of shops.slice(start, start + 400)) {
+          const ref = doc(collection(firestore, "shops", shop.id, "adminNotices"));
+          batch.set(ref, { title: shopNoticeTitle.trim(), body: shopNoticeBody.trim(), createdAt: Timestamp.now() });
+        }
+        await batch.commit();
+      }
+      setShopNoticeTitle(""); setShopNoticeBody("");
+      await loadShopDashboardNotices();
+      setNotice("सूचना Shop Dashboards में प्रकाशित हो गई। यह Homepage या Customers को नहीं दिखाई जाएगी और कोई Push Notification नहीं भेजा गया।");
+    } catch (err) {
+      setError(err instanceof Error ? "सूचना प्रकाशित नहीं हो पाई: " + err.message : "सूचना प्रकाशित नहीं हो पाई।");
+    } finally { setShopNoticeBusy(false); }
+  }
+
+  async function deleteShopDashboardNotice(item: ShopDashboardNotice) {
+    if (!db || !item.shopId || !item.id || !window.confirm("क्या यह सूचना Shop Dashboard से हटानी है?")) return;
+    setDeletingShopNoticeId(item.id); setError(""); setNotice("");
+    try {
+      await deleteDoc(doc(db, "shops", item.shopId, "adminNotices", item.id));
+      setShopDashboardNotices((current) => current.filter((entry) => !(entry.id === item.id && entry.shopId === item.shopId)));
+      setNotice("Shop Dashboard की सूचना हटा दी गई।");
+    } catch (err) {
+      setError(err instanceof Error ? "सूचना हट नहीं पाई: " + err.message : "सूचना हट नहीं पाई।");
+    } finally { setDeletingShopNoticeId(""); }
+  }
+
   async function publishAnnouncement() {
     if (!user || !announcementTitle.trim() || !announcementBody.trim()) { setError("पोस्ट का Title और Message दोनों लिखें।"); return; }
     setAnnouncementBusy(true); setError(""); setNotice("");
@@ -311,6 +361,7 @@ export default function AdminPage() {
       <button type="button" className={activeAdminSection === "registrations" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("registrations")}>Shop registrations</button>
       <button type="button" className={activeAdminSection === "products" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("products")}>Shop products</button>
       <button type="button" className={activeAdminSection === "announcements" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("announcements")}>📢 पोस्ट और नोटिफिकेशन</button>
+      <button type="button" className={activeAdminSection === "shopNotices" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("shopNotices")}>🏪 Shopkeeper सूचना</button>
       <button type="button" className={activeAdminSection === "customers" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("customers")}>Customers</button>
       <button type="button" className={activeAdminSection === "settings" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("settings")}>Settings</button>
       <Link href="/admin/payments" className="admin-secondary role-link">Subscription payments</Link>
@@ -334,6 +385,7 @@ export default function AdminPage() {
     {activeAdminSection === "overview" && <section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>}
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
     {activeAdminSection === "announcements" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>📢 Official post और Push Notification</h2><p>यह पोस्ट वेबसाइट के Customer Updates में दिखेगी और जिन डिवाइसों ने Push चालू किया है, उन पर भेजी जाएगी।</p></div></div><label>पोस्ट का Title<input value={announcementTitle} onChange={(event) => setAnnouncementTitle(event.target.value)} maxLength={120} placeholder="जैसे: नया ऑफर या जरूरी सूचना" /></label><label>Message<textarea value={announcementBody} onChange={(event) => setAnnouncementBody(event.target.value)} maxLength={300} rows={4} placeholder="अपनी सूचना यहाँ लिखें…" /></label><div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}><small className="admin-muted">{announcementTitle.length}/120 · {announcementBody.length}/300 अक्षर</small><button className="admin-primary" disabled={announcementBusy || !announcementTitle.trim() || !announcementBody.trim()} onClick={() => void publishAnnouncement()}>{announcementBusy ? "भेजा जा रहा है…" : "📢 पोस्ट प्रकाशित करें और Notification भेजें"}</button></div><p className="admin-muted">जिन फोन में अनुमति और Push Registration चालू है, उन्हीं पर Notification पहुँचेगा। पोस्ट वेबसाइट के Search box के ठीक ऊपर रंगीन scrolling banner में भी दिखेगी।</p><div className="admin-announcement-list"><div className="admin-panel-head"><div><h3>आपकी प्रकाशित पोस्ट</h3><p>यहाँ से पोस्ट हटाने पर वेबसाइट के ticker और Customer Updates से हट जाएगी।</p></div><button type="button" className="admin-secondary small" onClick={() => void loadAdminAnnouncements()}>Refresh</button></div>{adminAnnouncements.length === 0 ? <p className="admin-muted">अभी कोई official post नहीं है।</p> : adminAnnouncements.map((item) => <article className="admin-announcement-row" key={item.id}><div><strong>{item.title || "Official update"}</strong><p>{item.body || ""}</p><small className="admin-muted">{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString("hi-IN") : "Published post"}</small></div><button type="button" className="admin-danger small" disabled={deletingAnnouncementId === item.id} onClick={() => void deleteAdminAnnouncement(item)}>{deletingAnnouncementId === item.id ? "हटा रहे हैं…" : "🗑 Delete"}</button></article>)}</div></section>}
+    {activeAdminSection === "shopNotices" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>🏪 Shopkeeper के लिए निजी सूचना</h2><p>यह सूचना हर दुकान के अपने Shop Dashboard में ही दिखेगी। Homepage, Customer Updates और Push Notification में नहीं जाएगी।</p></div></div><label>सूचना का Title<input value={shopNoticeTitle} onChange={(event) => setShopNoticeTitle(event.target.value)} maxLength={120} placeholder="जैसे: जरूरी जानकारी" /></label><label>सूचना<textarea value={shopNoticeBody} onChange={(event) => setShopNoticeBody(event.target.value)} maxLength={1000} rows={4} placeholder="सभी दुकानदारों के लिए सूचना लिखें…" /></label><div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}><small className="admin-muted">{shopNoticeTitle.length}/120 · {shopNoticeBody.length}/1000 अक्षर · {shops.length} दुकानें</small><button type="button" className="admin-primary" disabled={shopNoticeBusy || !shopNoticeTitle.trim() || !shopNoticeBody.trim() || shops.length === 0} onClick={() => void publishShopDashboardNotice()}>{shopNoticeBusy ? "प्रकाशित हो रही है…" : "🏪 सिर्फ Shop Dashboard में प्रकाशित करें"}</button></div><div className="admin-announcement-list"><div className="admin-panel-head"><div><h3>पहले भेजी गई Shopkeeper सूचनाएँ</h3><p>Delete करने पर संबंधित Shop Dashboard से सूचना हट जाएगी।</p></div><button type="button" className="admin-secondary small" onClick={() => void loadShopDashboardNotices()}>Refresh</button></div>{shopDashboardNotices.length === 0 ? <p className="admin-muted">अभी कोई Shopkeeper सूचना नहीं है।</p> : shopDashboardNotices.map((item) => <article className="admin-announcement-row" key={item.shopId + "-" + item.id}><div><strong>{item.title || "सूचना"}</strong><p>{item.body || ""}</p><small className="admin-muted">दुकान ID: {item.shopId}{item.createdAt?.toDate ? " · " + item.createdAt.toDate().toLocaleString("hi-IN") : ""}</small></div><button type="button" className="admin-danger small" disabled={deletingShopNoticeId === item.id} onClick={() => void deleteShopDashboardNotice(item)}>{deletingShopNoticeId === item.id ? "हटा रहे हैं…" : "🗑 Delete"}</button></article>)}</div></section>}
     {activeAdminSection === "customers" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>Registered customers</h2><p>Firestore में सेव ग्राहक रिकॉर्ड। यह Firebase Authentication की पूरी user-list नहीं है।</p></div><span className="admin-count">{customerError ? "Unavailable" : `${customers.length} customers`}</span></div>{customerError && <p className="admin-error" role="alert">Customer records load नहीं हो पाए: {customerError}. Shop management अभी भी इस्तेमाल कर सकते हैं।</p>}<div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>नाम</th><th>मोबाइल</th><th>ईमेल</th><th>स्थिति</th></tr></thead><tbody>{customers.map((customer)=><tr key={customer.id}><td>{customer.name||"—"}</td><td>{customer.phone||customer.id}</td><td>{customer.email||"—"}</td><td>{customer.uid?"App account linked":"Shop-created record"}</td></tr>)}</tbody></table></div></section>}
     {activeAdminSection === "products" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop products</h2><p>सभी दुकानों के प्रोडक्ट यहाँ दिखेंगे, चाहे वे active हों या inactive।</p></div><span className="admin-count">{shopProducts.length} products</span></div>{productError && <p className="admin-error" role="alert">Products load नहीं हुए: {productError}</p>}{!productError && shopProducts.length === 0 ? <p className="admin-muted">अभी किसी दुकान में प्रोडक्ट सेव नहीं हैं।</p> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Shop</th><th>Price</th><th>Visibility</th><th>Product ID</th></tr></thead><tbody>{shopProducts.map((product) => <tr key={product.shopId + "-" + product.id}><td><strong>{product.name || "Unnamed product"}</strong><small>{product.category || "Category not set"}</small></td><td>{product.shopName}<small>{product.shopId}</small></td><td>₹{Number(product.price || 0).toFixed(2)}</td><td><span className={`admin-status ${product.active === true ? "live" : "inactive"}`}>{product.active === true ? "Active · Public" : "Inactive · Hidden"}</span><button className="admin-secondary small" onClick={() => void toggleProductVisibility(product)}>{product.active === true ? "Hide product" : "Show product"}</button></td><td><small>{product.id}</small></td></tr>)}</tbody></table></div>}</section>}
     {activeAdminSection === "registrations" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>
