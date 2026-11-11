@@ -10,17 +10,11 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
-type NotificationPermissionState = NotificationPermission | "unsupported";
-
 export default function PwaInstallButton() {
   const [ready, setReady] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [showHelp, setShowHelp] = useState(false);
-  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>("default");
-  const [notificationMessage, setNotificationMessage] = useState("");
-  const [isRegistering, setIsRegistering] = useState(false);
 
   useEffect(() => {
     const isStandalone = () =>
@@ -46,25 +40,9 @@ export default function PwaInstallButton() {
         // The standalone display-mode check still hides the button in this session.
       }
       setInstalled(true);
-      if ("Notification" in window) {
-        setNotificationPermission(Notification.permission);
-        if (Notification.permission === "default") setShowNotificationPrompt(true);
-      } else {
-        setNotificationPermission("unsupported");
-      }
     } else {
       if (wasInstalled) {
         setInstalled(true);
-        // Some browsers do not fire appinstalled for manual home-screen installs.
-        // If this browser has an install marker, offer notification opt-in on its next open too.
-        if ("Notification" in window && Notification.permission === "default") {
-          setShowNotificationPrompt(true);
-        }
-      }
-      if ("Notification" in window) {
-        setNotificationPermission(Notification.permission);
-      } else {
-        setNotificationPermission("unsupported");
       }
     }
     setReady(true);
@@ -90,12 +68,6 @@ export default function PwaInstallButton() {
       setInstalled(true);
       setShowHelp(false);
       setInstallPrompt(null);
-      if ("Notification" in window) {
-        setNotificationPermission(Notification.permission);
-        if (Notification.permission === "default") setShowNotificationPrompt(true);
-      } else {
-        setNotificationPermission("unsupported");
-      }
     };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
@@ -113,74 +85,19 @@ export default function PwaInstallButton() {
     };
   }, []);
 
-  // Keep the in-app Allow button in sync if the user changes site permission
-  // in browser settings while MY ICE CREAM is open or returns to the app later.
-  useEffect(() => {
-    const syncPermission = () => {
-      if (!("Notification" in window)) {
-        setNotificationPermission("unsupported");
-        setShowNotificationPrompt(false);
-        return;
-      }
-      const permission = Notification.permission;
-      setNotificationPermission(permission);
-      // Once permission is granted (or denied), never show the Allow button.
-      setShowNotificationPrompt(permission === "default" && installed);
-    };
-
-    window.addEventListener("focus", syncPermission);
-    window.addEventListener("pageshow", syncPermission);
-    document.addEventListener("visibilitychange", syncPermission);
-    syncPermission();
-    return () => {
-      window.removeEventListener("focus", syncPermission);
-      window.removeEventListener("pageshow", syncPermission);
-      document.removeEventListener("visibilitychange", syncPermission);
-    };
-  }, [installed]);
-
-  // Re-register this device's FCM token whenever any signed-in app user opens the app.
-  // This covers shop admins and customers, including users who sign in after granting permission.
+  // Ask for browser permission after Google sign-in, then register this phone silently.
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser || typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return;
-      setIsRegistering(true);
+      if (!currentUser || typeof window === "undefined" || !("Notification" in window)) return;
+      if (Notification.permission !== "granted") return;
       try {
         await registerPushSubscription(currentUser.uid);
-        setNotificationMessage("इस मोबाइल पर Notifications सफलतापूर्वक Register हो गए हैं।");
       } catch (error) {
-        setNotificationMessage(error instanceof Error
-          ? "इस मोबाइल का Notification Registration पूरा नहीं हुआ: " + error.message
-          : "इस मोबाइल का Notification Registration पूरा नहीं हुआ। कृपया दोबारा प्रयास करें।");
-      } finally {
-        setIsRegistering(false);
+        console.error("MY ICE CREAM push registration failed:", error);
       }
     });
   }, []);
-
-  const handleRegisterDevice = async () => {
-    const currentUser = auth?.currentUser;
-    if (!currentUser) {
-      setNotificationMessage("पहले Google Sign in करें, फिर इस मोबाइल को Register करें।");
-      return;
-    }
-    if (!("Notification" in window) || Notification.permission !== "granted") {
-      setNotificationMessage("मोबाइल की Site Notifications Settings में Allow करें।");
-      return;
-    }
-    setIsRegistering(true);
-    try {
-      await registerPushSubscription(currentUser.uid);
-      setNotificationMessage("इस मोबाइल का Notification Registration सफल हुआ।");
-    } catch (error) {
-      setNotificationMessage(error instanceof Error
-        ? "Registration असफल: " + error.message
-        : "Registration असफल। कृपया दोबारा प्रयास करें।");
-    } finally {
-      setIsRegistering(false);
-    }
-  };
 
   const handleInstall = async () => {
     if (!installPrompt) {
@@ -197,84 +114,10 @@ export default function PwaInstallButton() {
     }
   };
 
-  const enableNotifications = async () => {
-    if (!("Notification" in window)) {
-      setNotificationPermission("unsupported");
-      setNotificationMessage("इस browser में notifications उपलब्ध नहीं हैं।");
-      return;
-    }
-
-    try {
-      const permission = await Notification.requestPermission();
-      setNotificationPermission(permission);
-      if (permission === "granted") {
-        setShowNotificationPrompt(false);
-        if (auth?.currentUser) {
-          try {
-            await registerPushSubscription(auth.currentUser.uid);
-            setNotificationMessage("Notifications चालू हो गई हैं। नए products के alerts मिलेंगे।");
-          } catch (error) {
-            setNotificationMessage(error instanceof Error
-              ? "Permission मिल गई, लेकिन registration पूरा नहीं हुआ: " + error.message
-              : "Permission मिल गई, लेकिन notification registration पूरा नहीं हुआ।");
-          }
-        } else {
-          setNotificationMessage("Permission मिल गई है। सभी product alerts पाने के लिए Google sign-in करें।");
-        }
-      } else if (permission === "denied") {
-        setNotificationMessage("Notifications बंद हैं। इन्हें browser या phone Settings में जाकर चालू करें।");
-      } else {
-        setNotificationMessage("आपने अभी अनुमति नहीं दी। आप बाद में browser settings से इसे चालू कर सकते हैं।");
-      }
-    } catch {
-      setNotificationMessage("अभी अनुमति नहीं मिल सकी। कृपया browser settings जाँचें।");
-    }
-  };
-
   if (!ready) return null;
 
   return (
     <div className="ice-install-root">
-      {showNotificationPrompt && installed && notificationPermission === "default" && "Notification" in window && Notification.permission === "default" && (
-        <section className="ice-notification-card" role="dialog" aria-labelledby="ice-notification-title">
-          <button
-            className="ice-install-close"
-            type="button"
-            aria-label="Close notification prompt"
-            onClick={() => setShowNotificationPrompt(false)}
-          >
-            ×
-          </button>
-          <span className="ice-notification-emoji" aria-hidden="true">🔔</span>
-          <strong id="ice-notification-title">Offers की खबर सबसे पहले पाएँ!</strong>
-          <p>MY ICE CREAM के नए products और special offers के alerts पाने के लिए notifications Allow करें।</p>
-          <button className="ice-notification-allow" type="button" onClick={enableNotifications}>
-            Allow Notifications
-          </button>
-          <button className="ice-notification-later" type="button" onClick={() => setShowNotificationPrompt(false)}>
-            अभी नहीं
-          </button>
-        </section>
-      )}
-
-      {notificationMessage && (
-        <div className="ice-notification-status" role="status">
-          <span>{notificationMessage}</span>
-          <button type="button" aria-label="Close message" onClick={() => setNotificationMessage("")}>×</button>
-        </div>
-      )}
-      {"Notification" in window && Notification.permission === "granted" && auth?.currentUser && (
-        <button
-          type="button"
-          className="ice-notification-allow"
-          onClick={handleRegisterDevice}
-          disabled={isRegistering}
-          aria-label="Register this device for notifications"
-        >
-          {isRegistering ? "Registering..." : "🔔 इस मोबाइल को Notification के लिए Register करें"}
-        </button>
-      )}
-
       {!installed && showHelp && (
         <div className="ice-install-help" role="status">
           <button
