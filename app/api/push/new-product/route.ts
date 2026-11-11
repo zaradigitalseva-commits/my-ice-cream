@@ -208,13 +208,27 @@ export async function POST(request: NextRequest) {
     const accessToken = await getGoogleAccessToken(serviceAccount);
     const eventId = await sha256Hex(shopId + ":" + productId);
     const now = new Date().toISOString();
-    const lock = await writeEvent(projectId, eventId, accessToken, {
+    let lock = await writeEvent(projectId, eventId, accessToken, {
       shopId, productId, state: "sending", createdAt: { timestamp: now }
     }, true);
     if (lock.status === 409) {
-      return NextResponse.json({ sent: 0, duplicate: true, message: "This product notification was already processed." });
+      // A previous attempt with zero successful deliveries must be retryable after
+      // customers enable notifications. Only a completed successful send is final.
+      const previous = await firestoreDocument(projectId, "pushNotificationEvents/" + eventId, accessToken);
+      if (previous?.state === "sent" && Number(previous.sentCount || 0) > 0) {
+        return NextResponse.json({ sent: 0, duplicate: true, message: "This product notification was already delivered." });
+      }
+      if (previous?.state === "sending") {
+        const startedAt = Date.parse(String(previous.createdAt || ""));
+        if (Number.isFinite(startedAt) && Date.now() - startedAt < 5 * 60 * 1000) {
+          return NextResponse.json({ sent: 0, duplicate: true, message: "This product notification is already being processed. Try again shortly." });
+        }
+      }
+      lock = await writeEvent(projectId, eventId, accessToken, {
+        shopId, productId, state: "sending", createdAt: { timestamp: now }
+      }, false);
     }
-    if (!lock.ok) throw new Error("Could not create the notification delivery record (" + lock.status + ").");
+    if (!lock.ok) throw new Error("Could not create or refresh the notification delivery record (" + lock.status + ").");
 
     const subscriptions = await listPushSubscriptions(projectId, accessToken);
     // A customer may have signed in with more than one account on the same browser.
@@ -230,6 +244,7 @@ export async function POST(request: NextRequest) {
     let sent = 0;
     let failed = 0;
     const stale: string[] = [];
+    const failures: { code: string; message: string }[] = [];
     const tokens = Array.from(unique.entries());
 
     for (let start = 0; start < tokens.length; start += 20) {
@@ -262,28 +277,41 @@ export async function POST(request: NextRequest) {
         if (response.ok) return { sent: true, stale: false, documentName };
         const error = await response.json().catch(() => ({})) as JsonMap;
         const detail = JSON.stringify(error);
+        const fcmError = (error.error || {}) as JsonMap;
+        const code = String(fcmError.status || fcmError.code || response.status);
+        const message = String(fcmError.message || "FCM request failed").slice(0, 180);
         const isStale = response.status === 404 || detail.includes("UNREGISTERED") || detail.includes("registration-token-not-registered");
-        return { sent: false, stale: isStale, documentName };
+        return { sent: false, stale: isStale, documentName, code, message };
       }));
       for (const result of results) {
         if (result.sent) sent++;
         else {
           failed++;
           if (result.stale) stale.push(result.documentName);
+          if ("code" in result) {
+            const failure = { code: result.code, message: result.message };
+            if (!failures.some((item) => item.code === failure.code)) failures.push(failure);
+          }
         }
       }
     }
 
     await Promise.all(stale.map((name) => removeInvalidSubscription(name, accessToken)));
     await writeEvent(projectId, eventId, accessToken, {
-      state: "sent", sentCount: sent, failedCount: failed, updatedAt: { timestamp: new Date().toISOString() }
+      state: sent > 0 ? "sent" : failed > 0 ? "failed" : "no_subscribers",
+      sentCount: sent, failedCount: failed, updatedAt: { timestamp: new Date().toISOString() }
     }, false);
 
     return NextResponse.json({
       sent,
       failed,
       subscribers: unique.size,
-      message: sent > 0 ? "New product push notifications sent." : "No customers have registered push notifications yet."
+      failures: failures.slice(0, 3),
+      message: sent > 0
+        ? "New product push notifications sent."
+        : unique.size === 0
+          ? "No customers have registered push notifications yet."
+          : "FCM could not deliver this notification to the registered devices."
     });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Push notification could not be sent.", 500);
