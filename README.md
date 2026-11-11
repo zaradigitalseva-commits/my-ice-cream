@@ -51,3 +51,22 @@ Required environment variables are listed in `.env.example`. Never commit `.env.
 ## Not production-ready yet
 
 The current landing page is a starter shell, not a complete marketplace. Shop onboarding, database schema, secure roles and shop-level access rules, product uploads, ordering, subscription verification, admin tools, tests, deployment and backup/restore workflows still need to be built and reviewed.
+
+
+## Customer push notifications (new products)
+
+The app can send Firebase Cloud Messaging (FCM) web-push notifications to customers who are signed in, have granted browser notification permission, and have registered this browser. Notifications are sent when a LIVE shop adds a new **active** product. Editing an existing product does not send another notification. The service worker displays the notification and opens that product when tapped.
+
+### Required one-time Firebase setup
+
+1. In Firebase Console for the project used by MY ICE CREAM, open **Project settings → Cloud Messaging → Web configuration** and generate a Web Push certificate key pair.
+2. Add the **public** VAPID key as `NEXT_PUBLIC_FIREBASE_VAPID_KEY` in the hosting provider's build/runtime environment, alongside the existing `NEXT_PUBLIC_FIREBASE_*` values. Rebuild/redeploy after setting it.
+3. In Google Cloud Console, enable the **Firebase Cloud Messaging API** for the same project.
+4. Create a service account for this Firebase project and grant it **Firebase Cloud Messaging API Admin** and **Cloud Datastore User** roles. Create a JSON key.
+5. Add the complete JSON key as the server-only secret `FCM_SERVICE_ACCOUNT_JSON` in the hosting provider. Do not commit it to GitHub and do not prefix it with `NEXT_PUBLIC_`.
+6. Publish `firebase/firestore.rules` in Firebase Console → Firestore Database → Rules. The new `pushSubscriptions` rule allows customers to manage only their own token records; customers cannot read other customers' tokens.
+7. Deploy the application and test with two different customer devices/browsers. Sign in on each, install/open the app, tap **Allow Notifications**, then add a new active product from a LIVE shop.
+
+The server verifies the Firebase ID token against Firestore's shop/product access rules before sending. It stores an idempotency record per product so editing a product or retrying the same request does not send duplicate notifications. Invalid FCM tokens are removed after FCM reports them as unregistered.
+
+**Delivery limits:** customers must sign in at least once on each device, grant notification permission, and have a supported browser/OS with internet access. Browser/OS battery and notification settings can delay or suppress delivery. This is web push, not SMS or WhatsApp.
