@@ -15,15 +15,29 @@ self.addEventListener("push", (event) => {
     payload = { body: event.data ? event.data.text() : "" };
   }
 
-  const title = typeof payload.title === "string" ? payload.title : "MY ICE CREAM";
+  // Firebase Cloud Messaging sends title/body inside notification and product links inside data.
+  const notification = payload.notification && typeof payload.notification === "object" ? payload.notification : {};
+  const data = payload.data && typeof payload.data === "object" ? payload.data : {};
+  const title = typeof payload.title === "string"
+    ? payload.title
+    : typeof notification.title === "string" ? notification.title : "MY ICE CREAM";
+  const body = typeof payload.body === "string" && payload.body
+    ? payload.body
+    : typeof notification.body === "string" && notification.body
+      ? notification.body
+      : "नए products और offers देखने के लिए MY ICE CREAM खोलें।";
+  const productTag = typeof data.productId === "string" ? "product-" + data.productId : "my-ice-cream-update";
+  const targetUrl = typeof payload.url === "string"
+    ? payload.url
+    : typeof data.url === "string" ? data.url
+      : typeof notification.click_action === "string" ? notification.click_action : "/";
   const options = {
-    body: typeof payload.body === "string" && payload.body
-      ? payload.body
-      : "नए products और offers देखने के लिए MY ICE CREAM खोलें।",
+    body,
     icon: "/my-ice-cream-app.svg",
     badge: "/my-ice-cream-app.svg",
-    tag: typeof payload.tag === "string" ? payload.tag : "my-ice-cream-update",
-    data: { url: typeof payload.url === "string" ? payload.url : "/" }
+    tag: typeof payload.tag === "string" ? payload.tag : productTag,
+    renotify: false,
+    data: { url: targetUrl }
   };
 
   event.waitUntil(self.registration.showNotification(title, options));

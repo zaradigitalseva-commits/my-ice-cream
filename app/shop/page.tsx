@@ -447,8 +447,8 @@ export default function ShopPage() {
   async function compressProductImage(file: File) {
     setImageBusy(true); setError("");
     try {
-      const result = await compressImageToWebP(file, { maxDimension: 1200, maxBytes: 220 * 1024, initialQuality: 0.84 });
-      setImageUrl(result); setNotice("Image automatically compressed to WebP and ready to save.");
+      const result = await compressImageToWebP(file, { targetWidth: 800, targetHeight: 450, fit: "contain", maxBytes: 100 * 1024, initialQuality: 0.84 });
+      setImageUrl(result); setNotice("Product photo 800 × 450 px WebP mein compress ho gayi (100 KB se kam). Ab save kar sakte hain.");
     } catch (e) { setError(e instanceof Error ? e.message : "Image compression failed."); }
     finally { setImageBusy(false); }
   }
@@ -501,13 +501,13 @@ export default function ShopPage() {
         const createdProduct = await addDoc(collection(db, "shops", shop.id, "products"), { ...data, createdAt: serverTimestamp() });
         if (productActive) {
           try {
-            await setDoc(doc(db, "notifications", "product_" + shop.id + "_" + createdProduct.id), {
-              type: "product", shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop",
-              productId: createdProduct.id, title: "नया प्रोडक्ट: " + cleanName,
-              body: (shop.name || shop.shopName || "दुकान") + " में नया प्रोडक्ट जुड़ा है। कीमत ₹" + sellingPrice,
-              createdAt: serverTimestamp()
-            });
+            await setDoc(doc(db, "notifications", "product_" + shop.id + "_" + createdProduct.id), { type: "product", shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop", productId: createdProduct.id, title: "नया प्रोडक्ट: " + cleanName, body: (shop.name || shop.shopName || "दुकान") + " में नया प्रोडक्ट जुड़ा है। कीमत ₹" + sellingPrice, createdAt: serverTimestamp() });
           } catch { /* Notification failure must not undo a saved product. */ }
+          try {
+            const idToken = await user.getIdToken();
+            const response = await fetch("/api/push/new-product", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken }, body: JSON.stringify({ shopId: shop.id, productId: createdProduct.id }) });
+            if (!response.ok) setNotice("Product added successfully. Homepage notice is saved; device push setup needs attention.");
+          } catch { setNotice("Product added successfully. Homepage notice is saved; device push could not be sent right now."); }
         }
       }
       await loadProducts(shop.id); resetProduct(); setNotice(productId ? "Product updated." : "Product added successfully. Customers can see the new-product notice.");
@@ -649,7 +649,7 @@ export default function ShopPage() {
             <label>Selling price (₹)<input required type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} /></label>
             <label>Original price (₹, optional)<input type="number" min="0" step="0.01" value={originalPrice} onChange={e=>setOriginalPrice(e.target.value)} /></label>
             <label><input type="checkbox" checked={productActive} onChange={e=>setProductActive(e.target.checked)} /> Show this product to customers</label>
-            <label>Product photo (auto-compressed to WebP)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProductImage(file);}} /></label>{imageUrl && <div><img src={imageUrl} alt="Product preview" style={{maxWidth:140,maxHeight:100,borderRadius:12}}/><button type="button" className="admin-secondary small" onClick={()=>setImageUrl("")}>Remove photo</button></div>}{imageBusy && <p className="admin-muted">Compressing image…</p>}
+            <label>Product photo (800 × 450 px · WebP · 100 KB se kam)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProductImage(file);}} /></label>{imageUrl && <div><img src={imageUrl} alt="Product preview" style={{maxWidth:140,maxHeight:100,borderRadius:12}}/><button type="button" className="admin-secondary small" onClick={()=>setImageUrl("")}>Remove photo</button></div>}{imageBusy && <p className="admin-muted">Compressing image…</p>}
             <div><button type="submit" className="admin-primary" disabled={busy||imageBusy}>{busy ? "Saving product…" : productId ? "Update product" : "Add product"}</button>{productId && <button type="button" className="admin-secondary" onClick={resetProduct}>Cancel edit</button>}</div>
           </form>
         </section> : <section className="admin-panel"><h2>Approval pending</h2><p>Product management unlocks after Admin approves your shop and changes its status to LIVE.</p></section>)}

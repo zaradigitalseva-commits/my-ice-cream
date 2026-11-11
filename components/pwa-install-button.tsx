@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { registerPushSubscription } from "@/lib/push-client";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -102,6 +105,20 @@ export default function PwaInstallButton() {
     };
   }, []);
 
+  // Re-register this browser's FCM token whenever a signed-in customer opens the app.
+  // This also restores delivery after the customer grants permission and signs in later.
+  useEffect(() => {
+    if (!auth) return;
+    return onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser || typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return;
+      try {
+        await registerPushSubscription(currentUser.uid);
+      } catch {
+        // Product browsing remains available if push setup is incomplete.
+      }
+    });
+  }, []);
+
   const handleInstall = async () => {
     if (!installPrompt) {
       setShowHelp((current) => !current);
@@ -129,7 +146,18 @@ export default function PwaInstallButton() {
       setNotificationPermission(permission);
       if (permission === "granted") {
         setShowNotificationPrompt(false);
-        setNotificationMessage("Notifications की अनुमति मिल गई है।");
+        if (auth?.currentUser) {
+          try {
+            await registerPushSubscription(auth.currentUser.uid);
+            setNotificationMessage("Notifications चालू हो गई हैं। नए products के alerts मिलेंगे।");
+          } catch (error) {
+            setNotificationMessage(error instanceof Error
+              ? "Permission मिल गई, लेकिन registration पूरा नहीं हुआ: " + error.message
+              : "Permission मिल गई, लेकिन notification registration पूरा नहीं हुआ।");
+          }
+        } else {
+          setNotificationMessage("Permission मिल गई है। सभी product alerts पाने के लिए Google sign-in करें।");
+        }
       } else if (permission === "denied") {
         setNotificationMessage("Notifications बंद हैं। इन्हें browser या phone Settings में जाकर चालू करें।");
       } else {
