@@ -107,7 +107,18 @@ export default function HomePage() {
   async function handleAuth() {
     if (!auth) { setMessage("Firebase setup is pending. Please try again later."); return; }
     setBusy(true); setMessage("");
-    try { if (user) await signOut(auth); else await signInWithPopup(auth, googleProvider); }
+    try {
+      if (user) {
+        await signOut(auth);
+      } else {
+        await signInWithPopup(auth, googleProvider);
+        // Use the Google sign-in action to request the browser's native permission prompt.
+        // The browser may still defer the prompt if its permission policy requires another gesture.
+        if ("Notification" in window && Notification.permission === "default") {
+          try { await Notification.requestPermission(); } catch { /* User can enable it in site settings later. */ }
+        }
+      }
+    }
     catch (error) { setMessage(error instanceof Error ? error.message : "Sign-in could not be completed."); }
     finally { setBusy(false); }
   }
