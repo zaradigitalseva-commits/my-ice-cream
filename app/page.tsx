@@ -6,6 +6,7 @@ import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebas
 import { collection, getDocs, query, where, doc, getDoc, orderBy, limit } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
+import { registerPushSubscription } from "@/lib/push-client";
 
 type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };
 type MarketplaceProduct = { id: string; shopId: string; shopName: string; city?: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; createdAt?: { toDate?: () => Date } | Date | string | number };
@@ -111,11 +112,13 @@ export default function HomePage() {
       if (user) {
         await signOut(auth);
       } else {
-        await signInWithPopup(auth, googleProvider);
-        // Use the Google sign-in action to request the browser's native permission prompt.
-        // The browser may still defer the prompt if its permission policy requires another gesture.
+        const credential = await signInWithPopup(auth, googleProvider);
+        // Request the native browser permission from the Google sign-in action.
         if ("Notification" in window && Notification.permission === "default") {
-          try { await Notification.requestPermission(); } catch { /* User can enable it in site settings later. */ }
+          try { await Notification.requestPermission(); } catch { /* User may enable it in browser settings. */ }
+        }
+        if ("Notification" in window && Notification.permission === "granted") {
+          try { await registerPushSubscription(credential.user.uid); } catch { /* Retry on a later signed-in visit. */ }
         }
       }
     }
