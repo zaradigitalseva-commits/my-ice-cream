@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
               },
               data: { url: productUrl, shopId, productId },
               webpush: {
-                headers: { TTL: "86400" },
+                headers: { TTL: "86400", Urgency: "high" },
                 notification: {
                   icon: "/my-ice-cream-app.svg",
                   badge: "/my-ice-cream-app.svg",
