@@ -174,35 +174,12 @@ export default function HomePage() {
           <button onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); handleAuth(); }} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
         </div>
       </details>
-    </header>
-    <section id="discover">
-      {customerNotices.some((notice) => notice.type === "admin") && <div className="official-post-ticker" aria-label="Official MY ICE CREAM announcements"><div className="official-post-ticker-label">📢 OFFICIAL UPDATE</div><div className="official-post-ticker-window"><div className="official-post-ticker-track">{[...customerNotices.filter((notice) => notice.type === "admin"), ...customerNotices.filter((notice) => notice.type === "admin")].map((notice, index) => <span className="official-post-ticker-item" key={notice.id + "-" + index}><strong>{notice.title}</strong>{notice.body ? " — " + notice.body : ""}<b>✦</b></span>)}</div></div></div>}
-      <div className="marketplace-tools"><label className="marketplace-search"><span>Search products</span><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search ice cream, kulfi, cones…" /></label></div>
-
-      {productLoadError && <p className="admin-error" role="alert">{productLoadError}</p>}{loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : marketProducts.filter((product) => {
-        const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
-        return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
-      }).length === 0 ? <div className="empty-panel"><h3>अभी कोई प्रोडक्ट उपलब्ध नहीं है</h3><p>LIVE दुकानों के उपलब्ध प्रोडक्ट यहाँ दिखाई देंगे।</p></div> :
-      <div className="shop-grid marketplace-product-grid">{marketProducts.filter((product) => {
-        const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
-        return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
-      }).map((product) => <article className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
-        <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="marketplace-product-open" aria-label={"Open " + (product.name || "product") + " in its shop"}>
-          {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
-          <div className="shop-card-body marketplace-product-summary"><h3>{product.name || "Ice cream treat"}</h3><strong>₹{Number(product.price || 0).toFixed(2)}</strong><span className="admin-muted">{product.shopName}</span></div>
-        </Link>
-        <div className="shop-card-body" style={{paddingTop:0}}>
-          <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="admin-primary customer-add-button">＋ Add to cart</Link>
-        </div>
-      </article>)}</div>}
-    </section>
     <section className="customer-notifications" aria-label="Customer notifications">
       <div className="customer-notification-launcher">
         <button type="button" className="customer-notification-icon" aria-label="नए प्रोडक्ट और ऑफर की सूचनाएँ खोलें" aria-expanded={showCustomerUpdates} onClick={() => setShowCustomerUpdates((open) => !open)}>
           <span aria-hidden="true">🔔</span>
           {customerNotices.filter((notice) => !hiddenCustomerNoticeIds.includes(notice.id)).length > 0 && <span className="customer-notification-count">{customerNotices.filter((notice) => !hiddenCustomerNoticeIds.includes(notice.id)).length}</span>}
         </button>
-        <span className="customer-notification-label">Updates</span>
       </div>
       {showCustomerUpdates && <div className="customer-notification-drawer">
         <div className="customer-notification-heading">
@@ -227,6 +204,29 @@ export default function HomePage() {
         </div>}
       </div>}
     </section>
+    </header>
+    <section id="discover">
+      {customerNotices.some((notice) => notice.type === "admin") && <div className="official-post-ticker" aria-label="Official MY ICE CREAM announcements"><div className="official-post-ticker-label">📢 OFFICIAL UPDATE</div><div className="official-post-ticker-window"><div className="official-post-ticker-track">{[...customerNotices.filter((notice) => notice.type === "admin"), ...customerNotices.filter((notice) => notice.type === "admin")].map((notice, index) => <span className="official-post-ticker-item" key={notice.id + "-" + index}><strong>{notice.title}</strong>{notice.body ? " — " + notice.body : ""}<b>✦</b></span>)}</div></div></div>}
+      <div className="marketplace-tools"><label className="marketplace-search"><span>Search products</span><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search ice cream, kulfi, cones…" /></label></div>
+
+      {productLoadError && <p className="admin-error" role="alert">{productLoadError}</p>}{loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : marketProducts.filter((product) => {
+        const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
+        return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
+      }).length === 0 ? <div className="empty-panel"><h3>अभी कोई प्रोडक्ट उपलब्ध नहीं है</h3><p>LIVE दुकानों के उपलब्ध प्रोडक्ट यहाँ दिखाई देंगे।</p></div> :
+      <div className="shop-grid marketplace-product-grid">{marketProducts.filter((product) => {
+        const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
+        return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
+      }).map((product) => <article className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
+        <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="marketplace-product-open" aria-label={"Open " + (product.name || "product") + " in its shop"}>
+          {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
+          <div className="shop-card-body marketplace-product-summary"><h3>{product.name || "Ice cream treat"}</h3><strong>₹{Number(product.price || 0).toFixed(2)}</strong><span className="admin-muted">{product.shopName}</span></div>
+        </Link>
+        <div className="shop-card-body" style={{paddingTop:0}}>
+          <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="admin-primary customer-add-button">＋ Add to cart</Link>
+        </div>
+      </article>)}</div>}
+    </section>
+
     <section id="shops" className="bottom-live-shops">
       {showLiveShops && <>
         <label className="marketplace-search"><span>Search all shops</span><input value={shopSearchText} onChange={(e) => setShopSearchText(e.target.value)} placeholder="Enter shop name, city or address" /></label>
