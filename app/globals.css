@@ -535,3 +535,18 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
   .marketplace-3d .topbar .top-actions a,
   .marketplace-3d .topbar .top-actions button{font-size:10px!important}
 }
+
+
+/* Single compact dropdown for every MY ICE CREAM header navigation/action. */
+.marketplace-3d .header-menu-dropdown{position:relative;z-index:50;flex:0 0 auto}
+.marketplace-3d .header-menu-dropdown>summary{list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 15px;border:1px solid #e8c9e8;border-radius:14px;background:#fff;color:#60366f;font-size:14px;font-weight:800;box-shadow:0 3px 0 #e8c9e8}
+.marketplace-3d .header-menu-dropdown>summary::-webkit-details-marker{display:none}
+.marketplace-3d .header-menu-icon{font-size:18px;line-height:1}
+.marketplace-3d .header-menu-panel{position:absolute;right:0;top:calc(100% + 9px);display:grid;gap:2px;min-width:210px;padding:9px;border:1px solid #ecd9ed;border-radius:16px;background:#fff;box-shadow:0 14px 35px #51235b25}
+.marketplace-3d .header-menu-panel a,.marketplace-3d .header-menu-panel button{display:block;width:100%;padding:11px 12px;border:0;border-radius:9px;background:transparent;color:#573365;text-align:left;text-decoration:none;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.marketplace-3d .header-menu-panel a:hover,.marketplace-3d .header-menu-panel button:hover{background:#fff0f7}
+.marketplace-3d .header-menu-panel button:disabled{opacity:.6;cursor:wait}
+@media(max-width:720px){
+ .marketplace-3d .topbar{justify-content:space-between}
+ .marketplace-3d .header-menu-dropdown>summary{padding:9px 12px;font-size:13px}
+}
