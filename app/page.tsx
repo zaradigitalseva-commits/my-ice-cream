@@ -162,6 +162,7 @@ export default function HomePage() {
   return <main className="site-shell marketplace-3d">
     <header className="topbar">
       <Link className="brand brand-3d-logo" href="/" aria-label="MY ICE CREAM home"><img className="brand-logo-image" src={siteLogo || "/my-ice-cream-logo.svg"} alt="MY ICE CREAM" /></Link>
+      <Link className="header-offer-highlight" href="/shop/register" aria-label="Shop offers">✦ OFFER ✦</Link>
       <details className="header-menu-dropdown">
         <summary aria-label="Open website menu"><span className="header-menu-icon">☰</span><span>Menu</span></summary>
         <div className="header-menu-panel">
