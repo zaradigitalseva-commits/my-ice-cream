@@ -418,15 +418,15 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 
 
 
-/* Official admin announcements: colorful 3D scrolling ticker above product search. */
-.official-post-ticker{display:flex;align-items:center;gap:12px;overflow:hidden;margin:0 0 14px;padding:10px 14px;border:1px solid rgba(255,255,255,.75);border-radius:16px;background:linear-gradient(110deg,#fff0a8 0%,#ffd1e8 28%,#c8f4ff 62%,#d9d0ff 100%);box-shadow:0 7px 0 rgba(91,61,145,.12),0 12px 24px rgba(70,55,130,.14);color:#34205f}
-.official-post-ticker-label{position:relative;z-index:1;flex:0 0 auto;padding:7px 10px;border-radius:10px;background:linear-gradient(145deg,#7c3aed,#ec4899);box-shadow:0 4px 0 #6b21a8;color:#fff;font-size:11px;font-weight:900;letter-spacing:.04em}
+/* Simple, compact announcement ticker above product search. */
+.official-post-ticker{display:flex;align-items:center;gap:8px;overflow:hidden;margin:0 0 8px;padding:5px 8px;border:1px solid #e5e7eb;border-radius:5px;background:#fff;color:#374151}
+.official-post-ticker-label{flex:0 0 auto;padding:2px 5px;border-radius:3px;background:#f3f4f6;color:#374151;font-size:10px;font-weight:600;letter-spacing:0}
 .official-post-ticker-window{min-width:0;overflow:hidden;flex:1}
 .official-post-ticker-track{display:flex;width:max-content;align-items:center;animation:official-post-scroll 32s linear infinite}
 .official-post-ticker:hover .official-post-ticker-track{animation-play-state:paused}
-.official-post-ticker-item{display:inline-flex;align-items:center;gap:8px;padding:4px 24px;font-size:14px;font-weight:700;white-space:nowrap;text-shadow:0 1px 0 rgba(255,255,255,.8)}
-.official-post-ticker-item strong{color:#7c2d92;font-weight:950}
-.official-post-ticker-item b{color:#ea580c}
+.official-post-ticker-item{display:inline-flex;align-items:center;gap:6px;padding:2px 16px;font-size:12px;font-weight:500;white-space:nowrap}
+.official-post-ticker-item strong{color:#374151;font-weight:600}
+.official-post-ticker-item b{color:#9ca3af;font-weight:400}
 @keyframes official-post-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .admin-announcement-list{display:grid;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid #e5e7eb}
 .admin-announcement-row{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff}
