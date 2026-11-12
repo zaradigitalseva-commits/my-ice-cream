@@ -140,13 +140,13 @@ export default function HomePage() {
       <details className="header-menu-dropdown">
         <summary aria-label="Open website menu"><span className="header-menu-icon">☰</span><span>Menu</span></summary>
         <div className="header-menu-panel">
-          <a href="#discover">Discover</a>
-          <a href="#shops" onClick={() => setShowLiveShops(true)}>All Shops</a>
-          <a href="#for-shops">For shops</a>
-          <a href="#about">About</a>
-          <Link href="/shop/register">Register your shop</Link>
-          {user && (adminAccount ? <Link href="/admin">Admin Dashboard</Link> : shopOwner ? <Link href="/shop">Shop Dashboard</Link> : <Link href="/customer">My Account</Link>)}
-          <button onClick={handleAuth} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
+          <a href="#discover" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Discover</a>
+          <a href="#shops" onClick={(event) => { setShowLiveShops(true); event.currentTarget.closest("details")?.removeAttribute("open"); }}>All Shops</a>
+          <a href="#for-shops" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>For shops</a>
+          <a href="#about" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>About</a>
+          <Link href="/shop/register" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Register your shop</Link>
+          {user && (adminAccount ? <Link href="/admin" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Admin Dashboard</Link> : shopOwner ? <Link href="/shop" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Shop Dashboard</Link> : <Link href="/customer" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>My Account</Link>)}
+          <button onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); handleAuth(); }} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
         </div>
       </details>
     </header>
