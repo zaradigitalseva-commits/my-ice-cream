@@ -137,13 +137,18 @@ export default function HomePage() {
   return <main className="site-shell marketplace-3d">
     <header className="topbar">
       <Link className="brand brand-3d-logo" href="/" aria-label="MY ICE CREAM home"><img className="brand-logo-image" src={siteLogo || "/my-ice-cream-logo.svg"} alt="MY ICE CREAM" /></Link>
-      <nav className="navlinks" aria-label="Main navigation"><a href="#discover">Discover</a><a href="#shops">For shops</a><a href="#about">About</a></nav>
-      <div className="top-actions">
-        <Link href="#shops" className="primary-button all-shops-header-button" onClick={() => setShowLiveShops(true)}>All Shop</Link>
-        <Link href="/shop/register" className="primary-button">Register your shop</Link>
-        {user && (adminAccount ? <Link className="account-link" href="/admin">Admin Dashboard</Link> : shopOwner ? <Link className="account-link" href="/shop">Shop Dashboard</Link> : <Link className="account-link" href="/customer">My Account</Link>)}
-        <button className="login-button" onClick={handleAuth} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
-      </div>
+      <details className="header-menu-dropdown">
+        <summary aria-label="Open website menu"><span className="header-menu-icon">☰</span><span>Menu</span></summary>
+        <div className="header-menu-panel">
+          <a href="#discover">Discover</a>
+          <a href="#shops" onClick={() => setShowLiveShops(true)}>All Shops</a>
+          <a href="#for-shops">For shops</a>
+          <a href="#about">About</a>
+          <Link href="/shop/register">Register your shop</Link>
+          {user && (adminAccount ? <Link href="/admin">Admin Dashboard</Link> : shopOwner ? <Link href="/shop">Shop Dashboard</Link> : <Link href="/customer">My Account</Link>)}
+          <button onClick={handleAuth} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
+        </div>
+      </details>
     </header>
     <section id="discover">
       {customerNotices.some((notice) => notice.type === "admin") && <div className="official-post-ticker" aria-label="Official MY ICE CREAM announcements"><div className="official-post-ticker-label">📢 OFFICIAL UPDATE</div><div className="official-post-ticker-window"><div className="official-post-ticker-track">{[...customerNotices.filter((notice) => notice.type === "admin"), ...customerNotices.filter((notice) => notice.type === "admin")].map((notice, index) => <span className="official-post-ticker-item" key={notice.id + "-" + index}><strong>{notice.title}</strong>{notice.body ? " — " + notice.body : ""}<b>✦</b></span>)}</div></div></div>}
