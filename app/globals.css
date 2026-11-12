@@ -812,3 +812,38 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .marketplace-3d #discover .official-post-ticker{margin-bottom:2px!important}
 .marketplace-3d #discover .marketplace-tools{margin-top:0!important}
 .marketplace-3d #discover .marketplace-search{gap:0!important}
+
+
+/* Animated LED border and bold text for the homepage search box. */
+@property --ice-search-led-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes iceSearchLedTravel {
+  to { --ice-search-led-angle: 360deg; }
+}
+.marketplace-3d #discover .marketplace-search input {
+  border: 2px solid transparent !important;
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    conic-gradient(from var(--ice-search-led-angle), #ff4fa3 0deg, #ffd84d 75deg, #52e8ff 150deg, #a66bff 225deg, #ff4fa3 300deg, #ff4fa3 360deg) border-box !important;
+  font-weight: 800 !important;
+  color: #44234f !important;
+  animation: iceSearchLedTravel 3.2s linear infinite;
+  box-shadow: 0 0 7px #ff55b855, 0 0 15px #54dfff35 !important;
+}
+.marketplace-3d #discover .marketplace-search input::placeholder {
+  font-weight: 700;
+  color: #8b7890;
+  opacity: 1;
+}
+.marketplace-3d #discover .marketplace-search input:focus {
+  outline: none;
+  box-shadow: 0 0 9px #ff55b8a0, 0 0 20px #54dffff0 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marketplace-3d #discover .marketplace-search input {
+    animation: none;
+  }
+}
