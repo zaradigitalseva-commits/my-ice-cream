@@ -900,3 +900,67 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 @media (prefers-reduced-motion:reduce) {
   .marketplace-3d .topbar>.header-offer-highlight { animation:none; }
 }
+
+
+/* Refined offer link: clean premium pill instead of a flashing banner. */
+.marketplace-3d .topbar>.header-offer-highlight {
+  position:relative;
+  flex:0 1 112px;
+  min-width:72px;
+  max-width:132px;
+  min-height:34px;
+  margin:0 8px;
+  padding:7px 12px;
+  overflow:hidden;
+  border:1px solid #efc7df;
+  border-radius:999px;
+  background:linear-gradient(135deg,#fff8df 0%,#ffe6f1 52%,#eee8ff 100%);
+  color:#8b347b;
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:1px;
+  line-height:1;
+  text-shadow:0 1px 0 #fff;
+  box-shadow:0 2px 0 #e8c5df,0 5px 12px #8d4e8c18;
+  animation:none!important;
+  transition:transform .2s ease,box-shadow .2s ease,filter .2s ease;
+}
+.marketplace-3d .topbar>.header-offer-highlight::after {
+  content:"";
+  position:absolute;
+  top:-40%;
+  left:-65%;
+  width:38%;
+  height:180%;
+  transform:rotate(22deg);
+  background:linear-gradient(90deg,transparent,#ffffffb8,transparent);
+  animation:offerSoftShine 4.8s ease-in-out infinite;
+  pointer-events:none;
+}
+.marketplace-3d .topbar>.header-offer-highlight:hover {
+  transform:translateY(-1px);
+  box-shadow:0 3px 0 #e8c5df,0 8px 16px #8d4e8c25;
+  filter:saturate(1.08);
+}
+@keyframes offerSoftShine {
+  0%,55% { left:-65%; }
+  100% { left:135%; }
+}
+@media(max-width:720px) {
+  .marketplace-3d .topbar>.header-offer-highlight {
+    flex:1 1 0!important;
+    width:auto!important;
+    max-width:108px!important;
+    min-width:0!important;
+    min-height:31px;
+    margin:0 3px!important;
+    padding:6px 5px!important;
+    border-radius:999px;
+    font-size:10px!important;
+    letter-spacing:.65px;
+    white-space:nowrap;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  .marketplace-3d .topbar>.header-offer-highlight::after { animation:none; }
+}
