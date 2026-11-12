@@ -207,7 +207,7 @@ export default function HomePage() {
     </header>
     <section id="discover">
       {customerNotices.some((notice) => notice.type === "admin") && <div className="official-post-ticker" aria-label="Official MY ICE CREAM announcements"><div className="official-post-ticker-label">🆕 NEW UPDATE</div><div className="official-post-ticker-window"><div className="official-post-ticker-track">{[...customerNotices.filter((notice) => notice.type === "admin"), ...customerNotices.filter((notice) => notice.type === "admin")].map((notice, index) => <span className="official-post-ticker-item" key={notice.id + "-" + index}><strong>{notice.title}</strong>{notice.body ? " — " + notice.body : ""}<b>✦</b></span>)}</div></div></div>}
-      <div className="marketplace-tools"><label className="marketplace-search"><span>Search products</span><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search ice cream, kulfi, cones…" /></label></div>
+      <div className="marketplace-tools"><label className="marketplace-search"><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search ice cream, kulfi, cones…" /></label></div>
 
       {productLoadError && <p className="admin-error" role="alert">{productLoadError}</p>}{loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : marketProducts.filter((product) => {
         const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
