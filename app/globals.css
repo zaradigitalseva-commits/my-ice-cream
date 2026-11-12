@@ -787,3 +787,22 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
     right:0!important;
   }
 }
+
+/* Sticky, colorful MY ICE CREAM marketplace header. */
+.marketplace-3d{overflow:clip!important}
+.marketplace-3d .topbar{
+  position:sticky!important;
+  top:0!important;
+  z-index:1000!important;
+  isolation:isolate;
+  background:linear-gradient(100deg,#ffe0ed 0%,#fff0c9 35%,#e5e0ff 68%,#dff7ff 100%)!important;
+  border-bottom:1px solid #edcfe9!important;
+  border-radius:0 0 16px 16px;
+  box-shadow:0 5px 18px #6e47751c;
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+}
+.marketplace-3d .topbar>.brand-3d-logo,
+.marketplace-3d .topbar>.customer-notifications,
+.marketplace-3d .topbar>.header-menu-dropdown{position:relative;z-index:1}
+
