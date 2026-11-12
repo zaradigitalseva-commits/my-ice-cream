@@ -711,55 +711,79 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 }
 
 
-/* Mobile header: half-width logo, then notification and icon-only menu. */
+/* Mobile header: large half-width logo, notification icon, and menu icon only. */
 @media(max-width:720px){
   .marketplace-3d .topbar{
     display:flex!important;
     align-items:center!important;
     justify-content:space-between!important;
-    gap:8px!important;
-    min-height:72px!important;
+    gap:7px!important;
+    min-height:76px!important;
     height:auto!important;
+    padding:6px 0!important;
   }
-  .marketplace-3d .topbar .brand-3d-logo{
+  .marketplace-3d .topbar>.brand-3d-logo{
     order:1!important;
-    flex:0 0 50%!important;
-    width:50%!important;
-    max-width:50%!important;
+    display:flex!important;
+    flex:0 0 52%!important;
+    width:52%!important;
+    max-width:52%!important;
     min-width:0!important;
+    height:auto!important;
+    margin:0!important;
+    padding:0!important;
+    visibility:visible!important;
+    opacity:1!important;
+    filter:none!important;
   }
-  .marketplace-3d .topbar .brand-logo-image{
+  .marketplace-3d .topbar>.brand-3d-logo .brand-logo-image{
     display:block!important;
     width:100%!important;
     max-width:100%!important;
-    max-height:58px!important;
     height:auto!important;
+    max-height:none!important;
     object-fit:contain!important;
     object-position:left center!important;
   }
-  .marketplace-3d .topbar .customer-notifications{
+  .marketplace-3d .topbar>.customer-notifications{
     order:2!important;
-    flex:0 0 auto!important;
-    margin-left:auto!important;
+    display:flex!important;
+    flex:0 0 36px!important;
+    width:36px!important;
+    min-width:36px!important;
+    margin:0 0 0 auto!important;
+    padding:0!important;
+    position:relative!important;
+    right:auto!important;
+    bottom:auto!important;
   }
-  .marketplace-3d .topbar .header-menu-dropdown{
+  .marketplace-3d .topbar>.header-menu-dropdown{
     order:3!important;
-    flex:0 0 auto!important;
+    display:block!important;
+    flex:0 0 36px!important;
+    width:36px!important;
+    min-width:36px!important;
+    margin:0!important;
   }
   .marketplace-3d .topbar .customer-notification-icon,
   .marketplace-3d .topbar .header-menu-dropdown>summary{
     display:grid!important;
     place-items:center!important;
-    width:38px!important;
-    min-width:38px!important;
-    height:38px!important;
+    width:36px!important;
+    min-width:36px!important;
+    height:36px!important;
     padding:0!important;
-    border-radius:10px!important;
+    margin:0!important;
+    border:0!important;
+    border-radius:8px!important;
+    box-shadow:none!important;
   }
   .marketplace-3d .topbar .header-menu-dropdown>summary>span:nth-child(2){
     display:none!important;
   }
-  .marketplace-3d .topbar .header-menu-icon{
-    font-size:20px!important;
+  .marketplace-3d .topbar .header-menu-icon{font-size:19px!important}
+  .marketplace-3d .topbar .customer-notification-drawer{
+    top:calc(100% + 10px)!important;
+    right:0!important;
   }
 }
