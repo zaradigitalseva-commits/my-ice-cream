@@ -680,3 +680,32 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
  .marketplace-3d .customer-notification-item{padding:10px}
 }
 @media(prefers-reduced-motion:reduce){.marketplace-3d .customer-notification-icon,.marketplace-3d .customer-notification-drawer{animation:none;transition:none}}
+
+
+/* Place the colorful customer notification bell in the header beside Menu. */
+.marketplace-3d .topbar{position:relative;display:flex;align-items:center;gap:12px}
+.marketplace-3d .topbar .customer-notifications{
+  position:relative!important;right:auto!important;bottom:auto!important;z-index:110;
+  display:flex;align-items:center;margin:0!important;padding:0!important;
+}
+.marketplace-3d .topbar .customer-notification-launcher{display:flex;align-items:center;justify-content:center}
+.marketplace-3d .topbar .customer-notification-icon{
+  width:48px;height:48px;border:1px solid #f3a8d0;border-radius:16px;
+  background:linear-gradient(145deg,#ffcf5c 0%,#ff8ac5 48%,#8edcff 100%);
+  color:#fff;font-size:24px;text-shadow:0 2px 4px #7b287966;
+  box-shadow:0 4px 0 #d66aa8,0 8px 18px #a34e9b35;
+}
+.marketplace-3d .topbar .customer-notification-icon:hover{
+  transform:translateY(-2px) rotate(-4deg);box-shadow:0 6px 0 #d66aa8,0 12px 22px #a34e9b40;
+}
+.marketplace-3d .topbar .customer-notification-count{
+  top:-7px;right:-7px;background:linear-gradient(135deg,#ff315e,#b026d3);
+}
+.marketplace-3d .topbar .customer-notification-drawer{
+  top:calc(100% + 12px);bottom:auto;right:0;z-index:130;
+}
+@media(max-width:720px){
+  .marketplace-3d .topbar{gap:8px!important}
+  .marketplace-3d .topbar .customer-notification-icon{width:42px;height:42px;border-radius:14px;font-size:21px}
+  .marketplace-3d .topbar .customer-notification-drawer{top:calc(100% + 10px);right:0}
+}
