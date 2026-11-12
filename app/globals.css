@@ -603,3 +603,33 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
   .marketplace-3d .header-menu-dropdown>summary,.marketplace-3d .header-menu-panel a,.marketplace-3d .header-menu-panel button{transition:none}
   .marketplace-3d .header-menu-dropdown[open] .header-menu-panel{animation:none}
 }
+
+
+/* Make menu choices feel like a polished vertical navigation list. */
+.marketplace-3d .header-menu-panel{counter-reset:header-menu-row;gap:5px;padding:11px}
+.marketplace-3d .header-menu-panel a,
+.marketplace-3d .header-menu-panel button{
+  position:relative;display:flex;align-items:center;gap:11px;
+  min-height:47px;padding:10px 12px;border:1px solid transparent;border-radius:12px;
+  background:rgba(255,255,255,.72);box-shadow:0 1px 4px rgba(91,48,100,.035);
+  counter-increment:header-menu-row;
+}
+.marketplace-3d .header-menu-panel a::before,
+.marketplace-3d .header-menu-panel button::before{
+  content:counter(header-menu-row,decimal-leading-zero);
+  flex:0 0 27px;width:27px;height:27px;display:grid;place-items:center;
+  border-radius:9px;background:linear-gradient(145deg,#ffe3f1,#e9e8ff);
+  color:#a04c91;font-size:10px;font-weight:900;letter-spacing:.02em;
+}
+.marketplace-3d .header-menu-panel a:hover,
+.marketplace-3d .header-menu-panel button:hover{
+  border-color:#f2d5e9;background:linear-gradient(100deg,#fff0f7,#f0f8ff);
+  box-shadow:0 5px 13px rgba(137,75,137,.10);transform:translateX(2px);
+}
+.marketplace-3d .header-menu-panel a:active,
+.marketplace-3d .header-menu-panel button:active{transform:scale(.985)}
+.marketplace-3d .header-menu-panel a+ a,
+.marketplace-3d .header-menu-panel a+button{border-top:1px solid transparent}
+@media(prefers-reduced-motion:reduce){
+ .marketplace-3d .header-menu-panel a,.marketplace-3d .header-menu-panel button{transition:none}
+}
