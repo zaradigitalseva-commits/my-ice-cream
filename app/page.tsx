@@ -20,6 +20,8 @@ export default function HomePage() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [marketProducts, setMarketProducts] = useState<MarketplaceProduct[]>([]);
   const [customerNotices, setCustomerNotices] = useState<CustomerNotice[]>([]);
+  const [showCustomerUpdates, setShowCustomerUpdates] = useState(false);
+  const [hiddenCustomerNoticeIds, setHiddenCustomerNoticeIds] = useState<string[]>([]);
   const [productLoadError, setProductLoadError] = useState("");
   const [loadingShops, setLoadingShops] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -105,6 +107,29 @@ export default function HomePage() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("my-ice-cream-hidden-notices");
+      if (saved) setHiddenCustomerNoticeIds(JSON.parse(saved) as string[]);
+    } catch { /* Ignore unavailable or invalid local notification preferences. */ }
+  }, []);
+
+  function hideCustomerNotice(noticeId: string) {
+    setHiddenCustomerNoticeIds((current) => {
+      const next = current.includes(noticeId) ? current : [...current, noticeId];
+      try { window.localStorage.setItem("my-ice-cream-hidden-notices", JSON.stringify(next)); } catch { /* Keep the current screen usable if storage is unavailable. */ }
+      return next;
+    });
+  }
+
+  function clearVisibleCustomerNotices() {
+    setHiddenCustomerNoticeIds((current) => {
+      const next = [...new Set([...current, ...customerNotices.map((notice) => notice.id)])];
+      try { window.localStorage.setItem("my-ice-cream-hidden-notices", JSON.stringify(next)); } catch { /* Keep the current screen usable if storage is unavailable. */ }
+      return next;
+    });
+  }
+
   async function handleAuth() {
     if (!auth) { setMessage("Firebase setup is pending. Please try again later."); return; }
     setBusy(true); setMessage("");
@@ -171,20 +196,35 @@ export default function HomePage() {
         </div>
       </article>)}</div>}
     </section>
-    <section className="customer-notifications" aria-label="Latest shop updates" style={{margin:"22px 0",padding:"18px",borderRadius:18,background:"#fff7ed",border:"1px solid #fed7aa"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-        <div><p className="eyebrow" style={{marginBottom:4}}>CUSTOMER UPDATES</p><h2 style={{margin:0}}>🔔 नए प्रोडक्ट और ऑफर</h2></div>
-        <span className="pill">{customerNotices.length} नई सूचनाएँ</span>
+    <section className="customer-notifications" aria-label="Customer notifications">
+      <div className="customer-notification-launcher">
+        <button type="button" className="customer-notification-icon" aria-label="नए प्रोडक्ट और ऑफर की सूचनाएँ खोलें" aria-expanded={showCustomerUpdates} onClick={() => setShowCustomerUpdates((open) => !open)}>
+          <span aria-hidden="true">🔔</span>
+          {customerNotices.filter((notice) => !hiddenCustomerNoticeIds.includes(notice.id)).length > 0 && <span className="customer-notification-count">{customerNotices.filter((notice) => !hiddenCustomerNoticeIds.includes(notice.id)).length}</span>}
+        </button>
+        <span className="customer-notification-label">Updates</span>
       </div>
-      {customerNotices.length === 0 ? <p className="admin-muted">नई दुकान सूचना यहाँ दिखाई देगी।</p> : <div style={{display:"grid",gap:10,marginTop:14}}>
-        {customerNotices.map((notice) => <article key={notice.id} style={{padding:12,borderRadius:12,background:"#fff",border:"1px solid #ffedd5"}}>
-          <strong>{notice.type === "admin" ? "📢 " : notice.type === "offer" ? "🎉 " : "🍦 "}{notice.title || "दुकान की नई सूचना"}</strong>
-          <p style={{margin:"5px 0"}}>{notice.body || ""}</p>
-          <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-            <small className="admin-muted">{notice.type === "admin" ? "MY ICE CREAM · Official Update" : notice.shopName || "MY ICE CREAM Shop"}{notice.createdAt?.toDate ? " · " + notice.createdAt.toDate().toLocaleString("hi-IN") : ""}</small>
-            {notice.shopId && <Link className="account-link" href={notice.productId ? "/shop/" + notice.shopId + "?product=" + encodeURIComponent(notice.productId) : "/shop/" + notice.shopId}>देखें</Link>}
+      {showCustomerUpdates && <div className="customer-notification-drawer">
+        <div className="customer-notification-heading">
+          <div><p className="eyebrow" style={{marginBottom:4}}>CUSTOMER UPDATES</p><h2 style={{margin:0}}>नए प्रोडक्ट और ऑफर</h2></div>
+          <div className="customer-notification-actions">
+            {customerNotices.some((notice) => !hiddenCustomerNoticeIds.includes(notice.id)) && <button type="button" onClick={clearVisibleCustomerNotices}>सभी हटाएँ</button>}
+            <button type="button" aria-label="सूचनाएँ बंद करें" onClick={() => setShowCustomerUpdates(false)}>✕</button>
           </div>
-        </article>)}
+        </div>
+        {customerNotices.filter((notice) => !hiddenCustomerNoticeIds.includes(notice.id)).length === 0 ? <p className="admin-muted">अभी कोई नई सूचना नहीं है।</p> : <div className="customer-notification-list">
+          {customerNotices.filter((notice) => !hiddenCustomerNoticeIds.includes(notice.id)).map((notice) => <article key={notice.id} className="customer-notification-item">
+            <div className="customer-notification-item-top">
+              <strong>{notice.type === "admin" ? "📢 " : notice.type === "offer" ? "🎉 " : "🍦 "}{notice.title || "दुकान की नई सूचना"}</strong>
+              <button type="button" className="customer-notification-delete" aria-label="यह सूचना हटाएँ" title="यह सूचना हटाएँ" onClick={() => hideCustomerNotice(notice.id)}>×</button>
+            </div>
+            <p>{notice.body || ""}</p>
+            <div className="customer-notification-meta">
+              <small className="admin-muted">{notice.type === "admin" ? "MY ICE CREAM · Official Update" : notice.shopName || "MY ICE CREAM Shop"}{notice.createdAt?.toDate ? " · " + notice.createdAt.toDate().toLocaleString("hi-IN") : ""}</small>
+              {notice.shopId && <Link className="account-link" href={notice.productId ? "/shop/" + notice.shopId + "?product=" + encodeURIComponent(notice.productId) : "/shop/" + notice.shopId}>देखें</Link>}
+            </div>
+          </article>)}
+        </div>}
       </div>}
     </section>
     <section id="shops" className="bottom-live-shops">
