@@ -847,3 +847,56 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
     animation: none;
   }
 }
+
+
+/* Colorful blinking OFFER label in the free space beside the logo. */
+.marketplace-3d .topbar>.header-offer-highlight {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:1 1 auto;
+  min-width:0;
+  padding:6px 4px;
+  margin:0 5px;
+  border:0;
+  border-radius:9px;
+  background:linear-gradient(100deg,#fff0a8,#ffd6ec,#d8f6ff,#e6dcff);
+  background-size:220% 220%;
+  color:#d51c79;
+  font-size:clamp(11px,1.5vw,16px);
+  line-height:1.1;
+  font-weight:900;
+  letter-spacing:.06em;
+  text-align:center;
+  white-space:nowrap;
+  text-decoration:none;
+  animation:iceOfferBlink 1s steps(2,end) infinite,iceOfferColor 3s ease-in-out infinite;
+}
+@keyframes iceOfferBlink {
+  50% { opacity:.38; }
+}
+@keyframes iceOfferColor {
+  0%,100% { color:#d51c79; }
+  33% { color:#7b35d5; }
+  66% { color:#087f9c; }
+}
+@media (max-width:720px) {
+  .marketplace-3d .topbar>.brand-3d-logo {
+    flex:0 0 52%!important;
+    width:52%!important;
+    max-width:52%!important;
+  }
+  .marketplace-3d .topbar>.header-offer-highlight {
+    order:2!important;
+    flex:1 1 0!important;
+    min-width:0!important;
+    margin:0 3px!important;
+    padding:6px 1px!important;
+    font-size:11px!important;
+  }
+  .marketplace-3d .topbar>.customer-notifications { order:3!important; }
+  .marketplace-3d .topbar>.header-menu-dropdown { order:4!important; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .marketplace-3d .topbar>.header-offer-highlight { animation:none; }
+}
