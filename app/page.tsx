@@ -134,7 +134,7 @@ export default function HomePage() {
   }
 
   function shareSiteOnWhatsApp() {
-    const digits = sharePhone.replace(/\\D/g, "");
+    const digits = sharePhone.replace(/\D/g, "");
     const normalized = digits.length === 10 ? "91" + digits : digits.length === 12 && digits.startsWith("91") ? digits : "";
     if (!normalized) { setShareError("10 अंकों का मोबाइल नंबर डालें।"); return; }
     const message = "MY ICE CREAM वेबसाइट देखें: " + window.location.origin;
