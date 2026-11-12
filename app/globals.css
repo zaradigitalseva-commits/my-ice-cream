@@ -1024,3 +1024,50 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
   .marketplace-3d .topbar>.header-menu-dropdown{order:4!important}
   .share-site-dialog{padding:26px 20px 20px}
 }
+
+
+/* Final compact mobile header: keep the logo, share icon, bell and menu on one row. */
+@media(max-width:720px){
+  .marketplace-3d .topbar{
+    flex-wrap:nowrap!important;
+    gap:6px!important;
+    min-height:66px!important;
+    padding:5px 0!important;
+  }
+  .marketplace-3d .topbar>.brand-3d-logo{
+    flex:0 1 52%!important;
+    width:52%!important;
+    max-width:52%!important;
+    min-width:0!important;
+  }
+  .marketplace-3d .topbar>.header-share-site{
+    order:2!important;
+    display:grid!important;
+    place-items:center!important;
+    flex:0 0 34px!important;
+    width:34px!important;
+    min-width:34px!important;
+    max-width:34px!important;
+    height:34px!important;
+    min-height:34px!important;
+    margin:0!important;
+    padding:0!important;
+    border-radius:10px!important;
+    font-size:18px!important;
+    line-height:1!important;
+  }
+  .marketplace-3d .topbar>.header-share-site span{display:none!important}
+  .marketplace-3d .topbar>.customer-notifications{
+    order:3!important;
+    flex:0 0 36px!important;
+    width:36px!important;
+    min-width:36px!important;
+    margin:0 0 0 auto!important;
+  }
+  .marketplace-3d .topbar>.header-menu-dropdown{
+    order:4!important;
+    flex:0 0 36px!important;
+    width:36px!important;
+    min-width:36px!important;
+  }
+}
