@@ -490,3 +490,48 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
   .marketplace-3d .topbar .top-actions button{font-size:12px!important}
   .marketplace-3d .customer-add-button{font-size:11px!important}
 }
+
+
+/* Keep the MY ICE CREAM logo visible on narrow mobile screens. */
+@media(max-width:720px){
+  .marketplace-3d .topbar{
+    height:auto!important;
+    min-height:70px;
+    gap:8px!important;
+    padding:8px 0;
+  }
+  .marketplace-3d .topbar .brand-3d-logo{
+    display:flex!important;
+    flex:0 0 auto!important;
+    width:clamp(104px,32vw,150px)!important;
+    max-width:clamp(104px,32vw,150px)!important;
+    min-width:104px;
+    visibility:visible!important;
+    opacity:1!important;
+  }
+  .marketplace-3d .topbar .brand-logo-image{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    height:auto!important;
+    max-height:44px!important;
+    object-fit:contain!important;
+  }
+  .marketplace-3d .topbar .top-actions{
+    display:flex!important;
+    flex:1 1 0!important;
+    min-width:0;
+    flex-wrap:wrap!important;
+    justify-content:flex-end;
+    gap:4px 8px!important;
+  }
+}
+@media(max-width:380px){
+  .marketplace-3d .topbar .brand-3d-logo{
+    width:104px!important;
+    max-width:104px!important;
+    min-width:104px;
+  }
+  .marketplace-3d .topbar .top-actions a,
+  .marketplace-3d .topbar .top-actions button{font-size:10px!important}
+}
