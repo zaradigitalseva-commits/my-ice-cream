@@ -806,3 +806,9 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .marketplace-3d .topbar>.customer-notifications,
 .marketplace-3d .topbar>.header-menu-dropdown{position:relative;z-index:1}
 
+
+
+/* Bring the product search closer to the announcement ticker. */
+.marketplace-3d #discover .official-post-ticker{margin-bottom:2px!important}
+.marketplace-3d #discover .marketplace-tools{margin-top:0!important}
+.marketplace-3d #discover .marketplace-search{gap:0!important}
