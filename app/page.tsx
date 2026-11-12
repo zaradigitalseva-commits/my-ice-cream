@@ -31,6 +31,9 @@ export default function HomePage() {
   const [showLiveShops, setShowLiveShops] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All treats");
   const [siteLogo, setSiteLogo] = useState("");
+  const [showShareSite, setShowShareSite] = useState(false);
+  const [sharePhone, setSharePhone] = useState("");
+  const [shareError, setShareError] = useState("");
 
   useEffect(() => {
     if (!auth) return;
@@ -130,6 +133,17 @@ export default function HomePage() {
     });
   }
 
+  function shareSiteOnWhatsApp() {
+    const digits = sharePhone.replace(/\\D/g, "");
+    const normalized = digits.length === 10 ? "91" + digits : digits.length === 12 && digits.startsWith("91") ? digits : "";
+    if (!normalized) { setShareError("10 अंकों का मोबाइल नंबर डालें।"); return; }
+    const message = "MY ICE CREAM वेबसाइट देखें: " + window.location.origin;
+    window.open("https://wa.me/" + normalized + "?text=" + encodeURIComponent(message), "_blank", "noopener,noreferrer");
+    setShowShareSite(false);
+    setShareError("");
+    setSharePhone("");
+  }
+
   async function handleAuth() {
     if (!auth) { setMessage("Firebase setup is pending. Please try again later."); return; }
     setBusy(true); setMessage("");
@@ -162,7 +176,7 @@ export default function HomePage() {
   return <main className="site-shell marketplace-3d">
     <header className="topbar">
       <Link className="brand brand-3d-logo" href="/" aria-label="MY ICE CREAM home"><img className="brand-logo-image" src={siteLogo || "/my-ice-cream-logo.svg"} alt="MY ICE CREAM" /></Link>
-      <Link className="header-offer-highlight" href="/shop/register" aria-label="Shop offers">✦ OFFER ✦</Link>
+      <button type="button" className="header-share-site" onClick={() => { setShowShareSite(true); setShareError(""); }} aria-label="Share MY ICE CREAM website">↗ <span>SHARE SITE</span></button>
       <details className="header-menu-dropdown">
         <summary aria-label="Open website menu"><span className="header-menu-icon">☰</span><span>Menu</span></summary>
         <div className="header-menu-panel">
