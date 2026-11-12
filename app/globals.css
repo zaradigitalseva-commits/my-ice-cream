@@ -433,3 +433,60 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .admin-announcement-row p{margin:5px 0}.admin-announcement-row small{display:block}
 @media(max-width:600px){.official-post-ticker{gap:8px;padding:8px}.official-post-ticker-label{font-size:9px;padding:6px 7px}.official-post-ticker-item{font-size:12px;padding:4px 16px}.admin-announcement-row{flex-direction:column}.admin-announcement-row button{align-self:flex-end}}
 @media(prefers-reduced-motion:reduce){.official-post-ticker-track{animation:none}}
+
+
+/* Plain, text-link style for homepage navigation and customer actions.
+   Keeps all existing links and button handlers intact. */
+.marketplace-3d .navlinks{gap:22px;color:#71417e}
+.marketplace-3d .navlinks a,
+.marketplace-3d .top-actions a,
+.marketplace-3d .top-actions button,
+.marketplace-3d .primary-button,
+.marketplace-3d .login-button,
+.marketplace-3d .marketplace-tools .pill,
+.marketplace-3d .customer-add-button,
+.marketplace-3d .live-shops-toggle,
+.marketplace-3d .shop-onboarding a,
+.marketplace-3d .marketplace-product-grid button{
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  background-image:none!important;
+  box-shadow:none!important;
+  text-shadow:none!important;
+  filter:none!important;
+  transform:none!important;
+  color:#71417e!important;
+  font:inherit;
+  font-size:14px;
+  font-weight:600;
+  text-decoration:none;
+  padding:4px 0!important;
+  min-height:0;
+}
+.marketplace-3d .navlinks a:hover,
+.marketplace-3d .top-actions a:hover,
+.marketplace-3d .top-actions button:hover,
+.marketplace-3d .primary-button:hover,
+.marketplace-3d .login-button:hover,
+.marketplace-3d .shop-onboarding a:hover,
+.marketplace-3d .marketplace-product-grid button:hover{
+  color:#c34b88!important;
+  text-decoration:underline;
+}
+.marketplace-3d .marketplace-tools .pill{padding:5px 9px!important}
+.marketplace-3d .marketplace-tools .pill.active{background:transparent!important;color:#c34b88!important;text-decoration:underline}
+.marketplace-3d .customer-add-button{display:inline-flex!important;align-items:center;justify-content:flex-start;width:auto!important;margin-top:8px!important;color:#71417e!important}
+.marketplace-3d .live-shops-toggle{width:auto;max-width:none;margin:0 auto 18px;padding:4px 0!important}
+.marketplace-3d .live-shops-toggle-count,
+.marketplace-3d .live-shops-toggle-arrow{background:transparent!important;color:inherit!important;border:0!important;padding:0!important}
+.marketplace-3d .topbar .top-actions .primary-button,
+.marketplace-3d .topbar .top-actions .login-button{padding:4px 0!important;font-size:14px!important}
+.marketplace-3d .brand-3d-logo{filter:none!important}
+@media(max-width:720px){
+  .marketplace-3d .navlinks{display:none}
+  .marketplace-3d .topbar .top-actions{gap:12px!important}
+  .marketplace-3d .topbar .top-actions a,
+  .marketplace-3d .topbar .top-actions button{font-size:12px!important}
+  .marketplace-3d .customer-add-button{font-size:11px!important}
+}
