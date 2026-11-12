@@ -964,3 +964,63 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 @media(prefers-reduced-motion:reduce) {
   .marketplace-3d .topbar>.header-offer-highlight::after { animation:none; }
 }
+
+
+/* Header share-site action and WhatsApp recipient dialog. */
+.marketplace-3d .topbar>.header-share-site{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  flex:0 1 auto;min-width:max-content;margin:0 8px;padding:9px 13px;
+  border:1px solid #c9e9d6;border-radius:999px;
+  background:linear-gradient(135deg,#e9fff1,#d9f7e5);
+  color:#147b45;font-size:12px;font-weight:900;letter-spacing:.45px;
+  box-shadow:0 2px 0 #b6dfc5,0 5px 12px #278b5520;
+  cursor:pointer;white-space:nowrap;transition:transform .18s ease,box-shadow .18s ease;
+}
+.marketplace-3d .topbar>.header-share-site:hover{transform:translateY(-1px);box-shadow:0 3px 0 #b6dfc5,0 8px 15px #278b5528}
+.share-site-backdrop{
+  position:fixed;inset:0;z-index:3000;display:grid;place-items:center;
+  padding:18px;background:#24152f80;backdrop-filter:blur(5px);
+}
+.share-site-dialog{
+  position:relative;width:min(100%,390px);padding:28px 24px 22px;
+  border:1px solid #f0d9e9;border-radius:25px;
+  background:linear-gradient(145deg,#fff,#fff8fc 60%,#f2fff6);
+  box-shadow:0 22px 70px #24152f45;color:#4d2862;
+}
+.share-site-close{
+  position:absolute;top:12px;right:14px;width:32px;height:32px;border:0;
+  border-radius:50%;background:#f6eaf2;color:#74436c;font-size:22px;cursor:pointer;
+}
+.share-site-whatsapp{
+  display:grid;place-items:center;width:48px;height:48px;margin-bottom:12px;
+  border-radius:16px;background:linear-gradient(145deg,#d8ffe6,#a9edc3);
+  color:#12834b;font-size:25px;box-shadow:0 4px 0 #a8dabe;
+}
+.share-site-dialog h2{margin:0 0 8px;font-size:21px;font-weight:900}
+.share-site-dialog>p{margin:0 0 17px;color:#79677c;font-size:13px;line-height:1.55}
+.share-site-dialog label{display:block;margin-bottom:7px;font-size:12px;font-weight:800;color:#63416b}
+.share-site-dialog input{
+  display:block;width:100%;height:46px;padding:0 13px;border:1px solid #e8cfe0;
+  border-radius:12px;background:#fff;color:#43244f;font:inherit;font-size:15px;outline:none;
+}
+.share-site-dialog input:focus{border-color:#2dbb70;box-shadow:0 0 0 3px #2dbb7020}
+.share-site-dialog>small{display:block;margin-top:7px;color:#88758b;font-size:11px}
+.share-site-dialog .share-site-error{margin:9px 0 0;color:#c12e4b;font-size:12px;font-weight:700}
+.share-site-send{
+  display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
+  min-height:46px;margin-top:17px;border:0;border-radius:13px;
+  background:linear-gradient(110deg,#20b968,#119b57);color:white;
+  font-size:14px;font-weight:900;box-shadow:0 4px 0 #087c43,0 8px 16px #159b5930;cursor:pointer;
+}
+.share-site-send span{font-size:18px}
+.share-site-dialog .share-site-note{margin:14px 0 0;text-align:center;font-size:11px;color:#8b7b8d}
+@media(max-width:720px){
+  .marketplace-3d .topbar>.header-share-site{
+    order:2!important;flex:1 1 0!important;min-width:0!important;max-width:116px;
+    margin:0 3px!important;padding:8px 5px!important;font-size:10px!important;
+    letter-spacing:.2px;gap:4px;
+  }
+  .marketplace-3d .topbar>.customer-notifications{order:3!important}
+  .marketplace-3d .topbar>.header-menu-dropdown{order:4!important}
+  .share-site-dialog{padding:26px 20px 20px}
+}
