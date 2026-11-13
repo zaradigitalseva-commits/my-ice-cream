@@ -265,6 +265,14 @@ export default function ShopPage() {
     const firestore = db;
     const items = products.filter(p => Number(saleQty[p.id] || 0) > 0).map(p => ({ productId:p.id, name:p.name || "Product", quantity:Number(saleQty[p.id]), price:Number(p.price || 0) }));
     if (!items.length) { setCustomerMessage("बिल में कम-से-कम एक प्रोडक्ट जोड़ें।"); return; }
+    if (items.length > 8) {
+      setCustomerMessage("एक बिल में अधिकतम 8 अलग-अलग products चुनें।");
+      return;
+    }
+    if (items.some((item) => item.quantity > 100)) {
+      setCustomerMessage("एक product की मात्रा अधिकतम 100 हो सकती है।");
+      return;
+    }
     const subtotal = items.reduce((sum,item)=>sum+item.price*item.quantity,0);
     const rawDiscount = Math.max(0,Number(discountValue)||0);
     const discount = Math.min(subtotal, discountType === "percent" ? subtotal*Math.min(rawDiscount,100)/100 : rawDiscount);
