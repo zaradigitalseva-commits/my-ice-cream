@@ -145,7 +145,8 @@ export default function HomePage() {
     const digits = sharePhone.replace(/\D/g, "");
     const normalized = digits.length === 10 ? "91" + digits : digits.length === 12 && digits.startsWith("91") ? digits : "";
     if (!normalized) { setShareError("10 अंकों का मोबाइल नंबर डालें।"); return; }
-    const message = "MY ICE CREAM वेबसाइट देखें: " + window.location.origin;
+    const siteUrl = window.location.origin;
+    const message = "Please install MY ICE CREAM app 🍦\n\nMY ICE CREAM website link: " + siteUrl + "\n\nPlease open this link on your mobile and install the MY ICE CREAM app. Thank you!";
     window.open("https://wa.me/" + normalized + "?text=" + encodeURIComponent(message), "_blank", "noopener,noreferrer");
     setShowShareSite(false);
     setShareError("");
