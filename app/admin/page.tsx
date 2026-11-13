@@ -61,8 +61,13 @@ export default function AdminPage() {
   async function loadAdminAnnouncements() {
     if (!db) return;
     try {
-      const result = await getDocs(query(collection(db, "notifications"), where("type", "==", "admin"), orderBy("createdAt", "desc"), limit(30)));
-      setAdminAnnouncements(result.docs.map((item) => ({ id: item.id, ...item.data() } as AdminAnnouncement)));
+      // Filter by type in Firestore, then sort and cap in the browser.
+      // This avoids requiring a composite (type + createdAt) index just to
+      // open the Admin post list on an existing Firebase project.
+      const result = await getDocs(query(collection(db, "notifications"), where("type", "==", "admin")));
+      const rows = result.docs.map((item) => ({ id: item.id, ...item.data() } as AdminAnnouncement));
+      rows.sort((a, b) => (b.createdAt?.toDate?.().getTime() || 0) - (a.createdAt?.toDate?.().getTime() || 0));
+      setAdminAnnouncements(rows.slice(0, 30));
     } catch (err) {
       setError(err instanceof Error ? "पोस्ट सूची लोड नहीं हुई: " + err.message : "पोस्ट सूची लोड नहीं हुई।");
     }
