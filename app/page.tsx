@@ -20,6 +20,7 @@ export default function HomePage() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [marketProducts, setMarketProducts] = useState<MarketplaceProduct[]>([]);
   const [customerNotices, setCustomerNotices] = useState<CustomerNotice[]>([]);
+  const [tickerNotices, setTickerNotices] = useState<CustomerNotice[]>([]);
   const [showCustomerUpdates, setShowCustomerUpdates] = useState(false);
   const [hiddenCustomerNoticeIds, setHiddenCustomerNoticeIds] = useState<string[]>([]);
   const [productLoadError, setProductLoadError] = useState("");
@@ -114,6 +115,11 @@ export default function HomePage() {
           if (active) setCustomerNotices(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CustomerNotice)));
         })
         .catch(() => { if (active) setCustomerNotices([]); });
+      getDocs(query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(100)))
+        .then((snapshot) => {
+          if (active) setTickerNotices(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CustomerNotice)).filter((item) => item.type === "admin" || item.type === "shopkeeper"));
+        })
+        .catch(() => { if (active) setTickerNotices([]); });
     }
     return () => { active = false; };
   }, []);
@@ -175,7 +181,6 @@ export default function HomePage() {
   }
 
   const adminAccount = isAdminEmail(user?.email);
-  const tickerNotices = customerNotices.filter((notice) => notice.type === "admin" || notice.type === "shopkeeper");
   const visibleShops = shops.filter((shop) => {
     const haystack = [shop.name, shop.shopName, shop.city, shop.address, shop.description, shop.category].filter(Boolean).join(" ").toLowerCase();
     const matchesSearch = haystack.includes(searchText.trim().toLowerCase());
