@@ -36,7 +36,7 @@ export default function AdminPage() {
   const [siteQr, setSiteQr] = useState("");
   const [pendingQrFile, setPendingQrFile] = useState<File | null>(null);
   const [qrBusy, setQrBusy] = useState(false);
-  const [activeAdminSection, setActiveAdminSection] = useState<"overview" | "settings" | "customers" | "products" | "registrations" | "announcements" | "shopNotices">("registrations");
+  const [activeAdminSection, setActiveAdminSection] = useState<"overview" | "settings" | "paymentQr" | "customers" | "products" | "registrations" | "announcements" | "shopNotices">("registrations");
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementBody, setAnnouncementBody] = useState("");
   const [announcementBusy, setAnnouncementBusy] = useState(false);
@@ -56,8 +56,11 @@ export default function AdminPage() {
   async function loadAdminAnnouncements() {
     if (!db) return;
     try {
-      const result = await getDocs(query(collection(db, "notifications"), where("type", "==", "admin"), orderBy("createdAt", "desc"), limit(30)));
-      setAdminAnnouncements(result.docs.map((item) => ({ id: item.id, ...item.data() } as AdminAnnouncement)));
+      // Avoid a composite Firestore index requirement for the Admin post list.
+      const result = await getDocs(query(collection(db, "notifications"), where("type", "==", "admin")));
+      const rows = result.docs.map((item) => ({ id: item.id, ...item.data() } as AdminAnnouncement));
+      rows.sort((a, b) => (b.createdAt?.toDate?.().getTime() || 0) - (a.createdAt?.toDate?.().getTime() || 0));
+      setAdminAnnouncements(rows.slice(0, 30));
     } catch (err) {
       setError(err instanceof Error ? "पोस्ट सूची लोड नहीं हुई: " + err.message : "पोस्ट सूची लोड नहीं हुई।");
     }
@@ -182,7 +185,11 @@ export default function AdminPage() {
   }
 
   async function saveUpiQr(file?: File) {
-    if (!db) return;
+    if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) {
+      setError("केवल verified Admin UPI QR बदल सकता है।");
+      return;
+    }
+    if (!file && siteQr && !window.confirm("क्या आप मौजूदा UPI QR हटाना चाहते हैं?")) return;
     setQrBusy(true); setError(""); setNotice("");
     try {
       let upiQrDataUrl = "";
@@ -389,6 +396,7 @@ export default function AdminPage() {
       <button type="button" className={activeAdminSection === "shopNotices" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("shopNotices")}>🏪 Shopkeeper सूचना</button>
       <button type="button" className={activeAdminSection === "customers" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("customers")}>Customers</button>
       <button type="button" className={activeAdminSection === "settings" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("settings")}>Settings</button>
+      <button type="button" className={activeAdminSection === "paymentQr" ? "admin-primary" : "admin-secondary"} onClick={() => setActiveAdminSection("paymentQr")}>💳 Payment QR</button>
       <Link href="/admin/payments" className="admin-secondary role-link">Subscription payments</Link>
     </nav>
     {activeAdminSection === "settings" && <><section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Website logo</h2><p>यह लोगो वेबसाइट के नाम की जगह सभी ग्राहकों को दिखेगा।</p></div></div>{logoError && <p className="admin-error" role="alert">Logo settings load नहीं हो पाईं: {logoError}</p>}
@@ -399,14 +407,16 @@ export default function AdminPage() {
         {siteLogo && <button className="admin-secondary small" disabled={logoBusy} onClick={() => { void saveSiteLogo().then(() => setPendingLogoFile(null)); }}>लोगो हटाएँ</button>}
       </div><small className="admin-muted">PNG, JPG या WebP image चुनें, फिर “लोगो सेव करें” दबाएँ। लोगो अपने-आप छोटा करके सेव होगा।</small>
     </section>
-    <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Subscription UPI QR Code</h2><p>पहली listing ₹599 (पहला महीना शामिल) और उसके बाद renewal ₹299 प्रति माह के भुगतान के लिए यही QR दिखेगा।</p></div></div>
+
+    </>}
+    {activeAdminSection === "paymentQr" && <section className="admin-panel site-logo-settings"><div className="admin-panel-head"><div><h2>Subscription UPI QR Code</h2><p>पहली listing ₹599 (पहला महीना शामिल) और उसके बाद renewal ₹299 प्रति माह के भुगतान के लिए यही QR दिखेगा।</p></div></div>
       <div className="site-logo-editor">{siteQr ? <img src={siteQr} alt="Admin UPI payment QR code" /> : <div className="site-logo-empty">UPI QR अभी सेट नहीं है</div>}
         <label className="admin-primary small">{pendingQrFile ? "दूसरा QR चुनें" : "UPI QR फोटो चुनें"}<input type="file" accept="image/*" hidden disabled={qrBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) { setPendingQrFile(file); setNotice(""); setError(""); } event.currentTarget.value = ""; }} /></label>
         {pendingQrFile && <button className="admin-primary small" disabled={qrBusy} onClick={() => { void saveUpiQr(pendingQrFile).then(() => setPendingQrFile(null)); }}>{qrBusy ? "सेव हो रहा है…" : "QR Code सेव करें"}</button>}
         {pendingQrFile && <button className="admin-secondary small" disabled={qrBusy} onClick={() => setPendingQrFile(null)}>रद्द करें</button>}
         {siteQr && <button className="admin-secondary small" disabled={qrBusy} onClick={() => { void saveUpiQr().then(() => setPendingQrFile(null)); }}>QR हटाएँ</button>}
-      </div><small className="admin-muted">साफ़ QR फोटो चुनें। फोटो अपने-आप WebP में छोटा करके सेव होगी। नया QR लगाने पर पुराना बदल जाएगा।</small>
-    </section></>}
+      </div><small className="admin-muted">साफ़ QR फोटो चुनें। फोटो अपने-आप WebP में छोटा करके सेव होगी। नया QR लगाने पर पुराना बदल जाएगा। QR upload/save/delete केवल verified Admin कर सकता है।</small>
+    </section>}
     {activeAdminSection === "overview" && <section className="admin-stats"><article><span>Total shops</span><strong>{shops.length}</strong></article><article><span>Awaiting review</span><strong>{pending}</strong></article><article><span>Live shops</span><strong>{live}</strong></article><article><span>Inactive shops</span><strong>{inactive}</strong></article><article><span>Rejected shops</span><strong>{rejected}</strong></article></section>}
     {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
     {activeAdminSection === "announcements" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>📢 Official post और Push Notification</h2><p>यह पोस्ट वेबसाइट के Customer Updates में दिखेगी और जिन डिवाइसों ने Push चालू किया है, उन पर भेजी जाएगी।</p></div></div><label>पोस्ट का Title<input value={announcementTitle} onChange={(event) => setAnnouncementTitle(event.target.value)} maxLength={120} placeholder="जैसे: नया ऑफर या जरूरी सूचना" /></label><label>Message<textarea value={announcementBody} onChange={(event) => setAnnouncementBody(event.target.value)} maxLength={300} rows={4} placeholder="अपनी सूचना यहाँ लिखें…" /></label><div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}><small className="admin-muted">{announcementTitle.length}/120 · {announcementBody.length}/300 अक्षर</small><button className="admin-primary" disabled={announcementBusy || !announcementTitle.trim() || !announcementBody.trim()} onClick={() => void publishAnnouncement()}>{announcementBusy ? "भेजा जा रहा है…" : "📢 पोस्ट प्रकाशित करें और Notification भेजें"}</button></div><p className="admin-muted">जिन फोन में अनुमति और Push Registration चालू है, उन्हीं पर Notification पहुँचेगा। पोस्ट वेबसाइट के Search box के ठीक ऊपर रंगीन scrolling banner में भी दिखेगी।</p><div className="admin-announcement-list"><div className="admin-panel-head"><div><h3>आपकी प्रकाशित पोस्ट</h3><p>यहाँ से पोस्ट हटाने पर वेबसाइट के ticker और Customer Updates से हट जाएगी।</p></div><button type="button" className="admin-secondary small" onClick={() => void loadAdminAnnouncements()}>Refresh</button></div>{adminAnnouncements.length === 0 ? <p className="admin-muted">अभी कोई official post नहीं है।</p> : adminAnnouncements.map((item) => <article className="admin-announcement-row" key={item.id}><div><strong>{item.title || "Official update"}</strong><p>{item.body || ""}</p><small className="admin-muted">{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString("hi-IN") : "Published post"}</small></div><button type="button" className="admin-danger small" disabled={deletingAnnouncementId === item.id} onClick={() => void deleteAdminAnnouncement(item)}>{deletingAnnouncementId === item.id ? "हटा रहे हैं…" : "🗑 Delete"}</button></article>)}</div></section>}
