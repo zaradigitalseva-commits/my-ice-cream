@@ -31,6 +31,7 @@ export default function CustomerPage() {
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [linkRequestBusy, setLinkRequestBusy] = useState(false);
 
   useEffect(() => {
     if (!auth) { setLoading(false); return; }
@@ -59,6 +60,31 @@ export default function CustomerPage() {
       }
     });
   }, [router]);
+
+  async function requestCustomerLink() {
+    if (!db || !user) return;
+    const digits = phone.replace(/\D/g, "");
+    if (!/^\d{10}$/.test(digits)) {
+      setError("पहले 10 अंकों का मोबाइल नंबर भरें।");
+      return;
+    }
+    setLinkRequestBusy(true); setError(""); setNotice("");
+    try {
+      await setDoc(doc(db, "customerLinkRequests", digits), {
+        uid: user.uid,
+        phone: digits,
+        name: name.trim() || user.displayName || "Customer",
+        email: user.email || "",
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
+      setNotice("आपकी लिंक रिक्वेस्ट Admin को भेज दी गई है। पहचान की जाँच के बाद Admin इसे मंज़ूर करेगा।");
+    } catch (e) {
+      setError(e instanceof Error && e.message.toLowerCase().includes("already")
+        ? "इस नंबर की रिक्वेस्ट पहले से भेजी जा चुकी है। Admin से संपर्क करें।"
+        : e instanceof Error ? e.message : "रिक्वेस्ट नहीं भेजी जा सकी।");
+    } finally { setLinkRequestBusy(false); }
+  }
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -123,6 +149,7 @@ export default function CustomerPage() {
           <button className="admin-primary" disabled={saving}>{saving ? "सेव हो रहा है…" : "जानकारी सेव करें"}</button>
         </form>
         {error && <p className="admin-error">{error}</p>}
+        {error.toLowerCase().includes("पहले से") || error.toLowerCase().includes("पहले") ? <button type="button" className="admin-secondary" disabled={linkRequestBusy} onClick={() => void requestCustomerLink()}>{linkRequestBusy ? "रिक्वेस्ट भेजी जा रही है…" : "Admin से ग्राहक रिकॉर्ड लिंक करने की रिक्वेस्ट भेजें"}</button> : null}
         {notice && <p className="admin-success">{notice}</p>}
         <Link href="/" className="admin-primary role-link">Explore all shops</Link>
       </section>

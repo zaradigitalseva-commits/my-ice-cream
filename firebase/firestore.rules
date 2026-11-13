@@ -17,10 +17,11 @@ service cloud.firestore {
         ];
     }
 
+    // Owner identity is held in the private owner-lock collection, not public shop data.
     function ownsShop(shopId) {
       return signedIn()
-        && get(/databases/$(database)/documents/shops/$(shopId))
-          .data.ownerUid == request.auth.uid;
+        && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
+        && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId;
     }
 
     function validSubscription(shopData) {
@@ -47,6 +48,23 @@ service cloud.firestore {
       return canonicalName is string
         && canonicalName.size() > 0
         && submittedName == canonicalName;
+    }
+
+    function validShopkeeperTickerNotice(shopId, notice) {
+      return notice.keys().hasOnly(["type", "shopId", "shopName", "title", "body", "createdAt"])
+        && notice.type == "shopkeeper"
+        && notice.shopId == shopId
+        && notice.shopName is string
+        && validShopkeeperNoticeName(shopId, notice.shopName)
+        && notice.title is string
+        && notice.title.size() > 0
+        && notice.title.size() <= 120
+        && notice.body is string
+        && notice.body.size() > 0
+        && notice.body.size() <= 300
+        && notice.createdAt is timestamp
+        && ownsShop(shopId)
+        && liveShop(shopId);
     }
 
     function validOrderItem(shopId, item) {
@@ -136,12 +154,11 @@ service cloud.firestore {
 
     function validProduct(data, shopId) {
       return data.keys().hasOnly([
-          "shopId", "ownerUid", "name", "description", "price",
+          "shopId", "name", "description", "price",
           "originalPrice", "category", "stock", "imageUrl", "active",
           "updatedAt", "createdAt"
         ])
         && data.shopId == shopId
-        && data.ownerUid == request.auth.uid
         && data.name is string
         && data.name.size() > 0
         && data.name.size() <= 120
@@ -160,15 +177,18 @@ service cloud.firestore {
     match /shops/{shopId} {
 
       allow read: if isAdmin()
-        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || ownsShop(shopId)
         // Public can read only shops already marked LIVE by Admin.
         || resource.data.status in ["live", "LIVE", "Live"];
 
       // A shop owner may register only a pending shop.
       // Subscription and admin-activation fields cannot be self-granted.
       allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid
+        && !("ownerUid" in request.resource.data)
+        && !("ownerName" in request.resource.data)
+        && !("ownerEmail" in request.resource.data)
         && request.resource.data.status == "pending"
+        && getAfter(/databases/$(database)/documents/shopPrivate/$(shopId)).data.ownerUid == request.auth.uid
         && (
           !("subscriptionStatus" in request.resource.data)
           || request.resource.data.subscriptionStatus in ["inactive", "expired"]
@@ -203,9 +223,16 @@ service cloud.firestore {
           )
         )
         || (
-          signedIn()
-          && resource.data.ownerUid == request.auth.uid
-          && request.resource.data.ownerUid == resource.data.ownerUid
+          isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "ownerUid", "ownerName", "ownerEmail"
+          ])
+          && !("ownerUid" in request.resource.data)
+          && !("ownerName" in request.resource.data)
+          && !("ownerEmail" in request.resource.data)
+        )
+        || (
+          ownsShop(shopId)
           && request.resource.data.status == resource.data.status
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "name", "shopName", "phone", "city", "address",
@@ -264,7 +291,6 @@ service cloud.firestore {
           || (
             ownsShop(shopId)
             && liveShop(shopId)
-            && resource.data.ownerUid == request.auth.uid
           );
       }
     }
@@ -299,14 +325,41 @@ service cloud.firestore {
       // A phone number entered by itself is not proof of ownership.
       // Existing shop-created customer records cannot be claimed by a Google account.
       // Only the account already linked to this record may update its profile.
-      allow update: if signedIn()
-        && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.phone == resource.data.phone
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["name", "email", "updatedAt", "registered"]);
+      allow update: if isAdmin()
+        || (signedIn()
+          && resource.data.uid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.phone == resource.data.phone
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["name", "email", "updatedAt", "registered"]));
       allow delete: if isAdmin();
     }
+    // Customer account linking is a manual identity check by an Admin.
+    // A signed-in customer can request a link but cannot approve their own request.
+    match /customerLinkRequests/{phoneNumber} {
+      allow read: if isAdmin();
+      allow create: if signedIn()
+        && phoneNumber.matches('^[0-9]{10}$')
+        && !exists(/databases/$(database)/documents/customerLinkRequests/$(phoneNumber))
+        && exists(/databases/$(database)/documents/customers/$(phoneNumber))
+        && get(/databases/$(database)/documents/customers/$(phoneNumber)).data.uid == ""
+        && request.resource.data.keys().hasOnly(["uid", "phone", "name", "email", "status", "createdAt"])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.phone == phoneNumber
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.email is string
+        && request.resource.data.status == "pending"
+        && request.resource.data.createdAt is timestamp;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "reviewedAt", "reviewedBy"])
+        && request.resource.data.status in ["approved", "rejected"]
+        && request.resource.data.reviewedBy == request.auth.uid
+        && request.resource.data.reviewedAt is timestamp;
+      allow delete: if isAdmin();
+    }
+
     match /sales/{saleId} {
       allow read: if isAdmin()
         || (signedIn() && resource.data.customerUid == request.auth.uid)
@@ -353,15 +406,31 @@ service cloud.firestore {
     }
     match /shopOwnerLocks/{ownerUid} {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == ownerUid);
-      allow create: if signedIn()
-        && request.auth.uid == ownerUid
-        && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid))
-        && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "createdAt"])
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.shopId is string
-        && request.resource.data.shopId.size() > 0;
+      allow create: if isAdmin()
+        || (signedIn()
+          && request.auth.uid == ownerUid
+          && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid))
+          && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "createdAt"])
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.shopId is string
+          && request.resource.data.shopId.size() > 0
+          && !exists(/databases/$(database)/documents/shops/$(request.resource.data.shopId)));
       allow update: if false;
       allow delete: if isAdmin();
+    }
+
+    // Private shop owner identity; public clients cannot list or read these records.
+    match /shopPrivate/{shopId} {
+      allow get: if isAdmin() || ownsShop(shopId);
+      allow list: if isAdmin();
+      allow create: if isAdmin()
+        || (signedIn()
+          && request.resource.data.keys().hasOnly(["shopId", "ownerUid", "ownerName", "ownerEmail", "createdAt", "updatedAt", "migratedAt"])
+          && request.resource.data.shopId == shopId
+          && request.resource.data.ownerUid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId
+          && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.status == "pending");
+      allow update, delete: if isAdmin();
     }
 
     match /orders/{orderId} {
@@ -552,7 +621,7 @@ service cloud.firestore {
         && request.resource.data.createdAt is timestamp
       ) || (signedIn()
         && request.resource.data.keys().hasOnly([
-          "type", "shopId", "shopName", "ownerUid", "productId", "title", "body", "createdAt"
+          "type", "shopId", "shopName", "productId", "title", "body", "createdAt"
         ])
         && request.resource.data.shopId is string
         && ownsShop(request.resource.data.shopId)
@@ -571,16 +640,15 @@ service cloud.firestore {
             request.resource.data.type == "product"
             && request.resource.data.productId is string
             && exists(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId))
-            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.ownerUid == request.auth.uid
+            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.shopId == request.resource.data.shopId
             && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.active == true
             && request.resource.data.title == "नया प्रोडक्ट: " + get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.name
           )
           || (
             request.resource.data.type == "shopkeeper"
             && !("productId" in request.resource.data)
-            && request.resource.data.ownerUid == request.auth.uid
-            && validShopkeeperNoticeName(request.resource.data.shopId, request.resource.data.shopName)
-            && request.resource.data.body.size() > 0
+            && notificationId == "shopkeeper_" + request.resource.data.shopId
+            && validShopkeeperTickerNotice(request.resource.data.shopId, request.resource.data)
           )
           || (
             request.resource.data.type == "offer"
@@ -596,11 +664,12 @@ service cloud.firestore {
             )
           )
         ));
-      allow update: if isAdmin();
-      allow delete: if isAdmin() || (signedIn()
+      allow update: if isAdmin() || (signedIn()
         && resource.data.type == "shopkeeper"
-        && resource.data.ownerUid == request.auth.uid
-        && ownsShop(resource.data.shopId));
+        && notificationId == "shopkeeper_" + resource.data.shopId
+        && request.resource.data.shopId == resource.data.shopId
+        && validShopkeeperTickerNotice(resource.data.shopId, request.resource.data));
+      allow delete: if isAdmin();
     }
 
     match /siteSettings/{settingId} {
