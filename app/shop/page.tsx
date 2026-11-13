@@ -8,13 +8,14 @@ import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
-type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
+type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
 type Order = { id: string; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
 type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
 type SubscriptionPayment = { id: string; amount?: number; paymentType?: string; utr?: string; status?: string; createdAt?: { toDate?: () => Date } };
 type ShopAdminNotice = { id: string; title?: string; body?: string; createdAt?: { toDate?: () => Date } };
+type ShopPublicNotice = { id: string; type?: string; shopId?: string; shopName?: string; title?: string; body?: string; createdAt?: { toDate?: () => Date } };
 
 export default function ShopPage() {
   const router = useRouter();
@@ -77,6 +78,10 @@ export default function ShopPage() {
   const [productsRefreshing, setProductsRefreshing] = useState(false);
   const [productRefreshMessage, setProductRefreshMessage] = useState("");
   const [adminNotices, setAdminNotices] = useState<ShopAdminNotice[]>([]);
+  const [shopPublicNotice, setShopPublicNotice] = useState<ShopPublicNotice | null>(null);
+  const [shopTickerTitle, setShopTickerTitle] = useState("");
+  const [shopTickerBody, setShopTickerBody] = useState("");
+  const [shopTickerBusy, setShopTickerBusy] = useState(false);
 
   useEffect(() => {
     if (!activeShopSection) return;
@@ -108,6 +113,41 @@ export default function ShopPage() {
     }
   }
 
+  async function loadShopPublicNotice(shopId: string) {
+    if (!db) return;
+    try {
+      const result = await getDoc(doc(db, "notifications", "shopkeeper_" + shopId));
+      setShopPublicNotice(result.exists() ? ({ id: result.id, ...result.data() } as ShopPublicNotice) : null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? "आपकी सार्वजनिक सूचना लोड नहीं हुई: " + loadError.message : "आपकी सार्वजनिक सूचना लोड नहीं हुई।");
+    }
+  }
+
+  async function publishShopTickerNotice(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!db || !shop || !user || !live || shopTickerBusy) return;
+    const title = shopTickerTitle.trim();
+    const body = shopTickerBody.trim();
+    if (!title || title.length > 120 || !body || body.length > 300) {
+      setError("शीर्षक 1–120 और सूचना 1–300 अक्षरों में लिखें।");
+      return;
+    }
+    setShopTickerBusy(true); setError(""); setNotice("");
+    try {
+      // The fixed document ID replaces the previous message; ownership is checked by shopOwnerLocks.
+      await setDoc(doc(db, "notifications", "shopkeeper_" + shop.id), {
+        type: "shopkeeper", shopId: shop.id,
+        shopName: shop.name || shop.shopName || "Ice Cream Shop",
+        title, body, createdAt: serverTimestamp(),
+      });
+      setShopTickerTitle(""); setShopTickerBody("");
+      await loadShopPublicNotice(shop.id);
+      setNotice("नई Scrolling सूचना प्रकाशित हो गई। पुरानी सूचना अपने-आप बदल गई।");
+    } catch (publishError) {
+      setError(publishError instanceof Error ? "सूचना प्रकाशित नहीं हुई: " + publishError.message : "सूचना प्रकाशित नहीं हुई। Firebase Firestore Rules Publish करना जरूरी हो सकता है।");
+    } finally { setShopTickerBusy(false); }
+  }
+
   async function loadProducts(shopId: string) {
     if (!db) return;
     const result = await getDocs(query(collection(db, "shops", shopId, "products")));
@@ -136,13 +176,15 @@ export default function ShopPage() {
       if (isAdminEmail(nextUser.email) && nextUser.emailVerified) { router.replace("/admin"); return; }
       if (!db) { setLoading(false); return; }
       try {
-        const result = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
-        const owned = result.docs[0];
-        if (owned) {
+        const ownerLock = await getDoc(doc(db, "shopOwnerLocks", nextUser.uid));
+        const ownedShopId = ownerLock.exists() ? String(ownerLock.data().shopId || "") : "";
+        const owned = ownedShopId ? await getDoc(doc(db, "shops", ownedShopId)) : null;
+        if (owned?.exists()) {
           const data = { id: owned.id, ...owned.data() } as Shop;
           const isLiveShop = ["live", "LIVE", "Live"].includes(String(data.status || ""));
           setShop(data);
           await loadShopAdminNotices(data.id);
+          await loadShopPublicNotice(data.id);
           if (window.location.hash === "#shop-profile") setActiveShopSection("profile");
           const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
           setPendingPayment(lock.exists() && !isLiveShop); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
@@ -163,16 +205,17 @@ export default function ShopPage() {
   useEffect(() => {
     if (!db || !user || !shop) return;
     const firestore = db;
-    const ownerUid = user.uid;
     let active = true;
     const refreshApprovalState = async () => {
       try {
-        const result = await getDocs(query(collection(firestore, "shops"), where("ownerUid", "==", ownerUid)));
-        const owned = result.docs[0];
-        if (!owned || !active) return;
+        const ownerLock = await getDoc(doc(firestore, "shopOwnerLocks", user.uid));
+        const ownedShopId = ownerLock.exists() ? String(ownerLock.data().shopId || "") : "";
+        const owned = ownedShopId ? await getDoc(doc(firestore, "shops", ownedShopId)) : null;
+        if (!owned?.exists() || !active) return;
         const latest = { id: owned.id, ...owned.data() } as Shop;
         setShop(latest);
         await loadShopAdminNotices(latest.id);
+        await loadShopPublicNotice(latest.id);
         const lock = await getDoc(doc(firestore, "paymentPendingLocks", latest.id));
         if (!active) return;
         const isLive = ["live", "LIVE", "Live"].includes(String(latest.status || ""));
@@ -507,7 +550,7 @@ export default function ShopPage() {
     }
     setBusy(true);
     setNotice("Product save ho raha hai…");
-    const data = { shopId: shop.id, ownerUid: user.uid, name: cleanName, description: productDescription.trim(), price: sellingPrice, originalPrice: comparePrice, category: productCategory, imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
+    const data = { shopId: shop.id, name: cleanName, description: productDescription.trim(), price: sellingPrice, originalPrice: comparePrice, category: productCategory, imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
     try {
       if (productId) {
         await updateDoc(doc(db, "shops", shop.id, "products", productId), data);
@@ -575,7 +618,19 @@ export default function ShopPage() {
         <section className="admin-heading"><div><p className="admin-kicker">SHOPKEEPER AREA</p><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""} · Status: <span className={"admin-status " + (shop.status || "pending")}>{(shop.status || "pending").toLowerCase() === "live" ? "APPROVED" : (shop.status || "pending").toUpperCase()}</span></p></div></section>
         {adminNotices.length > 0 && <section className="admin-panel" aria-label="Admin की निजी Shopkeeper सूचना" style={{border:"2px solid #f0b64d",background:"linear-gradient(135deg,#fff9e8,#fff1f2)"}}><p className="admin-kicker">🔔 ADMIN NOTICE · केवल SHOPKEEPER के लिए</p><h2 style={{marginTop:0}}>दुकान के लिए जरूरी सूचना</h2>{adminNotices.map((item) => <article key={item.id} style={{padding:"12px 0",borderTop:"1px solid #f2d9a6"}}><h3 style={{margin:"0 0 6px"}}>{item.title || "Admin सूचना"}</h3><p style={{whiteSpace:"pre-wrap",margin:"0 0 6px"}}>{item.body || ""}</p><small className="admin-muted">{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString("hi-IN") : ""}</small></article>)}</section>}
 
-        <section className="admin-panel" aria-live="polite">
+                {live && <section className="admin-panel" aria-label="Shopkeeper की सार्वजनिक Scrolling सूचना" style={{border:"2px solid #8b5cf6",background:"linear-gradient(135deg,#f5f3ff,#ecfeff)"}}>
+          <p className="admin-kicker">📢 PUBLIC SHOP UPDATE · सभी ग्राहकों को दिखाई देगी</p>
+          <h2 style={{marginTop:0}}>Homepage Scrolling Text</h2>
+          <p className="admin-muted">Registration से अलग। नया संदेश प्रकाशित करने पर पिछला संदेश अपने-आप बदल जाएगा।</p>
+          <form onSubmit={publishShopTickerNotice} style={{display:"grid",gap:10,maxWidth:720}}>
+            <label>शीर्षक <input value={shopTickerTitle} onChange={(event) => setShopTickerTitle(event.target.value)} maxLength={120} required placeholder="जैसे: आज नया फ्लेवर उपलब्ध है" /></label>
+            <label>सूचना <textarea value={shopTickerBody} onChange={(event) => setShopTickerBody(event.target.value)} maxLength={300} required rows={3} placeholder="ग्राहकों के लिए अपनी सूचना लिखें…" /></label>
+            <small className="admin-muted">{shopTickerTitle.length}/120 · {shopTickerBody.length}/300 अक्षर</small>
+            <button className="admin-primary" type="submit" disabled={shopTickerBusy}>{shopTickerBusy ? "प्रकाशित हो रहा है…" : "📢 Scrolling Text प्रकाशित करें"}</button>
+          </form>
+          {shopPublicNotice && <div style={{marginTop:18}}><h3>अभी Homepage पर प्रकाशित सूचना</h3><strong>{shopPublicNotice.title}</strong><p style={{whiteSpace:"pre-wrap"}}>{shopPublicNotice.body}</p></div>}
+        </section>}
+<section className="admin-panel" aria-live="polite">
           <p className="admin-kicker">REGISTRATION TRACKING</p>
           <h2>आपकी दुकान की स्थिति</h2>
           <p><strong className={"admin-status " + String(shop.status || "pending").toLowerCase()}>{String(shop.status || "pending").toLowerCase() === "live" ? "APPROVED · दुकान LIVE है" : String(shop.status || "pending").toUpperCase()}</strong></p>
