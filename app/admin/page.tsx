@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, collectionGroup, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc, where, writeBatch, deleteDoc, limit } from "firebase/firestore/lite";
+import { collection, collectionGroup, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc, where, writeBatch, deleteDoc, deleteField, limit } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
@@ -49,6 +49,8 @@ export default function AdminPage() {
   const [shopNoticeBusy, setShopNoticeBusy] = useState(false);
   const [shopDashboardNotices, setShopDashboardNotices] = useState<ShopDashboardNotice[]>([]);
   const [deletingShopNoticeId, setDeletingShopNoticeId] = useState("");
+  const [privacyMigrationBusy, setPrivacyMigrationBusy] = useState(false);
+  const [privacyMigrationMessage, setPrivacyMigrationMessage] = useState("");
 
   useEffect(() => {
     if (!auth) { setAuthReady(true); setError("Firebase configuration is missing."); return; }
@@ -88,8 +90,22 @@ export default function AdminPage() {
       if (token.claims.email_verified !== true) {
         throw new Error("Firebase token is not marked email-verified. Sign out and sign in again, then retry.");
       }
-      const result = await getDocs(query(collection(firestore, "shops"), orderBy("createdAt", "desc")));
-      const loadedShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
+      const [result, privateResult] = await Promise.all([
+        getDocs(query(collection(firestore, "shops"), orderBy("createdAt", "desc"))),
+        getDocs(collection(firestore, "shopPrivate")),
+      ]);
+      const privateByShop = new Map(privateResult.docs.map((item) => [item.id, item.data()]));
+      const loadedShops = result.docs.map((item) => {
+        const publicData = item.data();
+        const privateData = privateByShop.get(item.id) || {};
+        return {
+          id: item.id,
+          ...publicData,
+          ownerUid: privateData.ownerUid || publicData.ownerUid,
+          ownerName: privateData.ownerName || publicData.ownerName,
+          ownerEmail: privateData.ownerEmail || publicData.ownerEmail,
+        } as Shop;
+      });
       setShops(loadedShops);
       // Load payment records and UTR reservations for the main registrations table.
       // Keep this separate so a payment-read issue does not hide shop registrations.
@@ -321,6 +337,7 @@ export default function AdminPage() {
       }
 
       const finalBatch = writeBatch(firestore);
+      finalBatch.delete(doc(firestore, "shopPrivate", shop.id));
       finalBatch.delete(doc(firestore, "shops", shop.id));
       await finalBatch.commit();
       setShops((current) => current.filter((item) => item.id !== shop.id));
@@ -328,6 +345,107 @@ export default function AdminPage() {
     } catch (err) {
       setError(err instanceof Error ? `Delete incomplete: ${err.message}. Some records may already have been removed; refresh and retry after checking Firestore Rules.` : "Shop deletion failed. Some records may already have been removed.");
     } finally { setDeletingShopId(""); }
+  }
+
+  async function migrateShopOwnerPrivacy() {
+    if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
+    if (!window.confirm("यह प्रक्रिया पुराने दुकानों के owner UID, नाम और ईमेल को private shopPrivate रिकॉर्ड में सुरक्षित कॉपी करेगी, फिर सार्वजनिक shop/product/notification रिकॉर्ड से हटाएगी। पहले सुनिश्चित करें कि नई Firestore Rules प्रकाशित हो चुकी हैं। क्या आगे बढ़ें?")) return;
+    setPrivacyMigrationBusy(true); setPrivacyMigrationMessage(""); setError(""); setNotice("");
+    try {
+      const firestore = db;
+      const [shopSnapshot, lockSnapshot, privateSnapshot, notificationSnapshot] = await Promise.all([
+        getDocs(collection(firestore, "shops")),
+        getDocs(collection(firestore, "shopOwnerLocks")),
+        getDocs(collection(firestore, "shopPrivate")),
+        getDocs(collection(firestore, "notifications")),
+      ]);
+      const lockByShop = new Map<string, { ownerUid: string; shopId: string }>();
+      const lockByOwner = new Map<string, string>();
+      for (const item of lockSnapshot.docs) {
+        const data = item.data();
+        if (typeof data.shopId !== "string" || !data.shopId) continue;
+        lockByShop.set(data.shopId, { ownerUid: item.id, shopId: data.shopId });
+        lockByOwner.set(item.id, data.shopId);
+      }
+      const privateByShop = new Map(privateSnapshot.docs.map((item) => [item.id, item.data()]));
+      const ownersSeen = new Map<string, string>();
+      const records = shopSnapshot.docs.map((item) => {
+        const publicData = item.data();
+        const privateData = privateByShop.get(item.id) || {};
+        const lock = lockByShop.get(item.id);
+        const ownerUid = String(privateData.ownerUid || publicData.ownerUid || lock?.ownerUid || "");
+        if (!ownerUid) throw new Error("दुकान " + item.id + " का owner UID नहीं मिला। कोई डेटा नहीं बदला गया; Admin से जाँच कराएँ।");
+        const lockedShopId = lockByOwner.get(ownerUid);
+        if (lockedShopId && lockedShopId !== item.id) throw new Error("Owner " + ownerUid + " का lock दूसरी दुकान से जुड़ा है। कोई डेटा नहीं बदला गया।");
+        const previousShop = ownersSeen.get(ownerUid);
+        if (previousShop && previousShop !== item.id) throw new Error("एक ही owner UID पर दो दुकानें मिलीं (" + previousShop + " और " + item.id + ")। कोई डेटा नहीं बदला गया।");
+        if (privateData.ownerUid && privateData.ownerUid !== ownerUid) throw new Error("दुकान " + item.id + " के private owner record में mismatch है। कोई डेटा नहीं बदला गया।");
+        ownersSeen.set(ownerUid, item.id);
+        return {
+          id: item.id,
+          ownerUid,
+          ownerName: String(privateData.ownerName || publicData.ownerName || ""),
+          ownerEmail: String(privateData.ownerEmail || publicData.ownerEmail || ""),
+          createdAt: privateData.createdAt || publicData.createdAt || new Date(),
+          needsLock: !lockedShopId,
+          publicData,
+        };
+      });
+
+      // Phase 1: create/repair private owner records and owner locks before removing any public fields.
+      for (let start = 0; start < records.length; start += 200) {
+        const batch = writeBatch(firestore);
+        for (const record of records.slice(start, start + 200)) {
+          batch.set(doc(firestore, "shopPrivate", record.id), {
+            shopId: record.id,
+            ownerUid: record.ownerUid,
+            ownerName: record.ownerName,
+            ownerEmail: record.ownerEmail,
+            createdAt: record.createdAt,
+            updatedAt: new Date(),
+            migratedAt: new Date(),
+          }, { merge: true });
+          if (record.needsLock) {
+            batch.set(doc(firestore, "shopOwnerLocks", record.ownerUid), {
+              ownerUid: record.ownerUid, shopId: record.id, createdAt: new Date(),
+            });
+          }
+        }
+        await batch.commit();
+      }
+
+      // Phase 2: remove identity fields from public shop documents and product documents.
+      for (let start = 0; start < records.length; start += 1) {
+        const record = records[start];
+        const shopRef = doc(firestore, "shops", record.id);
+        if ("ownerUid" in record.publicData || "ownerName" in record.publicData || "ownerEmail" in record.publicData) {
+          await updateDoc(shopRef, { ownerUid: deleteField(), ownerName: deleteField(), ownerEmail: deleteField() });
+        }
+        const products = await getDocs(collection(firestore, "shops", record.id, "products"));
+        for (let offset = 0; offset < products.docs.length; offset += 450) {
+          const batch = writeBatch(firestore);
+          for (const product of products.docs.slice(offset, offset + 450)) {
+            if ("ownerUid" in product.data()) batch.update(product.ref, { ownerUid: deleteField() });
+          }
+          await batch.commit();
+        }
+      }
+
+      // Phase 3: remove owner UID from public customer-facing announcements.
+      const publicNotices = notificationSnapshot.docs.filter((item) => "ownerUid" in item.data());
+      for (let start = 0; start < publicNotices.length; start += 450) {
+        const batch = writeBatch(firestore);
+        for (const item of publicNotices.slice(start, start + 450)) batch.update(item.ref, { ownerUid: deleteField() });
+        await batch.commit();
+      }
+
+      setPrivacyMigrationMessage("Privacy migration पूरी हुई: " + records.length + " दुकानों के owner records private किए गए; " + publicNotices.length + " public notifications साफ की गईं। Admin Dashboard refresh करें।");
+      await loadShops();
+    } catch (err) {
+      setPrivacyMigrationMessage("Migration पूरी नहीं हुई: " + (err instanceof Error ? err.message : "Unknown error") + "। पहले से सेव private records सुरक्षित रखे गए हैं; Admin refresh करके स्थिति जाँचें।");
+    } finally {
+      setPrivacyMigrationBusy(false);
+    }
   }
 
   async function loadShopDashboardNotices() {
@@ -451,6 +569,12 @@ export default function AdminPage() {
       <h3>सभी ग्राहक रिकॉर्ड</h3><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>नाम</th><th>मोबाइल</th><th>ईमेल</th><th>स्थिति</th></tr></thead><tbody>{customers.map((customer)=><tr key={customer.id}><td>{customer.name||"—"}</td><td>{customer.phone||customer.id}</td><td>{customer.email||"—"}</td><td>{customer.uid?"App account linked":"Shop-created record"}</td></tr>)}</tbody></table></div></section>}
     {activeAdminSection === "products" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop products</h2><p>सभी दुकानों के प्रोडक्ट यहाँ दिखेंगे, चाहे वे active हों या inactive।</p></div><span className="admin-count">{shopProducts.length} products</span></div>{productError && <p className="admin-error" role="alert">Products load नहीं हुए: {productError}</p>}{!productError && shopProducts.length === 0 ? <p className="admin-muted">अभी किसी दुकान में प्रोडक्ट सेव नहीं हैं।</p> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Product</th><th>Shop</th><th>Price</th><th>Visibility</th><th>Product ID</th><th>Action</th></tr></thead><tbody>{shopProducts.map((product) => <tr key={product.shopId + "-" + product.id}><td><strong>{product.name || "Unnamed product"}</strong><small>{product.category || "Category not set"}</small></td><td>{product.shopName}<small>{product.shopId}</small></td><td>₹{Number(product.price || 0).toFixed(2)}</td><td><span className={`admin-status ${product.active === true ? "live" : "inactive"}`}>{product.active === true ? "Active · Public" : "Inactive · Hidden"}</span><button className="admin-secondary small" onClick={() => void toggleProductVisibility(product)}>{product.active === true ? "Hide product" : "Show product"}</button></td><td><small>{product.id}</small></td><td><button className="admin-danger small" disabled={deletingProductId === product.shopId + "-" + product.id} onClick={() => void deleteShopProduct(product)}>{deletingProductId === product.shopId + "-" + product.id ? "Deleting…" : "🗑 Delete"}</button></td></tr>)}</tbody></table></div>}</section>}
     {activeAdminSection === "registrations" && <section className="admin-panel"><div className="admin-panel-head"><div><h2>Shop registrations</h2><p>New shops should be reviewed before being made public.</p></div><span className="admin-count">{visibleShops.length} / {shops.length} shops</span></div>
+      <div className="admin-panel" style={{border:"1px solid #d97706",background:"#fffaf0",marginBottom:16}}>
+        <h3>🔐 Shop Owner Privacy Migration</h3>
+        <p className="admin-muted">नई Firestore Rules प्रकाशित होने के बाद एक बार चलाएँ। यह पुराने दुकानदारों का UID, नाम और ईमेल private record में सुरक्षित रखकर public shop, product और notification रिकॉर्ड से हटाएगा।</p>
+        <button type="button" className="admin-primary" disabled={privacyMigrationBusy} onClick={() => void migrateShopOwnerPrivacy()}>{privacyMigrationBusy ? "Privacy migration चल रही है…" : "🔐 पुराने दुकानों का Privacy Migration चलाएँ"}</button>
+        {privacyMigrationMessage && <p role="status" className={privacyMigrationMessage.startsWith("Privacy migration पूरी हुई") ? "admin-success" : "admin-error"}>{privacyMigrationMessage}</p>}
+      </div>
       <div className="admin-filters"><label>Search shops<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Shop, owner, mobile, city or ID…" /></label><label>Filter by status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="live">Live</option><option value="inactive">Inactive</option><option value="rejected">Rejected</option></select></label></div>
       {loading ? <p className="admin-muted">Loading shops…</p> : shops.length === 0 ? <div className="admin-empty"><span>🏪</span><h3>No shop registrations yet</h3><p>When a shop registration is saved to the Firestore <code>shops</code> collection, it will appear here for review.</p></div> :
       visibleShops.length === 0 ? <div className="admin-empty"><span>🔎</span><h3>No matching shops</h3><p>Search ya status filter badal kar dobara dekhein.</p><button className="admin-secondary" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</button></div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Shop details</th><th>Owner details</th><th>Contact & address</th><th>UTR / Payment</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visibleShops.map((shop) => { const status = (shop.status || "pending").toLowerCase(); return <tr key={shop.id}><td><strong>{shop.name || shop.shopName || "Unnamed shop"}</strong><small>ID: {shop.id}</small><small>{shop.description || shop.about || "Shop description not provided"}</small></td><td><strong>{shop.ownerName || "Name not provided"}</strong><small>{shop.ownerEmail || "Email not provided"}</small><small>UID: {shop.ownerUid || "—"}</small></td><td className="admin-contact-cell"><strong>📱 {shop.phone || shop.mobile || shop.mobileNumber || "Mobile not provided"}</strong><div className="admin-address"><b>📍 Shop address</b><span>{[shop.address, shop.fullAddress, shop.shopAddress, shop.location].find((value) => value?.trim()) || "Full address not provided by shop owner"}</span><small>City: {shop.city || "Not provided"}{shop.landmark ? ` · Landmark: ${shop.landmark}` : ""}</small></div></td><td>{(() => { const payment = shopPayments[shop.id]; return <><strong>{payment?.utr || "UTR not submitted"}</strong><small>{payment?.amount ? `₹${payment.amount}` : "Amount —"} · {payment?.status || "No payment record"}</small></>; })()}</td><td><span className={`admin-status ${status}`}>{status === "live" ? "APPROVED" : status.toUpperCase()}</span></td><td className="admin-actions">{status === "pending" && hasValidSubscription(shop) && <button className="admin-primary small" onClick={() => void setShopStatus(shop, "live")}>Approve shop & make LIVE</button>}{status === "inactive" && hasValidSubscription(shop) && <button className="admin-primary small" onClick={() => void setShopStatus(shop, "live")}>Resume shop</button>}{status === "rejected" && <button className="admin-primary small" onClick={() => void setShopStatus(shop, "pending")}>Reopen registration</button>}{status !== "live" && status !== "rejected" && !(status === "inactive" && hasValidSubscription(shop)) && !(status === "pending" && hasValidSubscription(shop)) && <Link href="/admin/payments" className="admin-primary small">Verify / renew payment</Link>}{status === "live" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "inactive")}>Pause shop</button>}{<button className="admin-secondary small" style={{color:"#b42318",borderColor:"#b42318"}} disabled={deletingShopId===shop.id} onClick={() => void deleteShopCompletely(shop)}>{deletingShopId===shop.id ? "Deleting…" : "Delete permanently"}</button>}{status === "pending" && <button className="admin-secondary small" onClick={() => void setShopStatus(shop, "rejected")}>Reject</button>}</td></tr>; })}</tbody></table></div>}
