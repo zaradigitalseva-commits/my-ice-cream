@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
-import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore/lite";
+import { collection, doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { compressImageToWebP } from "@/lib/image-compression";
 
@@ -30,10 +30,11 @@ export default function ShopRegisterPage() {
       if (!user || !db) { setExistingShop(null); setCheckingRegistration(false); return; }
       setCheckingRegistration(true);
       try {
-        const result = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid)));
+        const lock = await getDoc(doc(db, "shopOwnerLocks", user.uid));
         if (cancelled) return;
-        const found = result.docs[0];
-        if (found) {
+        const shopId = lock.exists() ? String(lock.data().shopId || "") : "";
+        const found = shopId ? await getDoc(doc(db, "shops", shopId)) : null;
+        if (found?.exists()) {
           const data = { id: found.id, ...found.data() } as { id: string; name?: string; shopName?: string; status?: string; city?: string };
           const status = (data.status || "pending").toLowerCase();
           if (status === "live") { router.replace("/shop"); return; }
@@ -66,9 +67,10 @@ export default function ShopRegisterPage() {
     if (!user || !db) return;
     setBusy(true); setMessage("");
     try {
-      const existing = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid)));
-      if (!existing.empty) {
-        const found = existing.docs[0];
+      const existingLock = await getDoc(doc(db, "shopOwnerLocks", user.uid));
+      const existingShopId = existingLock.exists() ? String(existingLock.data().shopId || "") : "";
+      const found = existingShopId ? await getDoc(doc(db, "shops", existingShopId)) : null;
+      if (found?.exists()) {
         const data = { id: found.id, ...found.data() } as { id: string; name?: string; shopName?: string; status?: string; city?: string };
         if ((data.status || "pending").toLowerCase() === "live") { router.replace("/shop"); return; }
         setExistingShop(data);
@@ -79,11 +81,15 @@ export default function ShopRegisterPage() {
       const lockRef = doc(db, "shopOwnerLocks", user.uid);
       const batch = writeBatch(db);
       batch.set(shopRef, {
-        name: name.trim(), shopName: name.trim(), ownerUid: user.uid,
-        ownerName: user.displayName || "", ownerEmail: user.email || "",
+        name: name.trim(), shopName: name.trim(),
         phone: phone.trim(), city: city.trim(), address: address.trim(),
         description: description.trim(), logoUrl, bannerUrl,
         status: "pending", createdAt: serverTimestamp()
+      });
+      batch.set(doc(db, "shopPrivate", shopRef.id), {
+        shopId: shopRef.id, ownerUid: user.uid,
+        ownerName: user.displayName || "", ownerEmail: user.email || "",
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
       });
       batch.set(lockRef, { ownerUid: user.uid, shopId: shopRef.id, createdAt: serverTimestamp() });
       await batch.commit();
