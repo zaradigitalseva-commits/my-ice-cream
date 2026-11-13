@@ -93,12 +93,14 @@ export default function AdminPaymentsPage() {
         if (!lockSnap.exists() || lockSnap.data().paymentId !== payment.id) throw new Error("Pending payment lock does not match. Do not approve; inspect the records.");
         const data = paymentSnap.data();
         const shop = shopSnap.data();
+        const privateShop = privateShopSnap.data();
+        if (!privateShop || typeof privateShop.ownerUid !== "string") throw new Error("Private shop owner UID is missing. Run the Admin privacy migration before approving this payment.");
         const initial = data.paymentType === "initial_listing";
         if (!initial && data.paymentType !== "monthly_renewal") throw new Error("Unknown payment type. Do not approve this payment.");
         const expected = initial ? 599 : 299;
         if (data.amount !== expected) throw new Error(`Payment amount does not match ₹${expected}.`);
         if (typeof data.utr !== "string" || !/^[A-Z0-9]{6,40}$/.test(data.utr)) throw new Error("UTR is missing or invalid.");
-        if (data.ownerUid !== privateShopSnap.data().ownerUid || data.shopId !== payment.shopId) throw new Error("Payment owner or shop reference does not match.");
+        if (data.ownerUid !== privateShop.ownerUid || data.shopId !== payment.shopId) throw new Error("Payment owner or shop reference does not match.");
         if (initial && (shop.initialPaymentVerified === true || shop.subscriptionExpiresAt)) throw new Error("This shop already has an initial payment or subscription. Do not approve as first listing.");
         if (!initial && shop.initialPaymentVerified !== true && !shop.subscriptionExpiresAt) throw new Error("The first ₹599 listing payment has not been verified yet.");
         const current = shop.subscriptionExpiresAt?.toDate?.() as Date | undefined;
