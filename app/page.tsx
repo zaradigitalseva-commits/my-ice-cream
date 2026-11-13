@@ -271,7 +271,7 @@ export default function HomePage() {
     {showShareSite && <div className="share-site-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowShareSite(false); }}>
       <form className="share-site-dialog" role="dialog" aria-modal="true" aria-labelledby="share-site-title" onSubmit={(event) => { event.preventDefault(); shareSiteOnWhatsApp(); }}>
         <button type="button" className="share-site-close" aria-label="बंद करें" onClick={() => setShowShareSite(false)}>×</button>
-        <div className="share-site-whatsapp" aria-hidden="true">☘</div>
+        <div className="share-site-whatsapp" aria-hidden="true">WA</div>
         <h2 id="share-site-title">WhatsApp पर SHARE SITE</h2>
         <p>जिस व्यक्ति को MY ICE CREAM वेबसाइट भेजनी है, उसका WhatsApp मोबाइल नंबर डालें।</p>
         <label htmlFor="share-site-phone">WhatsApp मोबाइल नंबर</label>
