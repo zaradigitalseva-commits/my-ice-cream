@@ -53,8 +53,8 @@ export default function HomePage() {
       // Their control panel remains available through the Admin Dashboard link.
       if (!db) return;
       try {
-        const owned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
-        if (!owned.empty) {
+        const ownerLock = await getDoc(doc(db, "shopOwnerLocks", nextUser.uid));
+        if (ownerLock.exists() && typeof ownerLock.data().shopId === "string" && ownerLock.data().shopId) {
           // Keep shop owners on the public customer homepage when they visit "/".
           // Their dashboard remains available through the Shop Dashboard link.
           setShopOwner(true);

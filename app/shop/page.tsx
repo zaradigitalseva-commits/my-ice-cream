@@ -8,7 +8,7 @@ import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
-type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
+type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
 type Order = { id: string; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
 type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
@@ -136,9 +136,10 @@ export default function ShopPage() {
       if (isAdminEmail(nextUser.email) && nextUser.emailVerified) { router.replace("/admin"); return; }
       if (!db) { setLoading(false); return; }
       try {
-        const result = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
-        const owned = result.docs[0];
-        if (owned) {
+        const ownerLock = await getDoc(doc(db, "shopOwnerLocks", nextUser.uid));
+        const ownedShopId = ownerLock.exists() ? String(ownerLock.data().shopId || "") : "";
+        const owned = ownedShopId ? await getDoc(doc(db, "shops", ownedShopId)) : null;
+        if (owned?.exists()) {
           const data = { id: owned.id, ...owned.data() } as Shop;
           const isLiveShop = ["live", "LIVE", "Live"].includes(String(data.status || ""));
           setShop(data);
@@ -163,13 +164,13 @@ export default function ShopPage() {
   useEffect(() => {
     if (!db || !user || !shop) return;
     const firestore = db;
-    const ownerUid = user.uid;
     let active = true;
     const refreshApprovalState = async () => {
       try {
-        const result = await getDocs(query(collection(firestore, "shops"), where("ownerUid", "==", ownerUid)));
-        const owned = result.docs[0];
-        if (!owned || !active) return;
+        const ownerLock = await getDoc(doc(firestore, "shopOwnerLocks", user.uid));
+        const ownedShopId = ownerLock.exists() ? String(ownerLock.data().shopId || "") : "";
+        const owned = ownedShopId ? await getDoc(doc(firestore, "shops", ownedShopId)) : null;
+        if (!owned?.exists() || !active) return;
         const latest = { id: owned.id, ...owned.data() } as Shop;
         setShop(latest);
         await loadShopAdminNotices(latest.id);
@@ -265,6 +266,14 @@ export default function ShopPage() {
     const firestore = db;
     const items = products.filter(p => Number(saleQty[p.id] || 0) > 0).map(p => ({ productId:p.id, name:p.name || "Product", quantity:Number(saleQty[p.id]), price:Number(p.price || 0) }));
     if (!items.length) { setCustomerMessage("बिल में कम-से-कम एक प्रोडक्ट जोड़ें।"); return; }
+    if (items.length > 8) {
+      setCustomerMessage("एक बिल में अधिकतम 8 अलग-अलग products चुनें।");
+      return;
+    }
+    if (items.some((item) => item.quantity > 100)) {
+      setCustomerMessage("एक product की मात्रा अधिकतम 100 हो सकती है।");
+      return;
+    }
     const subtotal = items.reduce((sum,item)=>sum+item.price*item.quantity,0);
     const rawDiscount = Math.max(0,Number(discountValue)||0);
     const discount = Math.min(subtotal, discountType === "percent" ? subtotal*Math.min(rawDiscount,100)/100 : rawDiscount);
@@ -499,7 +508,7 @@ export default function ShopPage() {
     }
     setBusy(true);
     setNotice("Product save ho raha hai…");
-    const data = { shopId: shop.id, ownerUid: user.uid, name: cleanName, description: productDescription.trim(), price: sellingPrice, originalPrice: comparePrice, category: productCategory, imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
+    const data = { shopId: shop.id, name: cleanName, description: productDescription.trim(), price: sellingPrice, originalPrice: comparePrice, category: productCategory, imageUrl: imageUrl.trim(), active: productActive, updatedAt: serverTimestamp() };
     try {
       if (productId) {
         await updateDoc(doc(db, "shops", shop.id, "products", productId), data);

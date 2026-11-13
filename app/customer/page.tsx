@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
@@ -31,6 +31,7 @@ export default function CustomerPage() {
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [linkRequestBusy, setLinkRequestBusy] = useState(false);
 
   useEffect(() => {
     if (!auth) { setLoading(false); return; }
@@ -60,6 +61,31 @@ export default function CustomerPage() {
     });
   }, [router]);
 
+  async function requestCustomerLink() {
+    if (!db || !user) return;
+    const digits = phone.replace(/\D/g, "");
+    if (!/^\d{10}$/.test(digits)) {
+      setError("पहले 10 अंकों का मोबाइल नंबर भरें।");
+      return;
+    }
+    setLinkRequestBusy(true); setError(""); setNotice("");
+    try {
+      await setDoc(doc(db, "customerLinkRequests", digits), {
+        uid: user.uid,
+        phone: digits,
+        name: name.trim() || user.displayName || "Customer",
+        email: user.email || "",
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
+      setNotice("आपकी लिंक रिक्वेस्ट Admin को भेज दी गई है। पहचान की जाँच के बाद Admin इसे मंज़ूर करेगा।");
+    } catch (e) {
+      setError(e instanceof Error && e.message.toLowerCase().includes("already")
+        ? "इस नंबर की रिक्वेस्ट पहले से भेजी जा चुकी है। Admin से संपर्क करें।"
+        : e instanceof Error ? e.message : "रिक्वेस्ट नहीं भेजी जा सकी।");
+    } finally { setLinkRequestBusy(false); }
+  }
+
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     if (!db || !user) return;
@@ -71,6 +97,10 @@ export default function CustomerPage() {
     setSaving(true); setError(""); setNotice("");
     try {
       const ref = doc(db, "customers", digits);
+      const existing = await getDoc(ref);
+      if (existing.exists() && existing.data().uid !== user.uid) {
+        throw new Error("यह मोबाइल नंबर पहले से दुकान के ग्राहक रिकॉर्ड में दर्ज है। सुरक्षा के लिए इसे अपने खाते से जोड़ने हेतु दुकान या Admin से संपर्क करें।");
+      }
       await setDoc(ref, {
         uid: user.uid, name: name.trim(), phone: digits, email: user.email || "",
         registered: true, updatedAt: serverTimestamp(),
@@ -78,7 +108,10 @@ export default function CustomerPage() {
       setPhone(digits);
       setNotice("आपकी जानकारी सेव हो गई।");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "जानकारी सेव नहीं हो सकी।");
+      const detail = e instanceof Error ? e.message : "";
+      setError(detail.toLowerCase().includes("permission")
+        ? "यह मोबाइल नंबर पहले से किसी दुकान के ग्राहक रिकॉर्ड में हो सकता है। सुरक्षा के लिए इसे अपने खाते से जोड़ने हेतु दुकान या Admin से संपर्क करें।"
+        : detail || "जानकारी सेव नहीं हो सकी।");
     } finally {
       setSaving(false);
     }
@@ -116,6 +149,7 @@ export default function CustomerPage() {
           <button className="admin-primary" disabled={saving}>{saving ? "सेव हो रहा है…" : "जानकारी सेव करें"}</button>
         </form>
         {error && <p className="admin-error">{error}</p>}
+        {error.toLowerCase().includes("पहले से") || error.toLowerCase().includes("पहले") ? <button type="button" className="admin-secondary" disabled={linkRequestBusy} onClick={() => void requestCustomerLink()}>{linkRequestBusy ? "रिक्वेस्ट भेजी जा रही है…" : "Admin से ग्राहक रिकॉर्ड लिंक करने की रिक्वेस्ट भेजें"}</button> : null}
         {notice && <p className="admin-success">{notice}</p>}
         <Link href="/" className="admin-primary role-link">Explore all shops</Link>
       </section>

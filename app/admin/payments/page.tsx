@@ -28,7 +28,23 @@ export default function AdminPaymentsPage() {
       getDocs(collection(firestore, "shops")),
       getDocs(collection(firestore, "utrReservations")),
     ]);
-    const allShops = shopsResult.docs.map((item) => ({ id: item.id, ...item.data() } as ShopDetails));
+    const privateByShop = new Map<string, { ownerUid?: string; ownerName?: string; ownerEmail?: string }>();
+    try {
+      const privateShopsResult = await getDocs(collection(firestore, "shopPrivate"));
+      for (const item of privateShopsResult.docs) privateByShop.set(item.id, item.data());
+    } catch {
+      // Preserve the legacy payment list until the private-record rules are published.
+    }
+    const allShops = shopsResult.docs.map((item) => {
+      const publicData = item.data();
+      const privateData = privateByShop.get(item.id) || {};
+      return {
+        id: item.id, ...publicData,
+        ownerUid: privateData.ownerUid || publicData.ownerUid,
+        ownerName: privateData.ownerName || publicData.ownerName,
+        ownerEmail: privateData.ownerEmail || publicData.ownerEmail,
+      } as ShopDetails;
+    });
     const reservations = reservationsResult.docs.map((item) => ({ id: item.id, ...item.data() } as { id: string; shopId?: string; paymentId?: string }));
     const payments = await Promise.all(result.docs.map(async (item) => {
       const payment = { id: item.id, ...item.data() } as Payment;
@@ -66,20 +82,25 @@ export default function AdminPaymentsPage() {
         const paymentRef = doc(firestore, "subscriptionPayments", payment.id);
         const shopRef = doc(firestore, "shops", payment.shopId!);
         const lockRef = doc(firestore, "paymentPendingLocks", payment.shopId!);
+        const privateShopRef = doc(firestore, "shopPrivate", payment.shopId!);
         const paymentSnap = await tx.get(paymentRef);
         const shopSnap = await tx.get(shopRef);
+        const privateShopSnap = await tx.get(privateShopRef);
         const lockSnap = await tx.get(lockRef);
         if (!paymentSnap.exists() || paymentSnap.data().status !== "pending") throw new Error("This payment is no longer pending.");
         if (!shopSnap.exists()) throw new Error("Shop record was not found.");
+        if (!privateShopSnap.exists()) throw new Error("Private shop owner record is missing. Run the Admin privacy migration before approving this payment.");
         if (!lockSnap.exists() || lockSnap.data().paymentId !== payment.id) throw new Error("Pending payment lock does not match. Do not approve; inspect the records.");
         const data = paymentSnap.data();
         const shop = shopSnap.data();
+        const privateShop = privateShopSnap.data();
+        if (!privateShop || typeof privateShop.ownerUid !== "string") throw new Error("Private shop owner UID is missing. Run the Admin privacy migration before approving this payment.");
         const initial = data.paymentType === "initial_listing";
         if (!initial && data.paymentType !== "monthly_renewal") throw new Error("Unknown payment type. Do not approve this payment.");
         const expected = initial ? 599 : 299;
         if (data.amount !== expected) throw new Error(`Payment amount does not match ₹${expected}.`);
         if (typeof data.utr !== "string" || !/^[A-Z0-9]{6,40}$/.test(data.utr)) throw new Error("UTR is missing or invalid.");
-        if (data.ownerUid !== shop.ownerUid || data.shopId !== payment.shopId) throw new Error("Payment owner or shop reference does not match.");
+        if (data.ownerUid !== privateShop.ownerUid || data.shopId !== payment.shopId) throw new Error("Payment owner or shop reference does not match.");
         if (initial && (shop.initialPaymentVerified === true || shop.subscriptionExpiresAt)) throw new Error("This shop already has an initial payment or subscription. Do not approve as first listing.");
         if (!initial && shop.initialPaymentVerified !== true && !shop.subscriptionExpiresAt) throw new Error("The first ₹599 listing payment has not been verified yet.");
         const current = shop.subscriptionExpiresAt?.toDate?.() as Date | undefined;
