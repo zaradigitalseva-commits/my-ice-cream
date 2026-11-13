@@ -1185,3 +1185,30 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 @media(prefers-reduced-motion:reduce){
   .marketplace-scroll-top{transition:none!important}
 }
+
+
+/* Shopkeeper-authored scrolling announcement on each public shop page. */
+.shop-owner-scrolling-ticker{
+  display:flex;align-items:center;gap:10px;overflow:hidden;
+  margin:0 0 12px;padding:10px 13px;border:1px solid #f4d46b;
+  border-radius:14px;background:linear-gradient(110deg,#fff9d9,#fff0b3);
+  color:#624500;box-shadow:0 3px 0 #e8c65d,0 7px 16px #8a6a0018;
+}
+.shop-owner-scrolling-ticker>span{
+  flex:0 0 auto;font-size:10px;font-weight:900;letter-spacing:.4px;
+}
+.shop-owner-scrolling-ticker>div{min-width:0;overflow:hidden;flex:1}
+.shop-owner-scrolling-ticker>div>div{
+  display:block;width:max-content;white-space:nowrap;
+  font-size:13px;font-weight:800;
+  animation:official-post-scroll 24s linear infinite;
+}
+.shop-owner-scrolling-ticker:hover>div>div{animation-play-state:paused}
+@media(max-width:600px){
+  .shop-owner-scrolling-ticker{gap:7px;padding:8px 10px;margin-bottom:9px}
+  .shop-owner-scrolling-ticker>span{font-size:9px}
+  .shop-owner-scrolling-ticker>div>div{font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){
+  .shop-owner-scrolling-ticker>div>div{animation:none;white-space:normal;width:auto}
+}
