@@ -1076,9 +1076,9 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 /* Keep the Share label readable on narrow mobile headers. */
 @media(max-width:720px){
   .marketplace-3d .topbar>.brand-3d-logo{
-    flex:0 1 40%!important;
-    width:40%!important;
-    max-width:40%!important;
+    flex:0 0 52%!important;
+    width:52%!important;
+    max-width:52%!important;
   }
   .marketplace-3d .topbar>.header-share-site{
     display:inline-flex!important;
