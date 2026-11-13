@@ -20,6 +20,7 @@ export default function HomePage() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [marketProducts, setMarketProducts] = useState<MarketplaceProduct[]>([]);
   const [customerNotices, setCustomerNotices] = useState<CustomerNotice[]>([]);
+  const [tickerNotices, setTickerNotices] = useState<CustomerNotice[]>([]);
   const [showCustomerUpdates, setShowCustomerUpdates] = useState(false);
   const [hiddenCustomerNoticeIds, setHiddenCustomerNoticeIds] = useState<string[]>([]);
   const [productLoadError, setProductLoadError] = useState("");
@@ -53,8 +54,8 @@ export default function HomePage() {
       // Their control panel remains available through the Admin Dashboard link.
       if (!db) return;
       try {
-        const owned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
-        if (!owned.empty) {
+        const ownerLock = await getDoc(doc(db, "shopOwnerLocks", nextUser.uid));
+        if (ownerLock.exists() && typeof ownerLock.data().shopId === "string" && ownerLock.data().shopId) {
           // Keep shop owners on the public customer homepage when they visit "/".
           // Their dashboard remains available through the Shop Dashboard link.
           setShopOwner(true);
@@ -114,6 +115,9 @@ export default function HomePage() {
           if (active) setCustomerNotices(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CustomerNotice)));
         })
         .catch(() => { if (active) setCustomerNotices([]); });
+      getDocs(query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(100)))
+        .then((snapshot) => { if (active) setTickerNotices(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CustomerNotice)).filter((item) => item.type === "admin" || item.type === "shopkeeper")); })
+        .catch(() => { if (active) setTickerNotices([]); });
     }
     return () => { active = false; };
   }, []);
@@ -230,7 +234,7 @@ export default function HomePage() {
     </section>
     </header>
     <section id="discover">
-      {customerNotices.some((notice) => notice.type === "admin") && <div className="official-post-ticker" aria-label="Official MY ICE CREAM announcements"><div className="official-post-ticker-label">🆕 NEW UPDATE</div><div className="official-post-ticker-window"><div className="official-post-ticker-track" style={{ animationDuration: `${Math.max(4.5, 12 / Math.sqrt(Math.max(1, customerNotices.filter((notice) => notice.type === "admin").length)))}s` }}>{[...customerNotices.filter((notice) => notice.type === "admin"), ...customerNotices.filter((notice) => notice.type === "admin")].map((notice, index) => <span className="official-post-ticker-item" key={notice.id + "-" + index}><strong>{notice.title}</strong>{notice.body ? " — " + notice.body : ""}<b>✦</b></span>)}</div></div></div>}
+      {tickerNotices.length > 0 && <div className="official-post-ticker" aria-label="Official and shopkeeper announcements"><div className="official-post-ticker-label">📢 SHOP UPDATES</div><div className="official-post-ticker-window"><div className="official-post-ticker-track" style={{ animationDuration: Math.max(4.5, 12 / Math.sqrt(tickerNotices.length)) + "s" }}>{[...tickerNotices, ...tickerNotices].map((notice, index) => <span className="official-post-ticker-item" key={notice.id + "-" + index}><strong>{notice.type === "admin" ? "MY ICE CREAM" : "🏪 " + (notice.shopName || "Shop")}: {notice.title}</strong>{notice.body ? " — " + notice.body : ""}<b>✦</b></span>)}</div></div></div>}
 
       <div className="marketplace-tools"><label className="marketplace-search"><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search ice cream, kulfi, cones…" /></label></div>
 
