@@ -106,6 +106,10 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 @keyframes store-float{0%,100%{transform:translateY(0) rotate(10deg)}50%{transform:translateY(-10px) rotate(4deg)}}
 .customer-store .admin-kicker{color:#bd5791}
 .customer-store-menu{background:linear-gradient(145deg,#fff,#fff5fb)!important}
+/* Keep the customer menu search sticky; the default admin panel clips sticky children. */
+.customer-store .customer-store-menu{overflow:visible!important}
+.customer-store .customer-product-search-wrap{position:sticky!important;top:8px;z-index:80}
+.customer-store .customer-product-search-wrap [role="listbox"]{z-index:81}
 .customer-section-title{display:flex;align-items:center;gap:14px;margin-bottom:20px}
 .customer-section-title>span{width:54px;height:54px;display:grid;place-items:center;border-radius:18px;background:linear-gradient(145deg,#ffe1ef,#ffe8ae);font-size:27px;box-shadow:0 6px 0 #edc8dc,0 12px 20px #a35c8a20}
 .customer-section-title h2{margin:0;color:#563265;font-size:24px}
