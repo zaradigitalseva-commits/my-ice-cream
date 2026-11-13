@@ -78,7 +78,7 @@ export default function ShopPage() {
   const [productsRefreshing, setProductsRefreshing] = useState(false);
   const [productRefreshMessage, setProductRefreshMessage] = useState("");
   const [adminNotices, setAdminNotices] = useState<ShopAdminNotice[]>([]);
-  const [shopPublicNotices, setShopPublicNotices] = useState<ShopPublicNotice[]>([]);
+  const [shopPublicNotice, setShopPublicNotice] = useState<ShopPublicNotice | null>(null);
   const [shopTickerTitle, setShopTickerTitle] = useState("");
   const [shopTickerBody, setShopTickerBody] = useState("");
   const [shopTickerBusy, setShopTickerBusy] = useState(false);
@@ -113,11 +113,10 @@ export default function ShopPage() {
   async function loadShopPublicNotices(shopId: string) {
     if (!db) return;
     try {
-      const result = await getDocs(query(collection(db, "notifications"), where("shopId", "==", shopId)));
-      const ownNotices = result.docs.map((item) => ({ id: item.id, ...item.data() } as ShopPublicNotice))
-        .filter((item) => item.type === "shopkeeper")
-        .sort((a, b) => (b.createdAt?.toDate?.().getTime() || 0) - (a.createdAt?.toDate?.().getTime() || 0));
-      setShopPublicNotices(ownNotices);
+      const result = await getDoc(doc(db, "notifications", "shopkeeper_" + shopId));
+      setShopPublicNotice(result.exists()
+        ? ({ id: result.id, ...result.data() } as ShopPublicNotice)
+        : null);
     } catch (loadError) {
       setError(loadError instanceof Error ? "आपकी सार्वजनिक सूचना लोड नहीं हुई: " + loadError.message : "आपकी सार्वजनिक सूचना लोड नहीं हुई।");
     }
@@ -134,7 +133,8 @@ export default function ShopPage() {
     }
     setShopTickerBusy(true); setError(""); setNotice("");
     try {
-      await addDoc(collection(db, "notifications"), {
+      // One fixed document per shop: a new message replaces the previous one.
+      await setDoc(doc(db, "notifications", "shopkeeper_" + shop.id), {
         type: "shopkeeper", shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop",
         ownerUid: user.uid, title, body, createdAt: serverTimestamp(),
       });
@@ -144,17 +144,6 @@ export default function ShopPage() {
     } catch (publishError) {
       setError(publishError instanceof Error ? "सूचना प्रकाशित नहीं हुई: " + publishError.message : "सूचना प्रकाशित नहीं हुई। Firebase Firestore Rules Publish करना जरूरी हो सकता है।");
     } finally { setShopTickerBusy(false); }
-  }
-
-  async function deleteShopTickerNotice(item: ShopPublicNotice) {
-    if (!db || !shop || !confirm("क्या आप अपनी यह सार्वजनिक सूचना हटाना चाहते हैं?")) return;
-    try {
-      await deleteDoc(doc(db, "notifications", item.id));
-      await loadShopPublicNotices(shop.id);
-      setNotice("आपकी सूचना Scrolling Text से हटा दी गई है।");
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "सूचना हटाई नहीं जा सकी।");
-    }
   }
 
   async function loadProducts(shopId: string) {
@@ -627,7 +616,7 @@ export default function ShopPage() {
       <section className="admin-panel"><h1>Register your shop</h1><p>Shopkeeper access starts with a separate shop registration. Admin approval is required before your shop is LIVE.</p><Link href="/shop/register" className="admin-primary role-link">Register Shop</Link></section> :
       <>
         <section className="admin-heading"><div><p className="admin-kicker">SHOPKEEPER AREA</p><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""} · Status: <span className={"admin-status " + (shop.status || "pending")}>{(shop.status || "pending").toLowerCase() === "live" ? "APPROVED" : (shop.status || "pending").toUpperCase()}</span></p></div></section>
-        {live && <section className="admin-panel" aria-label="Shopkeeper की सार्वजनिक Scrolling सूचना" style={{border:"2px solid #8b5cf6",background:"linear-gradient(135deg,#f5f3ff,#ecfeff)"}}><p className="admin-kicker">📢 PUBLIC SHOP UPDATE · सभी को दिखाई देगी</p><h2 style={{marginTop:0}}>Homepage Scrolling Text में सूचना लिखें</h2><p className="admin-muted">यह सूचना सभी ग्राहकों और सभी दुकानों को Homepage पर दिखाई देगी। कृपया केवल दुकान से जुड़ी सही जानकारी लिखें।</p><form onSubmit={publishShopTickerNotice} style={{display:"grid",gap:10,maxWidth:720}}><label>शीर्षक <input value={shopTickerTitle} onChange={(event) => setShopTickerTitle(event.target.value)} maxLength={120} required placeholder="जैसे: आज नया फ्लेवर उपलब्ध है" style={{display:"block",width:"100%",marginTop:5,padding:11,border:"1px solid #c4b5fd",borderRadius:10}} /></label><label>सूचना <textarea value={shopTickerBody} onChange={(event) => setShopTickerBody(event.target.value)} maxLength={300} required rows={3} placeholder="ग्राहकों के लिए अपनी सूचना लिखें…" style={{display:"block",width:"100%",marginTop:5,padding:11,border:"1px solid #c4b5fd",borderRadius:10}} /></label><small className="admin-muted">{shopTickerTitle.length}/120 · {shopTickerBody.length}/300 अक्षर</small><button className="admin-primary" type="submit" disabled={shopTickerBusy}>{shopTickerBusy ? "प्रकाशित हो रहा है…" : "📢 Scrolling Text में प्रकाशित करें"}</button></form>{shopPublicNotices.length > 0 && <div style={{marginTop:18}}><h3>आपकी प्रकाशित सूचनाएँ</h3>{shopPublicNotices.map((item) => <article key={item.id} style={{padding:"12px 0",borderTop:"1px solid #ddd6fe"}}><strong>{item.title}</strong><p style={{margin:"5px 0",whiteSpace:"pre-wrap"}}>{item.body}</p><div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center"}}><small className="admin-muted">{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString("hi-IN") : ""}</small><button type="button" className="admin-secondary" onClick={() => void deleteShopTickerNotice(item)}>अपनी सूचना Delete करें</button></div></article>)}</div>}</section>}
+        {live && <section className="admin-panel" aria-label="Shopkeeper की सार्वजनिक Scrolling सूचना" style={{border:"2px solid #8b5cf6",background:"linear-gradient(135deg,#f5f3ff,#ecfeff)"}}><p className="admin-kicker">📢 PUBLIC SHOP UPDATE · सभी को दिखाई देगी</p><h2 style={{marginTop:0}}>Homepage Scrolling Text में सूचना लिखें</h2><p className="admin-muted">यह सूचना सभी ग्राहकों और सभी दुकानों को Homepage पर दिखाई देगी। कृपया केवल दुकान से जुड़ी सही जानकारी लिखें।</p><form onSubmit={publishShopTickerNotice} style={{display:"grid",gap:10,maxWidth:720}}><label>शीर्षक <input value={shopTickerTitle} onChange={(event) => setShopTickerTitle(event.target.value)} maxLength={120} required placeholder="जैसे: आज नया फ्लेवर उपलब्ध है" style={{display:"block",width:"100%",marginTop:5,padding:11,border:"1px solid #c4b5fd",borderRadius:10}} /></label><label>सूचना <textarea value={shopTickerBody} onChange={(event) => setShopTickerBody(event.target.value)} maxLength={300} required rows={3} placeholder="ग्राहकों के लिए अपनी सूचना लिखें…" style={{display:"block",width:"100%",marginTop:5,padding:11,border:"1px solid #c4b5fd",borderRadius:10}} /></label><small className="admin-muted">{shopTickerTitle.length}/120 · {shopTickerBody.length}/300 अक्षर</small><button className="admin-primary" type="submit" disabled={shopTickerBusy}>{shopTickerBusy ? "प्रकाशित हो रहा है…" : "📢 Scrolling Text में प्रकाशित करें"}</button></form>{shopPublicNotice && <div style={{marginTop:18}}><h3>अभी Homepage पर प्रकाशित सूचना</h3><article style={{padding:"12px 0",borderTop:"1px solid #ddd6fe"}}><strong>{shopPublicNotice.title}</strong><p style={{margin:"5px 0",whiteSpace:"pre-wrap"}}>{shopPublicNotice.body}</p><small className="admin-muted">{shopPublicNotice.createdAt?.toDate ? shopPublicNotice.createdAt.toDate().toLocaleString("hi-IN") : ""}</small></article></div>}</section>}
         {adminNotices.length > 0 && <section className="admin-panel" aria-label="Admin की निजी Shopkeeper सूचना" style={{border:"2px solid #f0b64d",background:"linear-gradient(135deg,#fff9e8,#fff1f2)"}}><p className="admin-kicker">🔔 ADMIN NOTICE · केवल SHOPKEEPER के लिए</p><h2 style={{marginTop:0}}>दुकान के लिए जरूरी सूचना</h2>{adminNotices.map((item) => <article key={item.id} style={{padding:"12px 0",borderTop:"1px solid #f2d9a6"}}><h3 style={{margin:"0 0 6px"}}>{item.title || "Admin सूचना"}</h3><p style={{whiteSpace:"pre-wrap",margin:"0 0 6px"}}>{item.body || ""}</p><small className="admin-muted">{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString("hi-IN") : ""}</small></article>)}</section>}
 
         <section className="admin-panel" aria-live="polite">
