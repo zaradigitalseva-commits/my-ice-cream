@@ -45,6 +45,7 @@ export default function ShopPage() {
   const [offerDescription, setOfferDescription] = useState("");
   const [offerExpiresAt, setOfferExpiresAt] = useState("");
   const [scrollingText, setScrollingText] = useState("");
+  const [scrollingSavedMessage, setScrollingSavedMessage] = useState("");
   const [productId, setProductId] = useState("");
   const [productName, setProductName] = useState("");
   const [productDescription, setProductDescription] = useState("");
@@ -411,12 +412,14 @@ export default function ShopPage() {
   async function saveScrollingText() {
     if (!db || !shop) return;
     const value = scrollingText.trim();
+    setScrollingSavedMessage("");
     if (!value) { setError("पहले संदेश लिखें। हटाने के लिए Message हटाएँ बटन दबाएँ।"); return; }
     setBusy(true); setError(""); setNotice("");
     try {
       // Saving a new message replaces the previous message for this shop.
       await updateDoc(doc(db, "shops", shop.id), { scrollingText: value, updatedAt: serverTimestamp() });
       setShop({ ...shop, scrollingText: value });
+      setScrollingSavedMessage("✓ Scrolling Message सफलतापूर्वक सेव हो गया है। Home Page पर दिखेगा।");
       setNotice("नया Scrolling message सेव हो गया। पुराना संदेश बदल दिया गया है।");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scrolling message सेव नहीं हो सका।");
@@ -675,6 +678,7 @@ export default function ShopPage() {
               <button type="button" className="admin-secondary" disabled={busy || !shop?.scrollingText} onClick={()=>void clearScrollingText()}>Message हटाएँ</button>
             </div>
           </form>
+          {scrollingSavedMessage && <p className="admin-success" role="status" aria-live="polite" style={{marginTop:12,fontWeight:700}}>{scrollingSavedMessage}</p>}
           <hr />
           <h3>Customer Offer / Promotion</h3>
           <div className="register-form">
