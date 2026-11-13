@@ -15,6 +15,7 @@ type CustomerOrder = { id: string; customerName?: string; customerEmail?: string
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
 type SubscriptionPayment = { id: string; amount?: number; paymentType?: string; utr?: string; status?: string; createdAt?: { toDate?: () => Date } };
 type ShopAdminNotice = { id: string; title?: string; body?: string; createdAt?: { toDate?: () => Date } };
+type ShopPublicNotice = { id: string; type?: string; shopId?: string; shopName?: string; ownerUid?: string; title?: string; body?: string; createdAt?: { toDate?: () => Date } };
 
 export default function ShopPage() {
   const router = useRouter();
@@ -77,6 +78,10 @@ export default function ShopPage() {
   const [productsRefreshing, setProductsRefreshing] = useState(false);
   const [productRefreshMessage, setProductRefreshMessage] = useState("");
   const [adminNotices, setAdminNotices] = useState<ShopAdminNotice[]>([]);
+  const [shopPublicNotice, setShopPublicNotice] = useState<ShopPublicNotice | null>(null);
+  const [shopTickerTitle, setShopTickerTitle] = useState("");
+  const [shopTickerBody, setShopTickerBody] = useState("");
+  const [shopTickerBusy, setShopTickerBusy] = useState(false);
 
   useEffect(() => {
     if (!activeShopSection) return;
@@ -105,6 +110,49 @@ export default function ShopPage() {
       // Admin notices are optional. A notice-read permission/network issue must
       // not display a scary Firebase error in the shopkeeper dashboard.
       setAdminNotices([]);
+    }
+  }
+
+  async function loadShopPublicNotice(shopId: string) {
+    if (!db) return;
+    try {
+      const result = await getDoc(doc(db, "notifications", "shopkeeper_" + shopId));
+      setShopPublicNotice(result.exists()
+        ? ({ id: result.id, ...result.data() } as ShopPublicNotice)
+        : null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? "आपकी सार्वजनिक सूचना लोड नहीं हुई: " + loadError.message : "आपकी सार्वजनिक सूचना लोड नहीं हुई।");
+    }
+  }
+
+  async function publishShopTickerNotice(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!db || !shop || !user || !live || shopTickerBusy) return;
+    const title = shopTickerTitle.trim();
+    const body = shopTickerBody.trim();
+    if (!title || title.length > 120 || !body || body.length > 300) {
+      setError("शीर्षक 1–120 और सूचना 1–300 अक्षरों में लिखें।");
+      return;
+    }
+    setShopTickerBusy(true); setError(""); setNotice("");
+    try {
+      // A fixed document per shop means a new message replaces the previous one.
+      await setDoc(doc(db, "notifications", "shopkeeper_" + shop.id), {
+        type: "shopkeeper",
+        shopId: shop.id,
+        shopName: shop.name || shop.shopName || "Ice Cream Shop",
+        ownerUid: user.uid,
+        title,
+        body,
+        createdAt: serverTimestamp(),
+      });
+      setShopTickerTitle(""); setShopTickerBody("");
+      await loadShopPublicNotice(shop.id);
+      setNotice("नई Scrolling सूचना प्रकाशित हो गई। पुरानी सूचना अपने-आप बदल गई।");
+    } catch (publishError) {
+      setError(publishError instanceof Error ? "सूचना प्रकाशित नहीं हुई: " + publishError.message : "सूचना प्रकाशित नहीं हुई। Firebase Firestore Rules Publish करना जरूरी हो सकता है।");
+    } finally {
+      setShopTickerBusy(false);
     }
   }
 
@@ -143,6 +191,7 @@ export default function ShopPage() {
           const isLiveShop = ["live", "LIVE", "Live"].includes(String(data.status || ""));
           setShop(data);
           await loadShopAdminNotices(data.id);
+          await loadShopPublicNotice(data.id);
           if (window.location.hash === "#shop-profile") setActiveShopSection("profile");
           const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
           setPendingPayment(lock.exists() && !isLiveShop); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
@@ -173,6 +222,7 @@ export default function ShopPage() {
         const latest = { id: owned.id, ...owned.data() } as Shop;
         setShop(latest);
         await loadShopAdminNotices(latest.id);
+        await loadShopPublicNotice(latest.id);
         const lock = await getDoc(doc(firestore, "paymentPendingLocks", latest.id));
         if (!active) return;
         const isLive = ["live", "LIVE", "Live"].includes(String(latest.status || ""));
@@ -567,6 +617,18 @@ export default function ShopPage() {
         <section className="admin-heading"><div><p className="admin-kicker">SHOPKEEPER AREA</p><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""} · Status: <span className={"admin-status " + (shop.status || "pending")}>{(shop.status || "pending").toLowerCase() === "live" ? "APPROVED" : (shop.status || "pending").toUpperCase()}</span></p></div></section>
         {adminNotices.length > 0 && <section className="admin-panel" aria-label="Admin की निजी Shopkeeper सूचना" style={{border:"2px solid #f0b64d",background:"linear-gradient(135deg,#fff9e8,#fff1f2)"}}><p className="admin-kicker">🔔 ADMIN NOTICE · केवल SHOPKEEPER के लिए</p><h2 style={{marginTop:0}}>दुकान के लिए जरूरी सूचना</h2>{adminNotices.map((item) => <article key={item.id} style={{padding:"12px 0",borderTop:"1px solid #f2d9a6"}}><h3 style={{margin:"0 0 6px"}}>{item.title || "Admin सूचना"}</h3><p style={{whiteSpace:"pre-wrap",margin:"0 0 6px"}}>{item.body || ""}</p><small className="admin-muted">{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString("hi-IN") : ""}</small></article>)}</section>}
 
+        {live && <section className="admin-panel" aria-label="Shopkeeper की सार्वजनिक Scrolling सूचना" style={{border:"2px solid #8b5cf6",background:"linear-gradient(135deg,#f5f3ff,#ecfeff)"}}>
+          <p className="admin-kicker">📢 PUBLIC SHOP UPDATE · सभी ग्राहकों को दिखाई देगी</p>
+          <h2 style={{marginTop:0}}>Homepage Scrolling Text</h2>
+          <p className="admin-muted">यह सुविधा Registration से अलग है। नया संदेश प्रकाशित करने पर आपकी पिछली सूचना अपने-आप बदल जाएगी। Delete करने का विकल्प नहीं है।</p>
+          <form onSubmit={publishShopTickerNotice} style={{display:"grid",gap:10,maxWidth:720}}>
+            <label>शीर्षक <input value={shopTickerTitle} onChange={(event) => setShopTickerTitle(event.target.value)} maxLength={120} required placeholder="जैसे: आज नया फ्लेवर उपलब्ध है" style={{display:"block",width:"100%",marginTop:5,padding:11,border:"1px solid #c4b5fd",borderRadius:10}} /></label>
+            <label>सूचना <textarea value={shopTickerBody} onChange={(event) => setShopTickerBody(event.target.value)} maxLength={300} required rows={3} placeholder="ग्राहकों के लिए अपनी सूचना लिखें…" style={{display:"block",width:"100%",marginTop:5,padding:11,border:"1px solid #c4b5fd",borderRadius:10}} /></label>
+            <small className="admin-muted">{shopTickerTitle.length}/120 · {shopTickerBody.length}/300 अक्षर</small>
+            <button className="admin-primary" type="submit" disabled={shopTickerBusy}>{shopTickerBusy ? "प्रकाशित हो रहा है…" : "📢 Scrolling Text प्रकाशित करें"}</button>
+          </form>
+          {shopPublicNotice && <div style={{marginTop:18}}><h3>अभी Homepage पर प्रकाशित सूचना</h3><article style={{padding:"12px 0",borderTop:"1px solid #ddd6fe"}}><strong>{shopPublicNotice.title}</strong><p style={{margin:"5px 0",whiteSpace:"pre-wrap"}}>{shopPublicNotice.body}</p><small className="admin-muted">{shopPublicNotice.createdAt?.toDate ? shopPublicNotice.createdAt.toDate().toLocaleString("hi-IN") : ""}</small></article></div>}
+        </section>}
         <section className="admin-panel" aria-live="polite">
           <p className="admin-kicker">REGISTRATION TRACKING</p>
           <h2>आपकी दुकान की स्थिति</h2>
