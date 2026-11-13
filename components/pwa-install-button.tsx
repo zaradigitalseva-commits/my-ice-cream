@@ -93,11 +93,12 @@ export default function PwaInstallButton() {
   // Register this browser after permission is granted. Visitors without a Google
   // account receive an anonymous Firebase identity; no phone, OTP, or paid SMS.
   useEffect(() => {
-    if (!auth || typeof window === "undefined" || !("Notification" in window)) return;
-    return onAuthStateChanged(auth, async (currentUser) => {
+    const currentAuth = auth;
+    if (!currentAuth || typeof window === "undefined" || !("Notification" in window)) return;
+    return onAuthStateChanged(currentAuth, async (currentUser) => {
       if (Notification.permission !== "granted") return;
       try {
-        const user = currentUser || (await signInAnonymously(auth)).user;
+        const user = currentUser || (await signInAnonymously(currentAuth)).user;
         await registerPushSubscription(user.uid);
         setNotificationsEnabled(true);
         setNotificationMessage("इस डिवाइस पर Notifications चालू हैं।");
