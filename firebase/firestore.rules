@@ -91,6 +91,49 @@ service cloud.firestore {
         + (items.size() > 6 ? items[6].price * items[6].quantity : 0)
         + (items.size() > 7 ? items[7].price * items[7].quantity : 0);
     }
+    function validSaleItem(shopId, item) {
+      return item is map
+        && item.keys().hasOnly(["productId", "name", "quantity", "price"])
+        && item.productId is string
+        && item.productId.size() > 0
+        && item.name is string
+        && item.name.size() > 0
+        && item.name.size() <= 120
+        && item.quantity is int
+        && item.quantity > 0
+        && item.quantity <= 100
+        && item.price is number
+        && item.price >= 0
+        && exists(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId))
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.shopId == shopId
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.active == true
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.name == item.name
+        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.price == item.price;
+    }
+
+    function validSaleItems(shopId, items) {
+      return items is list && items.size() > 0 && items.size() <= 8
+        && validSaleItem(shopId, items[0])
+        && (items.size() < 2 || validSaleItem(shopId, items[1]))
+        && (items.size() < 3 || validSaleItem(shopId, items[2]))
+        && (items.size() < 4 || validSaleItem(shopId, items[3]))
+        && (items.size() < 5 || validSaleItem(shopId, items[4]))
+        && (items.size() < 6 || validSaleItem(shopId, items[5]))
+        && (items.size() < 7 || validSaleItem(shopId, items[6]))
+        && (items.size() < 8 || validSaleItem(shopId, items[7]));
+    }
+
+    function saleItemsSubtotal(items) {
+      return items[0].price * items[0].quantity
+        + (items.size() > 1 ? items[1].price * items[1].quantity : 0)
+        + (items.size() > 2 ? items[2].price * items[2].quantity : 0)
+        + (items.size() > 3 ? items[3].price * items[3].quantity : 0)
+        + (items.size() > 4 ? items[4].price * items[4].quantity : 0)
+        + (items.size() > 5 ? items[5].price * items[5].quantity : 0)
+        + (items.size() > 6 ? items[6].price * items[6].quantity : 0)
+        + (items.size() > 7 ? items[7].price * items[7].quantity : 0);
+    }
+
     function validProduct(data, shopId) {
       return data.keys().hasOnly([
           "shopId", "ownerUid", "name", "description", "price",
@@ -253,19 +296,15 @@ service cloud.firestore {
             && ownsShop(request.resource.data.createdByShopId)
             && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)))
         );
+      // A phone number entered by itself is not proof of ownership.
+      // Existing shop-created customer records cannot be claimed by a Google account.
+      // Only the account already linked to this record may update its profile.
       allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
         && request.resource.data.phone == resource.data.phone
-        && (
-          (resource.data.uid == request.auth.uid
-            && request.resource.data.uid == request.auth.uid
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(["name", "email", "updatedAt", "registered"]))
-          || (resource.data.uid == ""
-            && request.resource.data.uid == request.auth.uid
-            && request.resource.data.registered == true
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(["uid", "name", "email", "registered", "updatedAt"]))
-        );
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["name", "email", "updatedAt", "registered"]);
       allow delete: if isAdmin();
     }
     match /sales/{saleId} {
@@ -290,11 +329,10 @@ service cloud.firestore {
           == get(/databases/$(database)/documents/customers/$(request.resource.data.customerPhone)).data.uid
         && request.resource.data.shopName is string
         && request.resource.data.customerName is string
-        && request.resource.data.items is list
-        && request.resource.data.items.size() > 0
-        && request.resource.data.items.size() <= 100
+        && validSaleItems(request.resource.data.shopId, request.resource.data.items)
         && request.resource.data.subtotal is number
         && request.resource.data.subtotal >= 0
+        && request.resource.data.subtotal == saleItemsSubtotal(request.resource.data.items)
         && request.resource.data.discount is number
         && request.resource.data.discount >= 0
         && request.resource.data.discount <= request.resource.data.subtotal
