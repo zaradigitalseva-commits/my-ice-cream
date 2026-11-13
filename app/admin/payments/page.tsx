@@ -23,13 +23,18 @@ export default function AdminPaymentsPage() {
   async function loadPayments() {
     if (!db) return;
     const firestore = db;
-    const [result, shopsResult, privateShopsResult, reservationsResult] = await Promise.all([
+    const [result, shopsResult, reservationsResult] = await Promise.all([
       getDocs(collection(firestore, "subscriptionPayments")),
       getDocs(collection(firestore, "shops")),
-      getDocs(collection(firestore, "shopPrivate")),
       getDocs(collection(firestore, "utrReservations")),
     ]);
-    const privateByShop = new Map(privateShopsResult.docs.map((item) => [item.id, item.data()]));
+    const privateByShop = new Map<string, { ownerUid?: string; ownerName?: string; ownerEmail?: string }>();
+    try {
+      const privateShopsResult = await getDocs(collection(firestore, "shopPrivate"));
+      for (const item of privateShopsResult.docs) privateByShop.set(item.id, item.data());
+    } catch {
+      // Preserve the legacy payment list until the private-record rules are published.
+    }
     const allShops = shopsResult.docs.map((item) => {
       const publicData = item.data();
       const privateData = privateByShop.get(item.id) || {};
