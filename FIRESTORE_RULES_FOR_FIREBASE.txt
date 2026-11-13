@@ -158,7 +158,7 @@ service cloud.firestore {
             "pickupAvailable", "deliveryAvailable",
             "openingTime", "closingTime", "closedDays",
             "manualClosed", "deliveryFee", "minimumOrder",
-            "offerTitle", "offerDescription", "offerExpiresAt",
+            "offerTitle", "offerDescription", "offerExpiresAt", "scrollingText",
             "updatedAt"
           ])
         );
