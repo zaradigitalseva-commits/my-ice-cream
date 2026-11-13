@@ -1130,3 +1130,58 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
   transform:translateY(1px) scale(.98)!important;
   box-shadow:0 1px 0 #7136a4,0 3px 8px #873fc044!important;
 }
+
+
+/* Yellow 3D Share button and fixed scroll-to-top control. */
+.marketplace-3d .topbar>.header-share-site{
+  border:1px solid #ffe08a!important;
+  background:linear-gradient(135deg,#fff16a 0%,#ffc928 52%,#f5a900 100%)!important;
+  color:#553500!important;
+  text-shadow:0 1px 0 #fff8c7!important;
+  box-shadow:0 3px 0 #c88700,0 7px 16px #d99b003d!important;
+}
+.marketplace-3d .topbar>.header-share-site:hover{
+  transform:translateY(-2px)!important;
+  filter:saturate(1.08) brightness(1.03);
+  box-shadow:0 5px 0 #c88700,0 10px 20px #d99b0050!important;
+}
+.marketplace-3d .topbar>.header-share-site:active{
+  transform:translateY(1px) scale(.98)!important;
+  box-shadow:0 1px 0 #c88700,0 3px 8px #d99b003d!important;
+}
+.marketplace-scroll-top{
+  position:fixed!important;
+  left:50%!important;
+  bottom:18px!important;
+  z-index:2500!important;
+  display:grid!important;
+  place-items:center!important;
+  width:48px!important;
+  height:48px!important;
+  padding:0!important;
+  border:2px solid #fff4b8!important;
+  border-radius:50%!important;
+  background:linear-gradient(145deg,#fff06a,#ffbd16)!important;
+  color:#593800!important;
+  font-size:30px!important;
+  font-weight:900!important;
+  line-height:1!important;
+  box-shadow:0 4px 0 #c88700,0 8px 20px #8b5c0038!important;
+  transform:translateX(-50%)!important;
+  cursor:pointer!important;
+  transition:transform .18s ease,box-shadow .18s ease!important;
+}
+.marketplace-scroll-top:hover{
+  transform:translate(-50%,-3px)!important;
+  box-shadow:0 6px 0 #c88700,0 12px 24px #8b5c0048!important;
+}
+.marketplace-scroll-top:active{
+  transform:translate(-50%,1px)!important;
+  box-shadow:0 2px 0 #c88700,0 4px 10px #8b5c0038!important;
+}
+@media(max-width:720px){
+  .marketplace-scroll-top{bottom:14px!important;width:46px!important;height:46px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .marketplace-scroll-top{transition:none!important}
+}
