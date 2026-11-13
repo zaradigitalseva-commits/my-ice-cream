@@ -235,6 +235,7 @@ export default function HomePage() {
       </div>}
     </section>
     </header>
+    <section id="discover">
       {tickerNotices.length > 0 && <div className="official-post-ticker" aria-label="Official and shopkeeper announcements"><div className="official-post-ticker-label">📢 SHOP UPDATES</div><div className="official-post-ticker-window"><div className="official-post-ticker-track" style={{ animationDuration: Math.max(4.5, 12 / Math.sqrt(tickerNotices.length)) + "s" }}>{[...tickerNotices, ...tickerNotices].map((notice, index) => <span className="official-post-ticker-item" key={notice.id + "-" + index}><strong>{notice.type === "admin" ? "MY ICE CREAM" : "🏪 " + (notice.shopName || "Shop")}: {notice.title}</strong>{notice.body ? " — " + notice.body : ""}<b>✦</b></span>)}</div></div></div>}
 
       <div className="marketplace-tools"><label className="marketplace-search"><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search ice cream, kulfi, cones…" /></label></div>
