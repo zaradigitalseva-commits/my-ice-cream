@@ -408,9 +408,11 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isAdmin()
         || (signedIn()
+          && request.resource.data.keys().hasOnly(["shopId", "ownerUid", "ownerName", "ownerEmail", "createdAt", "updatedAt", "migratedAt"])
           && request.resource.data.shopId == shopId
           && request.resource.data.ownerUid == request.auth.uid
-          && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId);
+          && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId
+          && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.status == "pending");
       allow update, delete: if isAdmin();
     }
 
