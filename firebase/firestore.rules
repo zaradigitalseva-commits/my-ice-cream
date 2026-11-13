@@ -17,10 +17,11 @@ service cloud.firestore {
         ];
     }
 
+    // Owner identity is held in the private owner-lock collection, not public shop data.
     function ownsShop(shopId) {
       return signedIn()
-        && get(/databases/$(database)/documents/shops/$(shopId))
-          .data.ownerUid == request.auth.uid;
+        && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
+        && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId;
     }
 
     function validSubscription(shopData) {
@@ -136,12 +137,11 @@ service cloud.firestore {
 
     function validProduct(data, shopId) {
       return data.keys().hasOnly([
-          "shopId", "ownerUid", "name", "description", "price",
+          "shopId", "name", "description", "price",
           "originalPrice", "category", "stock", "imageUrl", "active",
           "updatedAt", "createdAt"
         ])
         && data.shopId == shopId
-        && data.ownerUid == request.auth.uid
         && data.name is string
         && data.name.size() > 0
         && data.name.size() <= 120
@@ -160,15 +160,18 @@ service cloud.firestore {
     match /shops/{shopId} {
 
       allow read: if isAdmin()
-        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || ownsShop(shopId)
         // Public can read only shops already marked LIVE by Admin.
         || resource.data.status in ["live", "LIVE", "Live"];
 
       // A shop owner may register only a pending shop.
       // Subscription and admin-activation fields cannot be self-granted.
       allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid
+        && !("ownerUid" in request.resource.data)
+        && !("ownerName" in request.resource.data)
+        && !("ownerEmail" in request.resource.data)
         && request.resource.data.status == "pending"
+        && getAfter(/databases/$(database)/documents/shopPrivate/$(shopId)).data.ownerUid == request.auth.uid
         && (
           !("subscriptionStatus" in request.resource.data)
           || request.resource.data.subscriptionStatus in ["inactive", "expired"]
@@ -203,9 +206,16 @@ service cloud.firestore {
           )
         )
         || (
-          signedIn()
-          && resource.data.ownerUid == request.auth.uid
-          && request.resource.data.ownerUid == resource.data.ownerUid
+          isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "ownerUid", "ownerName", "ownerEmail"
+          ])
+          && !("ownerUid" in request.resource.data)
+          && !("ownerName" in request.resource.data)
+          && !("ownerEmail" in request.resource.data)
+        )
+        || (
+          ownsShop(shopId)
           && request.resource.data.status == resource.data.status
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "name", "shopName", "phone", "city", "address",
@@ -264,7 +274,6 @@ service cloud.firestore {
           || (
             ownsShop(shopId)
             && liveShop(shopId)
-            && resource.data.ownerUid == request.auth.uid
           );
       }
     }
@@ -388,6 +397,18 @@ service cloud.firestore {
         && request.resource.data.shopId.size() > 0;
       allow update: if false;
       allow delete: if isAdmin();
+    }
+
+    // Private shop owner identity; public clients cannot list or read these records.
+    match /shopPrivate/{shopId} {
+      allow get: if isAdmin() || ownsShop(shopId);
+      allow list: if isAdmin();
+      allow create: if isAdmin()
+        || (signedIn()
+          && request.resource.data.shopId == shopId
+          && request.resource.data.ownerUid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId);
+      allow update, delete: if isAdmin();
     }
 
     match /orders/{orderId} {
@@ -578,7 +599,7 @@ service cloud.firestore {
         && request.resource.data.createdAt is timestamp
       ) || (signedIn()
         && request.resource.data.keys().hasOnly([
-          "type", "shopId", "shopName", "ownerUid", "productId", "title", "body", "createdAt"
+          "type", "shopId", "shopName", "productId", "title", "body", "createdAt"
         ])
         && request.resource.data.shopId is string
         && ownsShop(request.resource.data.shopId)
@@ -597,14 +618,13 @@ service cloud.firestore {
             request.resource.data.type == "product"
             && request.resource.data.productId is string
             && exists(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId))
-            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.ownerUid == request.auth.uid
+            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.shopId == request.resource.data.shopId
             && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.active == true
             && request.resource.data.title == "नया प्रोडक्ट: " + get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)/products/$(request.resource.data.productId)).data.name
           )
           || (
             request.resource.data.type == "shopkeeper"
             && !("productId" in request.resource.data)
-            && request.resource.data.ownerUid == request.auth.uid
             && validShopkeeperNoticeName(request.resource.data.shopId, request.resource.data.shopName)
             && request.resource.data.body.size() > 0
           )
@@ -625,7 +645,6 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if isAdmin() || (signedIn()
         && resource.data.type == "shopkeeper"
-        && resource.data.ownerUid == request.auth.uid
         && ownsShop(resource.data.shopId));
     }
 
