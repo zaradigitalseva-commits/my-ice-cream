@@ -70,7 +70,7 @@ export default function ShopPage() {
   const [discountValue, setDiscountValue] = useState("0");
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
   const [salePayment, setSalePayment] = useState<"paid" | "unpaid">("paid");
-  const [activeShopSection, setActiveShopSection] = useState<"profile" | "payments" | "products" | "myProducts" | "">("");
+  const [activeShopSection, setActiveShopSection] = useState<"profile" | "payments" | "products" | "myProducts" | "promotion" | "">("");
   const [paymentHistory, setPaymentHistory] = useState<SubscriptionPayment[]>([]);
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
   const [whatsAppUrl, setWhatsAppUrl] = useState("");
@@ -86,6 +86,7 @@ export default function ShopPage() {
       payments: "shop-payments",
       products: "shop-add-product",
       myProducts: "shop-my-products",
+      promotion: "shop-promotion",
     };
     const timer = window.setTimeout(() => {
       document.getElementById(sectionIds[activeShopSection])?.scrollIntoView({
@@ -400,22 +401,24 @@ export default function ShopPage() {
     if (!db || !shop) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      const isFirstOfferPublication = !(shop.offerTitle?.trim() || shop.offerDescription?.trim()) && Boolean(offerTitle.trim() || offerDescription.trim());
-      await updateDoc(doc(db, "shops", shop.id), { name: name.trim(), shopName: name.trim(), phone: phone.trim(), city: city.trim(), address: address.trim(), description: description.trim(), logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt, scrollingText: scrollingText.trim(), updatedAt: serverTimestamp() });
-      if (isFirstOfferPublication) {
-        try {
-          await setDoc(doc(db, "notifications", shop.id + "_offer_" + Date.now()), {
-            type: "offer", shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop",
-            title: offerTitle.trim() || "New shop offer",
-            body: offerDescription.trim() || "इस दुकान पर नया ऑफर आया है।",
-            createdAt: serverTimestamp()
-          });
-        } catch { /* Notification failure must not undo a saved profile. */ }
-      }
+      await updateDoc(doc(db, "shops", shop.id), { name: name.trim(), shopName: name.trim(), phone: phone.trim(), city: city.trim(), address: address.trim(), description: description.trim(), logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), updatedAt: serverTimestamp() });
       setShop({ ...shop, name: name.trim(), shopName: name.trim(), phone, city, address, description, logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), offerTitle: offerTitle.trim(), offerDescription: offerDescription.trim(), offerExpiresAt, scrollingText: scrollingText.trim() });
       setNotice("सेव हो गया। दुकान की जानकारी सफलतापूर्वक अपडेट हो गई है।");
     } catch (e) { setError(e instanceof Error ? e.message : "Profile update failed."); }
     finally { setBusy(false); }
+  }
+
+  async function saveScrollingText() {
+    if (!db || !shop) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const value = scrollingText.trim();
+      await updateDoc(doc(db, "shops", shop.id), { scrollingText: value, updatedAt: serverTimestamp() });
+      setShop({ ...shop, scrollingText: value });
+      setNotice(value ? "Scrolling message सेव हो गया।" : "Scrolling message हटा दिया गया।");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Scrolling message सेव नहीं हो सका।");
+    } finally { setBusy(false); }
   }
 
   async function saveOffer() {
@@ -643,8 +646,30 @@ export default function ShopPage() {
             <button type="button" className={activeShopSection === "payments" ? "admin-primary" : "admin-secondary"} onClick={()=>{if(activeShopSection === "payments")setActiveShopSection("");else void openPaymentHistory();}}>Payment History</button>
             <button type="button" className={activeShopSection === "products" ? "admin-primary" : "admin-secondary"} onClick={()=>{resetProduct();setActiveShopSection(activeShopSection === "products" ? "" : "products");}}>Add Product</button>
             <button type="button" className={activeShopSection === "myProducts" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "myProducts" ? "" : "myProducts")}>My Products</button>
+            <button type="button" className={activeShopSection === "promotion" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "promotion" ? "" : "promotion")}>Scrolling Message / Offer</button>
           </div>
         </section>
+        {activeShopSection === "promotion" && <section className="admin-panel" id="shop-promotion" style={{scrollMarginTop:20}}>
+          <p className="admin-kicker">SHOP PROMOTION</p><h2>Scrolling Message / Offer</h2>
+          <h3>दुकान का Scrolling Message</h3>
+          <form className="register-form" onSubmit={e=>{e.preventDefault();void saveScrollingText();}}>
+            <label>ग्राहकों को दिखने वाला संदेश<textarea rows={2} maxLength={180} value={scrollingText} onChange={e=>setScrollingText(e.target.value)} placeholder="जैसे: आज सभी कुल्फी पर 10% छूट!" /></label>
+            <p className="admin-muted">यह संदेश आपकी दुकान के पेज पर चलता हुआ दिखेगा। खाली करके सेव करने पर हट जाएगा।</p>
+            <button className="admin-primary" disabled={busy}>{busy ? "सेव हो रहा है…" : "Scrolling Message सेव करें"}</button>
+          </form>
+          <hr />
+          <h3>Customer Offer / Promotion</h3>
+          <div className="register-form">
+            <label>Offer title<input maxLength={60} value={offerTitle} onChange={e=>setOfferTitle(e.target.value)} placeholder="जैसे: Buy 2 Get 1 Free" /></label>
+            <label>Offer details<textarea rows={2} maxLength={240} value={offerDescription} onChange={e=>setOfferDescription(e.target.value)} placeholder="ऑफर की जानकारी लिखें" /></label>
+            <label>Offer valid until<input type="date" value={offerExpiresAt} onChange={e=>setOfferExpiresAt(e.target.value)} /></label>
+            <div className="admin-actions" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+              <button type="button" className="admin-primary" disabled={busy} onClick={()=>void saveOffer()}>{busy ? "सेव हो रहा है…" : "Offer सेव करें"}</button>
+              <button type="button" className="admin-secondary" disabled={busy||(!offerTitle&&!offerDescription&&!offerExpiresAt)} onClick={()=>void deleteOffer()}>Offer हटाएँ</button>
+            </div>
+            <p className="admin-muted">Offer सेव करने पर ग्राहक आपकी दुकान के पेज पर देख सकेंगे।</p>
+          </div>
+        </section>}
         {activeShopSection === "payments" && <section className="admin-panel" id="shop-payments" style={{scrollMarginTop:20}}><h2>Payment History</h2><p>आपकी दुकान की subscription payments और verification status.</p>
           {paymentHistoryLoading ? <p className="admin-muted">Payment history लोड हो रही है…</p> : paymentHistory.length === 0 ? <p className="admin-muted">अभी कोई payment record नहीं मिला।</p> :
             <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Date</th><th>Amount</th><th>Payment</th><th>UTR</th><th>Status</th></tr></thead><tbody>
@@ -668,18 +693,6 @@ export default function ShopPage() {
           <h3>Delivery settings</h3>
           <label>Delivery charge (₹)<input type="number" min="0" step="1" value={deliveryFee} onChange={e=>setDeliveryFee(e.target.value)} /></label>
           <label>Minimum order (₹)<input type="number" min="0" step="1" value={minimumOrder} onChange={e=>setMinimumOrder(e.target.value)} /></label>
-          <h3>दुकान का Scrolling Text</h3>
-          <label>ग्राहकों को चलने वाला संदेश<textarea rows={2} maxLength={180} value={scrollingText} onChange={e=>setScrollingText(e.target.value)} placeholder="जैसे: आज सभी कुल्फी पर 10% छूट!" /></label>
-          <p className="admin-muted">यह संदेश आपकी दुकान के पेज पर ऊपर चलता हुआ दिखाई देगा। अधिकतम 180 अक्षर। खाली करके सेव करने पर संदेश हट जाएगा।</p>
-          <h3>Customer offer / promotion</h3>
-          <label>Offer title<input maxLength={60} value={offerTitle} onChange={e=>setOfferTitle(e.target.value)} placeholder="e.g. Buy 2 get 1 free" /></label>
-          <label>Offer details<textarea rows={2} maxLength={240} value={offerDescription} onChange={e=>setOfferDescription(e.target.value)} placeholder="Add offer terms or eligible products" /></label>
-          <label>Offer valid until<input type="date" value={offerExpiresAt} onChange={e=>setOfferExpiresAt(e.target.value)} /></label>
-          <div className="admin-actions" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-            <button type="button" className="admin-primary" disabled={busy} onClick={()=>void saveOffer()}>{busy ? "सेव हो रहा है…" : "Offer सेव करें"}</button>
-            <button type="button" className="admin-secondary" disabled={busy||(!offerTitle&&!offerDescription&&!offerExpiresAt)} onClick={()=>void deleteOffer()}>Offer हटाएँ</button>
-          </div>
-          <p className="admin-muted">Offer को बदलकर Offer सेव करें। हटाने पर customer page से तुरंत हट जाएगा।</p>
           <label>Shop logo (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"logo");}} /></label>{logoUrl&&<img src={logoUrl} alt="Shop logo preview" style={{width:80,height:80,objectFit:"cover",borderRadius:14}}/>}
           <label>Shop banner (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"banner");}} /></label>{bannerUrl&&<img src={bannerUrl} alt="Shop banner preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:14}}/>}
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
