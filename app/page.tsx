@@ -34,6 +34,14 @@ export default function HomePage() {
   const [showShareSite, setShowShareSite] = useState(false);
   const [sharePhone, setSharePhone] = useState("");
   const [shareError, setShareError] = useState("");
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const updateScrollButton = () => setShowScrollTop(window.scrollY > 240);
+    updateScrollButton();
+    window.addEventListener("scroll", updateScrollButton, { passive: true });
+    return () => window.removeEventListener("scroll", updateScrollButton);
+  }, []);
 
   useEffect(() => {
     if (!auth) return;
@@ -259,5 +267,6 @@ export default function HomePage() {
     </section>
     <section id="for-shops" className="shop-onboarding"><div><p className="eyebrow">For ice cream businesses</p><h2>Bring your shop to MY ICE CREAM</h2><p>First listing ₹599 includes the first 30 days. Submit your UPI UTR; Admin verifies payment before the shop goes LIVE. Renewal is ₹299 per month.</p></div><Link href="/shop/register" className="primary-button">Register your shop</Link></section>
     <footer className="footer marketplace-footer" id="about"><div className="footer-main"><div><strong>🍦 MY ICE CREAM</strong><p>Discover local ice-cream shops, flavours and offers.</p></div><div className="footer-links" aria-label="Website information"><Link href="/about">About Us</Link><Link href="/contact">Contact Us</Link><Link href="/privacy-policy">Privacy Policy</Link><Link href="/terms">Terms &amp; Conditions</Link><Link href="/disclaimer">Disclaimer</Link><Link href="/cookie-policy">Cookie Policy</Link></div><div className="footer-contact"><strong>Contact Us</strong><a href="mailto:ngogrant454@gmail.com">Email: ngogrant454@gmail.com</a><a href="tel:+917517260192">Call: +91 7517260192</a><a href="https://wa.me/917517260192" target="_blank" rel="noopener noreferrer">WhatsApp: +91 7517260192</a></div></div><div className="footer-copy"><span>© {new Date().getFullYear()} MY ICE CREAM. All rights reserved.</span><span>Local shops · Sweet moments · Easy discovery</span></div></footer>
+    {showScrollTop && <button type="button" className="marketplace-scroll-top" aria-label="ऊपर जाएँ" title="ऊपर जाएँ" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>↑</button>}
   </main>;
 }
