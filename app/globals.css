@@ -1110,3 +1110,23 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
     min-width:34px!important;
   }
 }
+
+
+/* Colorful 3D Share button — keep existing label and mobile header sizing. */
+.marketplace-3d .topbar>.header-share-site{
+  border:1px solid #ffffffb8!important;
+  background:linear-gradient(120deg,#ff4f9a 0%,#a34cff 48%,#20b9d5 100%)!important;
+  color:#fff!important;
+  text-shadow:0 1px 2px #4b176b55;
+  box-shadow:0 3px 0 #7136a4,0 7px 16px #873fc044,0 0 12px #ff70c955!important;
+  transition:transform .18s ease,filter .18s ease,box-shadow .18s ease!important;
+}
+.marketplace-3d .topbar>.header-share-site:hover{
+  transform:translateY(-2px)!important;
+  filter:saturate(1.18) brightness(1.04);
+  box-shadow:0 5px 0 #7136a4,0 10px 20px #873fc055,0 0 16px #ff70c977!important;
+}
+.marketplace-3d .topbar>.header-share-site:active{
+  transform:translateY(1px) scale(.98)!important;
+  box-shadow:0 1px 0 #7136a4,0 3px 8px #873fc044!important;
+}
