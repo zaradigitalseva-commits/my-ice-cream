@@ -101,8 +101,10 @@ export default function ShopPage() {
     try {
       const result = await getDocs(query(collection(db, "shops", shopId, "adminNotices"), orderBy("createdAt", "desc"), limit(20)));
       setAdminNotices(result.docs.map((item) => ({ id: item.id, ...item.data() } as ShopAdminNotice)));
-    } catch (err) {
-      setError(err instanceof Error ? "Admin की सूचना लोड नहीं हुई: " + (err instanceof Error ? err.message : "") : "Admin की सूचना लोड नहीं हुई।");
+    } catch {
+      // Admin notices are optional. A notice-read permission/network issue must
+      // not display a scary Firebase error in the shopkeeper dashboard.
+      setAdminNotices([]);
     }
   }
 
