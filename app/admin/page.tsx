@@ -379,6 +379,8 @@ export default function AdminPage() {
         const privateData = privateByShop.get(item.id) || {};
         const lock = lockByShop.get(item.id);
         if (privateData.shopId && privateData.shopId !== item.id) throw new Error("दुकान " + item.id + " के private record में shop ID mismatch है। कोई डेटा नहीं बदला गया।");
+        if (privateData.ownerUid && typeof privateData.ownerUid !== "string") throw new Error("दुकान " + item.id + " के private owner UID का format गलत है। कोई डेटा नहीं बदला गया।");
+        if (publicData.ownerUid && typeof publicData.ownerUid !== "string") throw new Error("दुकान " + item.id + " के public owner UID का format गलत है। कोई डेटा नहीं बदला गया।");
         if (privateData.ownerUid && publicData.ownerUid && privateData.ownerUid !== publicData.ownerUid) throw new Error("दुकान " + item.id + " के public और private owner UID अलग हैं। कोई डेटा नहीं बदला गया।");
         const ownerUid = String(privateData.ownerUid || publicData.ownerUid || lock?.ownerUid || "");
         if (!ownerUid) throw new Error("दुकान " + item.id + " का owner UID नहीं मिला। कोई डेटा नहीं बदला गया; Admin से जाँच कराएँ।");
