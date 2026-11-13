@@ -90,11 +90,14 @@ export default function AdminPage() {
       if (token.claims.email_verified !== true) {
         throw new Error("Firebase token is not marked email-verified. Sign out and sign in again, then retry.");
       }
-      const [result, privateResult] = await Promise.all([
-        getDocs(query(collection(firestore, "shops"), orderBy("createdAt", "desc"))),
-        getDocs(collection(firestore, "shopPrivate")),
-      ]);
-      const privateByShop = new Map(privateResult.docs.map((item) => [item.id, item.data()]));
+      const result = await getDocs(query(collection(firestore, "shops"), orderBy("createdAt", "desc")));
+      const privateByShop = new Map<string, { ownerUid?: string; ownerName?: string; ownerEmail?: string }>();
+      try {
+        const privateResult = await getDocs(collection(firestore, "shopPrivate"));
+        for (const item of privateResult.docs) privateByShop.set(item.id, item.data());
+      } catch {
+        // Older Firestore Rules may not include shopPrivate yet; keep legacy Admin loading functional.
+      }
       const loadedShops = result.docs.map((item) => {
         const publicData = item.data();
         const privateData = privateByShop.get(item.id) || {};
@@ -364,6 +367,8 @@ export default function AdminPage() {
       for (const item of lockSnapshot.docs) {
         const data = item.data();
         if (typeof data.shopId !== "string" || !data.shopId) continue;
+        if (data.ownerUid && data.ownerUid !== item.id) throw new Error("Owner lock document " + item.id + " contains a mismatched owner UID. No data was changed.");
+        if (lockByShop.has(data.shopId) && lockByShop.get(data.shopId)?.ownerUid !== item.id) throw new Error("Multiple owner locks point to shop " + data.shopId + ". No data was changed.");
         lockByShop.set(data.shopId, { ownerUid: item.id, shopId: data.shopId });
         lockByOwner.set(item.id, data.shopId);
       }
@@ -373,8 +378,11 @@ export default function AdminPage() {
         const publicData = item.data();
         const privateData = privateByShop.get(item.id) || {};
         const lock = lockByShop.get(item.id);
+        if (privateData.shopId && privateData.shopId !== item.id) throw new Error("दुकान " + item.id + " के private record में shop ID mismatch है। कोई डेटा नहीं बदला गया।");
+        if (privateData.ownerUid && publicData.ownerUid && privateData.ownerUid !== publicData.ownerUid) throw new Error("दुकान " + item.id + " के public और private owner UID अलग हैं। कोई डेटा नहीं बदला गया।");
         const ownerUid = String(privateData.ownerUid || publicData.ownerUid || lock?.ownerUid || "");
         if (!ownerUid) throw new Error("दुकान " + item.id + " का owner UID नहीं मिला। कोई डेटा नहीं बदला गया; Admin से जाँच कराएँ।");
+        if (lock && lock.ownerUid !== ownerUid) throw new Error("दुकान " + item.id + " का owner lock अलग UID से जुड़ा है। कोई डेटा नहीं बदला गया।");
         const lockedShopId = lockByOwner.get(ownerUid);
         if (lockedShopId && lockedShopId !== item.id) throw new Error("Owner " + ownerUid + " का lock दूसरी दुकान से जुड़ा है। कोई डेटा नहीं बदला गया।");
         const previousShop = ownersSeen.get(ownerUid);
