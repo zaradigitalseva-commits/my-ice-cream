@@ -51,7 +51,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    locale: "en_IN",
+    locale: "hi_IN",
     siteName: "MY ICE CREAM",
     title: "MY ICE CREAM | Discover Local Ice Cream Shops, Kulfi & Treats",
     description: "Find local ice cream shops, browse delicious treats and discover shop offers on MY ICE CREAM."
@@ -85,7 +85,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="hi-IN">
       <body>
         {children}
         <PwaInstallButton />
