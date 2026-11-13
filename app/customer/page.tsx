@@ -82,7 +82,10 @@ export default function CustomerPage() {
       setPhone(digits);
       setNotice("आपकी जानकारी सेव हो गई।");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "जानकारी सेव नहीं हो सकी।");
+      const detail = e instanceof Error ? e.message : "";
+      setError(detail.toLowerCase().includes("permission")
+        ? "यह मोबाइल नंबर पहले से किसी दुकान के ग्राहक रिकॉर्ड में हो सकता है। सुरक्षा के लिए इसे अपने खाते से जोड़ने हेतु दुकान या Admin से संपर्क करें।"
+        : detail || "जानकारी सेव नहीं हो सकी।");
     } finally {
       setSaving(false);
     }
