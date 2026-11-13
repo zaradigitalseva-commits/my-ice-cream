@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { registerPushSubscription } from "@/lib/push-client";
 
@@ -15,6 +15,9 @@ export default function PwaInstallButton() {
   const [installed, setInstalled] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   useEffect(() => {
     const isStandalone = () =>
@@ -49,13 +52,15 @@ export default function PwaInstallButton() {
 
     const onBeforeInstall = (event: Event) => {
       event.preventDefault();
-      let alreadyInstalled = false;
+      // A browser install prompt means this browser currently considers the site
+      // installable. Clear a stale marker left behind after an app was uninstalled.
       try {
-        alreadyInstalled = window.localStorage.getItem(installMarker) === "yes";
+        window.localStorage.removeItem(installMarker);
       } catch {
         // Continue with the browser install prompt when storage is unavailable.
       }
-      if (!alreadyInstalled && !isStandalone()) {
+      if (!isStandalone()) {
+        setInstalled(false);
         setInstallPrompt(event as InstallPromptEvent);
       }
     };
@@ -85,19 +90,61 @@ export default function PwaInstallButton() {
     };
   }, []);
 
-  // Ask for browser permission after Google sign-in, then register this phone silently.
+  // Register this browser after permission is granted. Visitors without a Google
+  // account receive an anonymous Firebase identity; no phone, OTP, or paid SMS.
   useEffect(() => {
-    if (!auth) return;
+    if (!auth || typeof window === "undefined" || !("Notification" in window)) return;
     return onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser || typeof window === "undefined" || !("Notification" in window)) return;
       if (Notification.permission !== "granted") return;
       try {
-        await registerPushSubscription(currentUser.uid);
+        const user = currentUser || (await signInAnonymously(auth)).user;
+        await registerPushSubscription(user.uid);
+        setNotificationsEnabled(true);
+        setNotificationMessage("इस डिवाइस पर Notifications चालू हैं।");
       } catch (error) {
+        const detail = error instanceof Error ? error.message : "Registration failed";
+        setNotificationMessage(detail.includes("operation-not-allowed")
+          ? "Firebase में Anonymous sign-in चालू करना बाकी है।"
+          : "Notification registration नहीं हो पाया: " + detail);
         console.error("MY ICE CREAM push registration failed:", error);
       }
     });
   }, []);
+
+  const handleEnableNotifications = async () => {
+    if (!("Notification" in window)) {
+      setNotificationMessage("यह browser Push Notifications को support नहीं करता।");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      setNotificationMessage("Browser Settings में MY ICE CREAM के Notifications Allow करें।");
+      return;
+    }
+    if (!auth) {
+      setNotificationMessage("Firebase अभी configure नहीं है।");
+      return;
+    }
+    setNotificationBusy(true);
+    setNotificationMessage("");
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setNotificationMessage("Notifications की अनुमति नहीं मिली।");
+        return;
+      }
+      const user = auth.currentUser || (await signInAnonymously(auth)).user;
+      await registerPushSubscription(user.uid);
+      setNotificationsEnabled(true);
+      setNotificationMessage("इस डिवाइस पर Notifications चालू हैं।");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Registration failed";
+      setNotificationMessage(detail.includes("operation-not-allowed")
+        ? "Firebase में Anonymous sign-in चालू करना बाकी है।"
+        : "Notification registration नहीं हो पाया: " + detail);
+    } finally {
+      setNotificationBusy(false);
+    }
+  };
 
   const handleInstall = async () => {
     if (!installPrompt) {
@@ -118,6 +165,20 @@ export default function PwaInstallButton() {
 
   return (
     <div className="ice-install-root">
+      {"Notification" in window && !notificationsEnabled && (
+        <div className="ice-notification-card" role="status">
+          <strong>🍦 MY ICE CREAM Updates</strong>
+          <p>नए Products और Offers की सूचना पाने के लिए Notifications चालू करें। Google Login या OTP की जरूरत नहीं है।</p>
+          <button className="ice-notification-allow" type="button" onClick={handleEnableNotifications} disabled={notificationBusy}>
+            {notificationBusy ? "कृपया रुकें..." : "Notifications चालू करें"}
+          </button>
+          {notificationMessage && <p aria-live="polite">{notificationMessage}</p>}
+        </div>
+      )}
+      {notificationsEnabled && notificationMessage && (
+        <div className="ice-notification-status" role="status">{notificationMessage}</div>
+      )}
+
       {!installed && showHelp && (
         <div className="ice-install-help" role="status">
           <button
