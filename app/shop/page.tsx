@@ -8,7 +8,7 @@ import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
-type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; scrollingText?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
+type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
 type Order = { id: string; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
 type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
@@ -44,8 +44,6 @@ export default function ShopPage() {
   const [offerTitle, setOfferTitle] = useState("");
   const [offerDescription, setOfferDescription] = useState("");
   const [offerExpiresAt, setOfferExpiresAt] = useState("");
-  const [scrollingText, setScrollingText] = useState("");
-  const [scrollingSavedMessage, setScrollingSavedMessage] = useState("");
   const [productId, setProductId] = useState("");
   const [productName, setProductName] = useState("");
   const [productDescription, setProductDescription] = useState("");
@@ -146,7 +144,7 @@ export default function ShopPage() {
           if (window.location.hash === "#shop-profile") setActiveShopSection("profile");
           const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
           setPendingPayment(lock.exists() && !isLiveShop); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
-          setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || ""); setScrollingText(data.scrollingText || "");
+          setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
           if (isLiveShop) {
             await loadProducts(data.id);
             const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", data.id)));
@@ -409,36 +407,6 @@ export default function ShopPage() {
     finally { setBusy(false); }
   }
 
-  async function saveScrollingText() {
-    if (!db || !shop) return;
-    const value = scrollingText.trim();
-    setScrollingSavedMessage("");
-    if (!value) { setError("पहले संदेश लिखें। हटाने के लिए Message हटाएँ बटन दबाएँ।"); return; }
-    setBusy(true); setError(""); setNotice("");
-    try {
-      // Saving a new message replaces the previous message for this shop.
-      await updateDoc(doc(db, "shops", shop.id), { scrollingText: value, updatedAt: serverTimestamp() });
-      setShop({ ...shop, scrollingText: value });
-      setScrollingSavedMessage("✓ Scrolling Message सफलतापूर्वक सेव हो गया है। Home Page पर दिखेगा।");
-      setNotice("नया Scrolling message सेव हो गया। पुराना संदेश बदल दिया गया है।");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Scrolling message सेव नहीं हो सका।");
-    } finally { setBusy(false); }
-  }
-
-  async function clearScrollingText() {
-    if (!db || !shop) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
-      await updateDoc(doc(db, "shops", shop.id), { scrollingText: "", updatedAt: serverTimestamp() });
-      setScrollingText("");
-      setShop({ ...shop, scrollingText: "" });
-      setNotice("Scrolling message हटा दिया गया।");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Scrolling message हटाया नहीं जा सका।");
-    } finally { setBusy(false); }
-  }
-
   async function saveOffer() {
     if (!db || !shop) return;
     if (!offerTitle.trim() && !offerDescription.trim()) {
@@ -664,22 +632,11 @@ export default function ShopPage() {
             <button type="button" className={activeShopSection === "payments" ? "admin-primary" : "admin-secondary"} onClick={()=>{if(activeShopSection === "payments")setActiveShopSection("");else void openPaymentHistory();}}>Payment History</button>
             <button type="button" className={activeShopSection === "products" ? "admin-primary" : "admin-secondary"} onClick={()=>{resetProduct();setActiveShopSection(activeShopSection === "products" ? "" : "products");}}>Add Product</button>
             <button type="button" className={activeShopSection === "myProducts" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "myProducts" ? "" : "myProducts")}>My Products</button>
-            <button type="button" className={activeShopSection === "promotion" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "promotion" ? "" : "promotion")}>Scrolling Message / Offer</button>
+            <button type="button" className={activeShopSection === "promotion" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "promotion" ? "" : "promotion")}>Offer / Promotion</button>
           </div>
         </section>
         {activeShopSection === "promotion" && <section className="admin-panel" id="shop-promotion" style={{scrollMarginTop:20}}>
-          <p className="admin-kicker">SHOP PROMOTION</p><h2>Scrolling Message / Offer</h2>
-          <h3>दुकान का Scrolling Message</h3>
-          <form className="register-form" onSubmit={e=>{e.preventDefault();void saveScrollingText();}}>
-            <label>ग्राहकों को दिखने वाला संदेश<textarea rows={2} maxLength={180} value={scrollingText} onChange={e=>setScrollingText(e.target.value)} placeholder="जैसे: आज सभी कुल्फी पर 10% छूट!" /></label>
-            <p className="admin-muted">यह संदेश आपकी दुकान के पेज पर चलता हुआ दिखेगा। नया संदेश सेव करने पर पुराना संदेश अपने-आप बदल जाएगा।</p>
-            <div className="admin-actions" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-              <button type="submit" className="admin-primary" disabled={busy}>{busy ? "सेव हो रहा है…" : "Scrolling Message सेव करें"}</button>
-              <button type="button" className="admin-secondary" disabled={busy || !shop?.scrollingText} onClick={()=>void clearScrollingText()}>Message हटाएँ</button>
-            </div>
-          </form>
-          {scrollingSavedMessage && <p className="admin-success" role="status" aria-live="polite" style={{marginTop:12,fontWeight:700}}>{scrollingSavedMessage}</p>}
-          <hr />
+          <p className="admin-kicker">SHOP PROMOTION</p><h2>Offer / Promotion</h2>
           <h3>Customer Offer / Promotion</h3>
           <div className="register-form">
             <label>Offer title<input maxLength={60} value={offerTitle} onChange={e=>setOfferTitle(e.target.value)} placeholder="जैसे: Buy 2 Get 1 Free" /></label>
