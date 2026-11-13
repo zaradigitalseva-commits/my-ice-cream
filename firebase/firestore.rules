@@ -308,12 +308,13 @@ service cloud.firestore {
       // A phone number entered by itself is not proof of ownership.
       // Existing shop-created customer records cannot be claimed by a Google account.
       // Only the account already linked to this record may update its profile.
-      allow update: if signedIn()
-        && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.phone == resource.data.phone
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["name", "email", "updatedAt", "registered"]);
+      allow update: if isAdmin()
+        || (signedIn()
+          && resource.data.uid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.phone == resource.data.phone
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["name", "email", "updatedAt", "registered"]));
       allow delete: if isAdmin();
     }
     // Customer account linking is a manual identity check by an Admin.
@@ -388,13 +389,15 @@ service cloud.firestore {
     }
     match /shopOwnerLocks/{ownerUid} {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == ownerUid);
-      allow create: if signedIn()
-        && request.auth.uid == ownerUid
-        && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid))
-        && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "createdAt"])
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.shopId is string
-        && request.resource.data.shopId.size() > 0;
+      allow create: if isAdmin()
+        || (signedIn()
+          && request.auth.uid == ownerUid
+          && !exists(/databases/$(database)/documents/shopOwnerLocks/$(ownerUid))
+          && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "createdAt"])
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.shopId is string
+          && request.resource.data.shopId.size() > 0
+          && !exists(/databases/$(database)/documents/shops/$(request.resource.data.shopId)));
       allow update: if false;
       allow delete: if isAdmin();
     }
