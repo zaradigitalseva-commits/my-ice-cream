@@ -268,6 +268,19 @@ export default function HomePage() {
     </section>
     <section id="for-shops" className="shop-onboarding"><div><p className="eyebrow">For ice cream businesses</p><h2>Bring your shop to MY ICE CREAM</h2><p>First listing ₹599 includes the first 30 days. Submit your UPI UTR; Admin verifies payment before the shop goes LIVE. Renewal is ₹299 per month.</p></div><Link href="/shop/register" className="primary-button">Register your shop</Link></section>
     <footer className="footer marketplace-footer" id="about"><div className="footer-main"><div><strong>🍦 MY ICE CREAM</strong><p>Discover local ice-cream shops, flavours and offers.</p></div><div className="footer-links" aria-label="Website information"><Link href="/about">About Us</Link><Link href="/contact">Contact Us</Link><Link href="/privacy-policy">Privacy Policy</Link><Link href="/terms">Terms &amp; Conditions</Link><Link href="/disclaimer">Disclaimer</Link><Link href="/cookie-policy">Cookie Policy</Link></div><div className="footer-contact"><strong>Contact Us</strong><a href="mailto:ngogrant454@gmail.com">Email: ngogrant454@gmail.com</a><a href="tel:+917517260192">Call: +91 7517260192</a><a href="https://wa.me/917517260192" target="_blank" rel="noopener noreferrer">WhatsApp: +91 7517260192</a></div></div><div className="footer-copy"><span>© {new Date().getFullYear()} MY ICE CREAM. All rights reserved.</span><span>Local shops · Sweet moments · Easy discovery</span></div></footer>
+    {showShareSite && <div className="share-site-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowShareSite(false); }}>
+      <form className="share-site-dialog" role="dialog" aria-modal="true" aria-labelledby="share-site-title" onSubmit={(event) => { event.preventDefault(); shareSiteOnWhatsApp(); }}>
+        <button type="button" className="share-site-close" aria-label="बंद करें" onClick={() => setShowShareSite(false)}>×</button>
+        <div className="share-site-whatsapp" aria-hidden="true">☘</div>
+        <h2 id="share-site-title">WhatsApp पर SHARE SITE</h2>
+        <p>जिस व्यक्ति को MY ICE CREAM वेबसाइट भेजनी है, उसका WhatsApp मोबाइल नंबर डालें।</p>
+        <label htmlFor="share-site-phone">WhatsApp मोबाइल नंबर</label>
+        <input id="share-site-phone" type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={15} value={sharePhone} onChange={(event) => { setSharePhone(event.target.value.replace(/[^0-9+\\s-]/g, "").slice(0, 15)); setShareError(""); }} placeholder="10 अंकों का मोबाइल नंबर" />
+        <small>भारत का नंबर डालें। +91 लिखना जरूरी नहीं है।</small>
+        {shareError && <p className="share-site-error" role="alert">{shareError}</p>}
+        <button type="submit" className="share-site-send">WhatsApp पर भेजें <span aria-hidden="true">➜</span></button>
+      </form>
+    </div>}
     {showScrollTop && <button type="button" className="marketplace-scroll-top" aria-label="ऊपर जाएँ" title="ऊपर जाएँ" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>↑</button>}
   </main>;
 }
