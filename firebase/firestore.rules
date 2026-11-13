@@ -49,6 +49,26 @@ service cloud.firestore {
         && submittedName == canonicalName;
     }
 
+    function validShopkeeperNotice(shopId, notice) {
+      return notice.keys().hasOnly([
+          "type", "shopId", "shopName", "ownerUid", "title", "body", "createdAt"
+        ])
+        && notice.type == "shopkeeper"
+        && notice.shopId == shopId
+        && notice.ownerUid == request.auth.uid
+        && ownsShop(shopId)
+        && liveShop(shopId)
+        && notice.shopName is string
+        && validShopkeeperNoticeName(shopId, notice.shopName)
+        && notice.title is string
+        && notice.title.size() > 0
+        && notice.title.size() <= 120
+        && notice.body is string
+        && notice.body.size() > 0
+        && notice.body.size() <= 300
+        && notice.createdAt is timestamp;
+    }
+
     function validOrderItem(shopId, item) {
       return item is map
         && item.keys().hasOnly(["productId", "name", "price", "quantity"])
@@ -502,7 +522,7 @@ service cloud.firestore {
     }
 
     // Public, non-sensitive marketplace announcements only.
-    // Shop owners can publish notices for a real LIVE product or their currently saved offer.
+    // Shop owners can publish one replaceable public scrolling notice for their LIVE shop.
     match /notifications/{notificationId} {
       allow read: if true;
       allow create: if (isAdmin()
@@ -540,9 +560,8 @@ service cloud.firestore {
           || (
             request.resource.data.type == "shopkeeper"
             && !("productId" in request.resource.data)
-            && request.resource.data.ownerUid == request.auth.uid
-            && validShopkeeperNoticeName(request.resource.data.shopId, request.resource.data.shopName)
-            && request.resource.data.body.size() > 0
+            && notificationId == "shopkeeper_" + request.resource.data.shopId
+            && validShopkeeperNotice(request.resource.data.shopId, request.resource.data)
           )
           || (
             request.resource.data.type == "offer"
@@ -558,11 +577,13 @@ service cloud.firestore {
             )
           )
         ));
-      allow update: if isAdmin();
-      allow delete: if isAdmin() || (signedIn()
+      allow update: if isAdmin() || (signedIn()
         && resource.data.type == "shopkeeper"
         && resource.data.ownerUid == request.auth.uid
-        && ownsShop(resource.data.shopId));
+        && notificationId == "shopkeeper_" + resource.data.shopId
+        && validShopkeeperNotice(resource.data.shopId, request.resource.data));
+      // Shopkeepers replace their current message by publishing a new one; they cannot delete it.
+      allow delete: if isAdmin();
     }
 
     match /siteSettings/{settingId} {
