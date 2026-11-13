@@ -50,6 +50,23 @@ service cloud.firestore {
         && submittedName == canonicalName;
     }
 
+    function validShopkeeperTickerNotice(shopId, notice) {
+      return notice.keys().hasOnly(["type", "shopId", "shopName", "title", "body", "createdAt"])
+        && notice.type == "shopkeeper"
+        && notice.shopId == shopId
+        && notice.shopName is string
+        && validShopkeeperNoticeName(shopId, notice.shopName)
+        && notice.title is string
+        && notice.title.size() > 0
+        && notice.title.size() <= 120
+        && notice.body is string
+        && notice.body.size() > 0
+        && notice.body.size() <= 300
+        && notice.createdAt is timestamp
+        && ownsShop(shopId)
+        && liveShop(shopId);
+    }
+
     function validOrderItem(shopId, item) {
       return item is map
         && item.keys().hasOnly(["productId", "name", "price", "quantity"])
@@ -630,8 +647,8 @@ service cloud.firestore {
           || (
             request.resource.data.type == "shopkeeper"
             && !("productId" in request.resource.data)
-            && validShopkeeperNoticeName(request.resource.data.shopId, request.resource.data.shopName)
-            && request.resource.data.body.size() > 0
+            && notificationId == "shopkeeper_" + request.resource.data.shopId
+            && validShopkeeperTickerNotice(request.resource.data.shopId, request.resource.data)
           )
           || (
             request.resource.data.type == "offer"
@@ -647,10 +664,12 @@ service cloud.firestore {
             )
           )
         ));
-      allow update: if isAdmin();
-      allow delete: if isAdmin() || (signedIn()
+      allow update: if isAdmin() || (signedIn()
         && resource.data.type == "shopkeeper"
-        && ownsShop(resource.data.shopId));
+        && notificationId == "shopkeeper_" + resource.data.shopId
+        && request.resource.data.shopId == resource.data.shopId
+        && validShopkeeperTickerNotice(resource.data.shopId, request.resource.data));
+      allow delete: if isAdmin();
     }
 
     match /siteSettings/{settingId} {
