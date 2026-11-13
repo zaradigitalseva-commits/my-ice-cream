@@ -410,14 +410,29 @@ export default function ShopPage() {
 
   async function saveScrollingText() {
     if (!db || !shop) return;
+    const value = scrollingText.trim();
+    if (!value) { setError("पहले संदेश लिखें। हटाने के लिए Message हटाएँ बटन दबाएँ।"); return; }
     setBusy(true); setError(""); setNotice("");
     try {
-      const value = scrollingText.trim();
+      // Saving a new message replaces the previous message for this shop.
       await updateDoc(doc(db, "shops", shop.id), { scrollingText: value, updatedAt: serverTimestamp() });
       setShop({ ...shop, scrollingText: value });
-      setNotice(value ? "Scrolling message सेव हो गया।" : "Scrolling message हटा दिया गया।");
+      setNotice("नया Scrolling message सेव हो गया। पुराना संदेश बदल दिया गया है।");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scrolling message सेव नहीं हो सका।");
+    } finally { setBusy(false); }
+  }
+
+  async function clearScrollingText() {
+    if (!db || !shop) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await updateDoc(doc(db, "shops", shop.id), { scrollingText: "", updatedAt: serverTimestamp() });
+      setScrollingText("");
+      setShop({ ...shop, scrollingText: "" });
+      setNotice("Scrolling message हटा दिया गया।");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Scrolling message हटाया नहीं जा सका।");
     } finally { setBusy(false); }
   }
 
@@ -654,8 +669,11 @@ export default function ShopPage() {
           <h3>दुकान का Scrolling Message</h3>
           <form className="register-form" onSubmit={e=>{e.preventDefault();void saveScrollingText();}}>
             <label>ग्राहकों को दिखने वाला संदेश<textarea rows={2} maxLength={180} value={scrollingText} onChange={e=>setScrollingText(e.target.value)} placeholder="जैसे: आज सभी कुल्फी पर 10% छूट!" /></label>
-            <p className="admin-muted">यह संदेश आपकी दुकान के पेज पर चलता हुआ दिखेगा। खाली करके सेव करने पर हट जाएगा।</p>
-            <button className="admin-primary" disabled={busy}>{busy ? "सेव हो रहा है…" : "Scrolling Message सेव करें"}</button>
+            <p className="admin-muted">यह संदेश आपकी दुकान के पेज पर चलता हुआ दिखेगा। नया संदेश सेव करने पर पुराना संदेश अपने-आप बदल जाएगा।</p>
+            <div className="admin-actions" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+              <button type="submit" className="admin-primary" disabled={busy}>{busy ? "सेव हो रहा है…" : "Scrolling Message सेव करें"}</button>
+              <button type="button" className="admin-secondary" disabled={busy || !shop?.scrollingText} onClick={()=>void clearScrollingText()}>Message हटाएँ</button>
+            </div>
           </form>
           <hr />
           <h3>Customer Offer / Promotion</h3>
