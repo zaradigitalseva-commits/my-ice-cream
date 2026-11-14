@@ -12,6 +12,7 @@ export default function ShopRegisterPage() {
   const [user, setUser] = useState<User | null>(null);
   const [existingShop, setExistingShop] = useState<{ id: string; name?: string; shopName?: string; status?: string; city?: string } | null>(null);
   const [checkingRegistration, setCheckingRegistration] = useState(true);
+  const [registrationBlocked, setRegistrationBlocked] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
@@ -27,24 +28,32 @@ export default function ShopRegisterPage() {
   useEffect(() => {
     let cancelled = false;
     async function checkExistingRegistration() {
-      if (!user || !db) { setExistingShop(null); setCheckingRegistration(false); return; }
+      if (!user || !db) { setExistingShop(null); setRegistrationBlocked(false); setCheckingRegistration(false); return; }
       setCheckingRegistration(true);
+      setRegistrationBlocked(false);
+      let ownerLockFound = false;
       try {
         const lockSnap = await getDoc(doc(db, "shopOwnerLocks", user.uid));
         if (cancelled) return;
-        if (!lockSnap.exists()) { setExistingShop(null); return; }
+        if (!lockSnap.exists()) { setExistingShop(null); setRegistrationBlocked(false); return; }
+        ownerLockFound = true;
+        setRegistrationBlocked(true);
         const shopId = String(lockSnap.data().shopId || "");
-        if (!shopId) { setMessage("Your registration lock exists but has no shop ID. Please contact Admin."); return; }
+        if (!shopId) { setMessage("Aapki purani registration ka owner lock mila hai, lekin shop ID nahi mili. Admin se jaanch karayein; dobara register na karein."); return; }
         const shopSnap = await getDoc(doc(db, "shops", shopId));
         if (cancelled) return;
-        if (!shopSnap.exists()) { setMessage("Your registration record is being checked by Admin. Please contact support before registering again."); return; }
+        if (!shopSnap.exists()) { setMessage("Aapki purani registration ka lock mila hai, lekin shop record abhi nahi mil raha. Admin se jaanch karayein; dobara register na karein."); return; }
         const data = { id: shopSnap.id, ...shopSnap.data() } as { id: string; name?: string; shopName?: string; status?: string; city?: string };
         const status = (data.status || "pending").toLowerCase();
         if (status === "live") { router.replace("/shop"); return; }
         setExistingShop(data);
+        setRegistrationBlocked(false);
       } catch (error) {
         console.error("Shop registration pre-check failed:", error);
-        if (!cancelled) setMessage("Registration check failed: " + (error instanceof Error ? error.message : "Permission denied while checking your existing shop."));
+        if (!cancelled) {
+          setRegistrationBlocked(true);
+          setMessage("Purani registration verify nahi ho saki: " + (error instanceof Error ? error.message : "Firebase permission/network error") + (ownerLockFound ? " Aapka owner lock mila hai; dobara register na karein." : " Pehle Admin se registration check karayein."));
+        }
       } finally {
         if (!cancelled) setCheckingRegistration(false);
       }
@@ -137,6 +146,7 @@ export default function ShopRegisterPage() {
       <div className="register-card-heading"><div><span className="register-step">01 / SHOP DETAILS</span><h2>Register your ice cream shop</h2><p>Bas kuch details bhariye — baaki hum sambhal lenge!</p></div><span className="register-card-icon">🏪</span></div>
       {!user ? <div className="register-signin"><p>Registration shuru karne ke liye apne Google account se sign in karein.</p><button className="register-submit" onClick={() => auth && signInWithPopup(auth, googleProvider).catch((e) => setMessage(e.message))}> <span>G</span> Continue with Google</button></div> :
       checkingRegistration ? <div className="register-signin"><p>Aapki purani shop registration check ho rahi hai…</p></div> :
+      registrationBlocked ? <div className="register-signin register-existing-status"><h3>पुरानी registration की जाँच जरूरी</h3><p>{message || "आपकी पुरानी registration verify किए बिना नई दुकान register नहीं की जाएगी।"}</p><p>कृपया Admin से पुरानी दुकान और product record की जाँच कराएँ।</p><Link href="/" className="admin-secondary role-link">← Marketplace पर वापस जाएँ</Link></div> :
       existingShop ? <div className="register-signin register-existing-status">
         <div className="register-signed-in"><span>✓</span><div><small>Existing registration</small><strong>{existingShop.name || existingShop.shopName || "Your shop"}</strong></div></div>
         <h3>Registration status</h3>
@@ -168,7 +178,7 @@ export default function ShopRegisterPage() {
         <button className="register-submit" disabled={busy || !!imageBusy}>{busy ? "सेव हो रहा है…" : "Next → Payment"}</button>
         <p className="register-approval-note">🔒 Registration के बाद ₹599 payment करें। UTR submit और Admin verification के बाद shop approval होगा; तभी दुकान LIVE होगी.</p>
       </form>}
-      {message && <p className="admin-success register-message" role="status">{message}</p>}
+      {message && !registrationBlocked && <p className="admin-success register-message" role="status">{message}</p>}
     </section>
     <footer className="register-footer">Made with <span>♥</span> for ice cream lovers <b>🍦</b></footer>
   </main>;
