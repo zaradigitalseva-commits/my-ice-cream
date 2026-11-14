@@ -2,8 +2,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where } from "firebase/firestore/lite";
+import { onAuthStateChanged, signInAnonymously, signInWithPopup, type User } from "firebase/auth";
+import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
 type Shop={id:string;name?:string;shopName?:string;city?:string;address?:string;phone?:string;description?:string;offerTitle?:string;offerDescription?:string;offerExpiresAt?:string;scrollingText?:string;bannerUrl?:string;logoUrl?:string;status?:string;pickupAvailable?:boolean;deliveryAvailable?:boolean;openingTime?:string;closingTime?:string;closedDays?:string[];manualClosed?:boolean;deliveryFee?:number;minimumOrder?:number};
@@ -27,12 +27,14 @@ export default function ShopDetailsPage(){
  const shopOpen=!shop?.manualClosed&&!(shop?.closedDays||[]).includes(todayName)&&withinHours;
  const hasActiveOffer=Boolean(shop?.offerTitle?.trim()||shop?.offerDescription?.trim())&&(!shop?.offerExpiresAt||new Date(shop.offerExpiresAt+"T23:59:59").getTime()>=Date.now());
  function add(id:string){setCart(c=>({...c,[id]:(c[id]||0)+1}))}
- function placeOrder(){
-  if(!shop)return;
-  const items=products.filter(p=>(cart[p.id]||0)>0).map(p=>({name:p.name||"Product",price:Number(p.price||0),quantity:cart[p.id]}));
+ async function placeOrder(){
+  if(!shop||!db||!auth||busy)return;
+  const items=products.filter(p=>(cart[p.id]||0)>0).map(p=>({productId:p.id,name:p.name||"Product",price:Number(p.price||0),quantity:Number(cart[p.id]||0)}));
+  const minimumOrder=Number(shop.minimumOrder??20);
   if(!items.length){setMessage("पहले cart में products जोड़ें।");return;}
-  if(subtotal<20){setMessage("Minimum order ₹20 है। कृपया cart में ₹"+(20-subtotal).toFixed(2)+" और जोड़ें।");return;}
-  if(items.length>20){setMessage("एक ऑर्डर में अधिकतम 20 अलग-अलग products चुनें।");return;}
+  if(items.length>8){setMessage("एक ऑर्डर में अधिकतम 8 अलग-अलग products चुनें।");return;}
+  if(items.some(item=>item.quantity>100)){setMessage("एक product की मात्रा अधिकतम 100 हो सकती है।");return;}
+  if(subtotal<minimumOrder){setMessage("Minimum order ₹"+minimumOrder.toFixed(2)+" है। कृपया cart में ₹"+(minimumOrder-subtotal).toFixed(2)+" और जोड़ें।");return;}
   const cleanPhone=phone.replace(/\D/g,"");
   if(!/^\d{10}$/.test(cleanPhone)){setMessage("अपना 10 अंकों का मोबाइल नंबर दर्ज करें।");return;}
   const cleanCustomerName=customerName.trim();
@@ -46,6 +48,7 @@ export default function ShopDetailsPage(){
   const orderLines=items.map((item,index)=>String(index+1)+". "+item.name+" × "+item.quantity+" = ₹"+(item.price*item.quantity).toFixed(2));
   const orderMessage=[
     "🍦 *New Order - MY ICE CREAM*",
+    "Order ID: (save ke baad dashboard me milega)",
     "Shop: "+(shop.name||shop.shopName||"Ice Cream Shop"),
     "",
     "*Customer details*",
@@ -60,13 +63,42 @@ export default function ShopDetailsPage(){
     "Items subtotal: ₹"+subtotal.toFixed(2),
     "Delivery charge: ₹"+deliveryFee.toFixed(2),
     "*Total: ₹"+total.toFixed(2)+"*",
-    "",
     "Payment: Unpaid - payment will be coordinated directly with the shop.",
     "Please confirm this order."
   ].join("\n");
-  const whatsappUrl="https://wa.me/"+whatsappNumber+"?text="+encodeURIComponent(orderMessage);
-  setMessage("WhatsApp खुल रहा है। वहाँ Send दबाकर अपना ऑर्डर दुकान को भेजें।");
-  window.location.href=whatsappUrl;
+  setBusy(true);setMessage("ऑर्डर सेव किया जा रहा है…");
+  const whatsappWindow=window.open("about:blank","_blank");
+  try{
+    const customerUser=auth.currentUser||(await signInAnonymously(auth)).user;
+    const orderRef=doc(collection(db,"orders"));
+    const orderData={
+      shopId:shop.id,
+      shopName:shop.name||shop.shopName||"Ice Cream Shop",
+      deliveryFee,
+      subtotal,
+      customerUid:customerUser.uid,
+      customerName:cleanCustomerName,
+      customerEmail:customerUser.email||"",
+      customerPhone:cleanPhone,
+      fulfillmentType,
+      deliveryAddress:fulfillmentType==="delivery"?address.trim():"",
+      items,
+      total,
+      status:"placed",
+      paymentStatus:"unpaid",
+      createdAt:serverTimestamp()
+    };
+    await setDoc(orderRef,orderData);
+    const finalMessage=orderMessage.replace("Order ID: (save ke baad dashboard me milega)","Order ID: "+orderRef.id);
+    const whatsappUrl="https://wa.me/"+whatsappNumber+"?text="+encodeURIComponent(finalMessage);
+    setMessage("ऑर्डर सेव हो गया। अब WhatsApp में Send दबाकर दुकान को भेजें।");
+    if(whatsappWindow)whatsappWindow.location.href=whatsappUrl;
+    else window.location.href=whatsappUrl;
+    setCart({});
+  }catch(e){
+    if(whatsappWindow)whatsappWindow.close();
+    setMessage(e instanceof Error?"ऑर्डर सेव नहीं हुआ: "+e.message:"ऑर्डर सेव नहीं हो सका। कृपया दोबारा कोशिश करें।");
+  }finally{setBusy(false);}
  }
  return <main className="admin-wrap customer-store"><header className="admin-header customer-store-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM</Link><Link href="/" className="admin-secondary">← Back to shops</Link></header>
  {!shop?<section className="admin-panel"><h1>Shop details</h1><p>{message||"Loading shop…"}</p></section>:<>
@@ -74,7 +106,7 @@ export default function ShopDetailsPage(){
 <section className={`admin-panel customer-store-hero${shop.bannerUrl ? " has-shop-banner" : ""}`}>{shop.bannerUrl ? <img className="customer-store-banner-image" src={shop.bannerUrl} alt={`${shop.name||shop.shopName||"Shop"} banner`} /> : <div className="customer-store-orbit">🍦</div>}<p className="admin-kicker">✨ LIVE ICE CREAM SHOP</p><h1>{shop.name||shop.shopName}</h1><p>{[shop.city,shop.address].filter(Boolean).join(" · ")}</p><p>{shop.description}</p><p><strong>{shopOpen?"🟢 Open now":"🔴 Currently closed"}</strong> · Hours: {shop.openingTime||"10:00"}–{shop.closingTime||"22:00"}</p><p>Delivery charge: ₹{Number(shop.deliveryFee||0).toFixed(2)} · Minimum order: ₹20</p></section>
  {hasActiveOffer&&<section className="admin-panel" style={{border:"2px solid #f59e0b",background:"#fff8e7"}}><p className="admin-kicker">🎉 SPECIAL OFFER</p>{shop.offerTitle&&<h2>{shop.offerTitle}</h2>}{shop.offerDescription&&<p style={{whiteSpace:"pre-wrap"}}>{shop.offerDescription}</p>}{shop.offerExpiresAt&&<p><strong>Valid until:</strong> {shop.offerExpiresAt}</p>}</section>}
  <section className="admin-panel customer-store-menu"><div className="customer-section-title"><span>🍨</span><div><h2>Menu & prices</h2><p>अपनी पसंदीदा आइसक्रीम चुनें</p></div></div>{products.length>0&&<div className="customer-product-search-wrap" style={{position:"sticky",top:8,zIndex:40,margin:"16px 0"}}><label className="customer-product-search" style={{display:"flex",alignItems:"center",gap:10,padding:"0 14px",border:"1px solid #d8dce8",borderRadius:14,background:"#fff",boxShadow:"0 4px 14px rgba(0,0,0,.10)"}}><span aria-hidden="true">🔎</span><input type="search" value={productSearch} onChange={e=>setProductSearch(e.target.value)} placeholder="प्रोडक्ट खोजें..." aria-label="मेन्यू में प्रोडक्ट खोजें" style={{width:"100%",minWidth:0,padding:"13px 0",border:0,outline:"none",background:"transparent",fontSize:16}}/>{productSearch&&<button type="button" onClick={()=>setProductSearch("")} aria-label="खोज मिटाएँ" style={{border:0,background:"transparent",fontSize:20,cursor:"pointer"}}>×</button>}</label>{searchResults.length>0&&<div role="listbox" aria-label="मिलते-जुलते प्रोडक्ट" style={{position:"absolute",top:"calc(100% + 5px)",left:0,right:0,maxHeight:280,overflowY:"auto",background:"#fff",border:"1px solid #d8dce8",borderRadius:12,boxShadow:"0 10px 28px rgba(0,0,0,.16)"}}>{searchResults.map(p=><button key={p.id} type="button" role="option" aria-selected="false" onClick={()=>{setProductSearch("");document.getElementById("product-"+p.id)?.scrollIntoView({behavior:"smooth",block:"center"});}} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",width:"100%",padding:"11px 14px",border:0,borderBottom:"1px solid #edf0f5",background:"#fff",textAlign:"left",cursor:"pointer"}}><strong>{p.name||"Unnamed product"}</strong><span style={{fontSize:12,color:"#64748b"}}>{p.category||"Ice cream"} · ₹{Number(p.price||0).toFixed(2)}</span></button>)}</div>}{productSearch.trim()&&searchResults.length===0&&<div role="status" style={{position:"absolute",top:"calc(100% + 5px)",left:0,right:0,padding:14,background:"#fff",border:"1px solid #d8dce8",borderRadius:12,boxShadow:"0 8px 20px rgba(0,0,0,.12)"}}>कोई प्रोडक्ट नहीं मिला। दूसरा नाम लिखें।</div>}</div>}{products.length===0?<p className="admin-muted">This shop has not added any products yet.</p>:<><div className="shop-grid">{products.map(p=><article id={"product-"+p.id} className="shop-card customer-product-card" key={p.id} style={p.id===selectedProductId?{outline:"3px solid #f59e0b",outlineOffset:"4px"}:undefined}>{p.imageUrl&&<img className="shop-banner" src={p.imageUrl} alt={p.name||"Product"}/>}<div className="shop-card-body"><h3>{p.name}</h3><p>{p.category||"Ice cream"}</p><p>{p.description}</p><strong>₹{Number(p.price||0).toFixed(2)}</strong>{p.originalPrice&&p.originalPrice>Number(p.price||0)?<del className="admin-muted"> ₹{Number(p.originalPrice).toFixed(2)}</del>:null}<button className="admin-primary customer-add-button" onClick={()=>add(p.id)}>＋ Add to cart</button>{(cart[p.id]||0)>0&&<span className="admin-muted"> In cart: {cart[p.id]}</span>}</div></article>)}</div>{selectedProductId&&<p><Link className="admin-secondary" href={"/shop/"+shopId}>All Products</Link></p>}</>}</section>
- <section id="customer-cart" className="admin-panel customer-cart"><div className="customer-section-title"><span>🛒</span><div><h2>Your cart</h2><p>आपका स्वादिष्ट ऑर्डर</p></div></div>{products.filter(p=>(cart[p.id]||0)>0).length===0?<p className="admin-muted">आपका cart खाली है। Menu से products जोड़ें।</p>:products.filter(p=>(cart[p.id]||0)>0).map(p=><div className="cart-item-row" key={p.id}><span>{p.name} × {cart[p.id]} — ₹{(Number(p.price||0)*cart[p.id]).toFixed(2)}</span><div className="cart-item-actions"><button type="button" className="admin-secondary small" aria-label={p.name+" की मात्रा कम करें"} onClick={()=>setCart(c=>({...c,[p.id]:Math.max(0,(c[p.id]||0)-1)}))}>− कम करें</button><button type="button" className="admin-secondary small" aria-label={p.name+" की मात्रा बढ़ाएँ"} onClick={()=>add(p.id)}>＋ बढ़ाएँ</button><button type="button" className="admin-secondary small cart-remove-button" onClick={()=>setCart(c=>({...c,[p.id]:0}))}>हटाएँ</button></div></div>)}<p>Items: ₹{subtotal.toFixed(2)} · Delivery: ₹{deliveryFee.toFixed(2)}</p><h2>Total: ₹{total.toFixed(2)}</h2><div className="register-form"><label>Your name<input required maxLength={120} value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Enter your full name"/></label><label>Mobile number<input required inputMode="numeric" maxLength={10} value={phone} onChange={e=>setPhone(e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="10 digit mobile number"/></label><label>Order method<select value={fulfillmentType} onChange={e=>setFulfillmentType(e.target.value as "pickup"|"delivery")}><option value="pickup" disabled={shop.pickupAvailable===false}>Shop pickup</option><option value="delivery" disabled={!shop.deliveryAvailable}>Home delivery</option></select></label>{fulfillmentType==="delivery"&&<label>Delivery address<input required value={address} onChange={e=>setAddress(e.target.value)} placeholder="Your complete delivery address"/></label>}{shop.pickupAvailable===false&&!shop.deliveryAvailable&&<p className="admin-error">This shop has not enabled pickup or delivery yet.</p>}<button className="admin-primary customer-checkout-button" disabled={subtotal<20||!shopOpen||(fulfillmentType==="pickup"?shop.pickupAvailable===false:shop.deliveryAvailable!==true)} onClick={()=>void placeOrder()}>✨ Buy / WhatsApp पर ऑर्डर करें</button></div>{message&&<p className="admin-success" role="status">{message}</p>}<p className="admin-muted">ऑर्डर भेजने पर WhatsApp में पूरा cart खुलेगा। Send दबाते ही ऑर्डर दुकान के रजिस्ट्रेशन वाले WhatsApp नंबर पर जाएगा। भुगतान दुकान से सीधे तय करें।</p></section>
+ <section id="customer-cart" className="admin-panel customer-cart"><div className="customer-section-title"><span>🛒</span><div><h2>Your cart</h2><p>आपका स्वादिष्ट ऑर्डर</p></div></div>{products.filter(p=>(cart[p.id]||0)>0).length===0?<p className="admin-muted">आपका cart खाली है। Menu से products जोड़ें।</p>:products.filter(p=>(cart[p.id]||0)>0).map(p=><div className="cart-item-row" key={p.id}><span>{p.name} × {cart[p.id]} — ₹{(Number(p.price||0)*cart[p.id]).toFixed(2)}</span><div className="cart-item-actions"><button type="button" className="admin-secondary small" aria-label={p.name+" की मात्रा कम करें"} onClick={()=>setCart(c=>({...c,[p.id]:Math.max(0,(c[p.id]||0)-1)}))}>− कम करें</button><button type="button" className="admin-secondary small" aria-label={p.name+" की मात्रा बढ़ाएँ"} onClick={()=>add(p.id)}>＋ बढ़ाएँ</button><button type="button" className="admin-secondary small cart-remove-button" onClick={()=>setCart(c=>({...c,[p.id]:0}))}>हटाएँ</button></div></div>)}<p>Items: ₹{subtotal.toFixed(2)} · Delivery: ₹{deliveryFee.toFixed(2)}</p><h2>Total: ₹{total.toFixed(2)}</h2><div className="register-form"><label>Your name<input required maxLength={120} value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Enter your full name"/></label><label>Mobile number<input required inputMode="numeric" maxLength={10} value={phone} onChange={e=>setPhone(e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="10 digit mobile number"/></label><label>Order method<select value={fulfillmentType} onChange={e=>setFulfillmentType(e.target.value as "pickup"|"delivery")}><option value="pickup" disabled={shop.pickupAvailable===false}>Shop pickup</option><option value="delivery" disabled={!shop.deliveryAvailable}>Home delivery</option></select></label>{fulfillmentType==="delivery"&&<label>Delivery address<input required value={address} onChange={e=>setAddress(e.target.value)} placeholder="Your complete delivery address"/></label>}{shop.pickupAvailable===false&&!shop.deliveryAvailable&&<p className="admin-error">This shop has not enabled pickup or delivery yet.</p>}<button className="admin-primary customer-checkout-button" disabled={busy||subtotal<Number(shop.minimumOrder??20)||!shopOpen||(fulfillmentType==="pickup"?shop.pickupAvailable===false:shop.deliveryAvailable!==true)} onClick={()=>void placeOrder()}>{busy?"ऑर्डर सेव हो रहा है…":"✨ Buy / WhatsApp पर ऑर्डर करें"}</button></div>{message&&<p className="admin-success" role="status">{message}</p>}<p className="admin-muted">ऑर्डर भेजने पर WhatsApp में पूरा cart खुलेगा। Send दबाते ही ऑर्डर दुकान के रजिस्ट्रेशन वाले WhatsApp नंबर पर जाएगा। भुगतान दुकान से सीधे तय करें।</p></section>
  </>}
  {shop&&cartItemCount>0&&<button type="button" className="customer-floating-cart-button" onClick={()=>document.getElementById("customer-cart")?.scrollIntoView({behavior:"smooth",block:"start"})} style={{position:"fixed",left:"50%",bottom:"calc(88px + env(safe-area-inset-bottom))",transform:"translateX(-50%)",zIndex:60,display:"flex",alignItems:"center",justifyContent:"center",gap:10,padding:"13px 22px",border:0,borderRadius:999,background:"linear-gradient(135deg,#7c3aed,#ec4899)",color:"#fff",fontWeight:800,fontSize:16,boxShadow:"0 8px 26px rgba(91,33,182,.35)",whiteSpace:"nowrap",cursor:"pointer"}}>🛒 खरीदें · {cartItemCount} आइटम ↓</button>}
  </main>
