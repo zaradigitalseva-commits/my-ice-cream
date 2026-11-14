@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { registerPushSubscription } from "@/lib/push-client";
+import { enablePushNotifications, registerPushSubscription } from "@/lib/push-client";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -15,6 +15,8 @@ export default function PwaInstallButton() {
   const [installed, setInstalled] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [notificationState, setNotificationState] = useState<"checking" | "default" | "enabled" | "denied" | "unsupported" | "busy" | "error">("checking");
+  const [notificationMessage, setNotificationMessage] = useState("");
 
   useEffect(() => {
     const isStandalone = () =>
@@ -45,6 +47,8 @@ export default function PwaInstallButton() {
         setInstalled(true);
       }
     }
+    if (!("Notification" in window)) setNotificationState("unsupported");
+    else setNotificationState(Notification.permission === "denied" ? "denied" : "default");
     setReady(true);
 
     const onBeforeInstall = (event: Event) => {
@@ -93,11 +97,29 @@ export default function PwaInstallButton() {
       if (Notification.permission !== "granted") return;
       try {
         await registerPushSubscription(currentUser.uid);
+        setNotificationState("enabled");
+        setNotificationMessage("");
       } catch (error) {
         console.error("MY ICE CREAM push registration failed:", error);
+        setNotificationState("error");
+        setNotificationMessage(error instanceof Error ? error.message : "Notification registration failed.");
       }
     });
   }, []);
+
+  const handleEnableNotifications = async () => {
+    setNotificationState("busy");
+    setNotificationMessage("");
+    try {
+      await enablePushNotifications();
+      setNotificationState("enabled");
+      setNotificationMessage("इस डिवाइस पर Product Notifications चालू हो गए हैं।");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Notifications चालू नहीं हो सके।";
+      setNotificationMessage(message);
+      setNotificationState(typeof Notification !== "undefined" && Notification.permission === "denied" ? "denied" : "error");
+    }
+  };
 
   const handleInstall = async () => {
     if (!installPrompt) {
@@ -118,6 +140,21 @@ export default function PwaInstallButton() {
 
   return (
     <div className="ice-install-root">
+      {notificationState !== "checking" && notificationState !== "enabled" && notificationState !== "unsupported" && (
+        <div className="ice-notification-card" role="status">
+          <span className="ice-notification-emoji" aria-hidden="true">🔔</span>
+          <strong>नए Product की सूचना पाएँ</strong>
+          <p>{notificationMessage || "Google Login किए बिना इस डिवाइस पर नई Product Notifications प्राप्त करें।"}</p>
+          {notificationState !== "denied" && (
+            <button type="button" className="ice-notification-allow" onClick={handleEnableNotifications} disabled={notificationState === "busy"}>
+              {notificationState === "busy" ? "कृपया प्रतीक्षा करें…" : notificationState === "error" ? "फिर कोशिश करें" : "Notifications चालू करें"}
+            </button>
+          )}
+        </div>
+      )}
+      {notificationState === "enabled" && notificationMessage && (
+        <div className="ice-notification-status" role="status"><span>✓</span><span>{notificationMessage}</span></div>
+      )}
       {!installed && showHelp && (
         <div className="ice-install-help" role="status">
           <button
