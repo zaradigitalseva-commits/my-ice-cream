@@ -110,7 +110,7 @@ export default function PwaInstallButton() {
     });
   }, []);
 
-  const handleEnableNotifications = async () => {
+  // Show the successful opt-in confirmation briefly, then keep the page clean.\n  useEffect(() => {\n    if (notificationState !== "enabled" || !notificationMessage) return;\n    const timeout = window.setTimeout(() => setNotificationMessage(""), 3000);\n    return () => window.clearTimeout(timeout);\n  }, [notificationState, notificationMessage]);\n\n  const handleEnableNotifications = async () => {
     setNotificationState("busy");
     setNotificationMessage("");
     try {
