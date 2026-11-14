@@ -238,7 +238,7 @@ export default function HomePage() {
       {productLoadError && <p className="admin-error" role="alert">{productLoadError}</p>}
       {loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : visibleProducts.length === 0 ? <div className="empty-panel"><h3>अभी कोई प्रोडक्ट उपलब्ध नहीं है</h3><p>LIVE दुकानों के उपलब्ध प्रोडक्ट यहाँ दिखाई देंगे।</p></div> :
       <div className="shop-grid marketplace-product-grid">{visibleProducts.map((product) => <article className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
-        <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="marketplace-product-open" aria-label={"Open " + (product.name || "product") + " in its shop"}>
+        <Link href={"/shop/" + product.shopId} className="marketplace-product-open" aria-label={"Open all products from " + product.shopName}>
           {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
           <div className="shop-card-body marketplace-product-summary"><strong>₹{Number(product.price || 0).toFixed(2)}</strong></div>
         </Link>
