@@ -623,7 +623,7 @@ export default function ShopPage() {
     </main>;
   }
   return <main className="admin-wrap">
-    <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><Link href="/" className="admin-secondary role-link">Home page</Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></div></header>
+    <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><Link href="/shop/orders" className="admin-primary role-link">🛒 Customer Orders</Link><Link href="/" className="admin-secondary role-link">Home page</Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></div></header>
     {loading ? <section className="admin-panel"><h1>Loading your shop…</h1></section> : !shop ?
       <section className="admin-panel"><h1>Register your shop</h1><p>Shopkeeper access starts with a separate shop registration. Admin approval is required before your shop is LIVE.</p><Link href="/shop/register" className="admin-primary role-link">Register Shop</Link></section> :
       <>
