@@ -69,7 +69,7 @@ export default function ShopDetailsPage(){
   setBusy(true);setMessage("ऑर्डर सेव किया जा रहा है…");
   const whatsappWindow=window.open("about:blank","_blank");
   try{
-    const customerUser=auth.currentUser||(await signInAnonymously(auth)).user();
+    const customerUser=auth.currentUser||(await signInAnonymously(auth)).user;
 
     // Verify every cart item against its canonical per-shop product record.
     // If a product is missing or stale, explain it and still send a manual
