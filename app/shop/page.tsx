@@ -136,9 +136,11 @@ export default function ShopPage() {
       if (isAdminEmail(nextUser.email) && nextUser.emailVerified) { router.replace("/admin"); return; }
       if (!db) { setLoading(false); return; }
       try {
-        const result = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
-        const owned = result.docs[0];
-        if (owned) {
+        // Shop ownership is stored in shopOwnerLocks, not in the public shops document.
+        const ownerLock = await getDoc(doc(db, "shopOwnerLocks", nextUser.uid));
+        const ownedShopId = ownerLock.exists() ? String(ownerLock.data().shopId || "") : "";
+        const owned = ownedShopId ? await getDoc(doc(db, "shops", ownedShopId)) : null;
+        if (owned && owned.exists()) {
           const data = { id: owned.id, ...owned.data() } as Shop;
           const isLiveShop = ["live", "LIVE", "Live"].includes(String(data.status || ""));
           setShop(data);
@@ -158,6 +160,17 @@ export default function ShopPage() {
     });
   }, [router]);
 
+  // When registration redirects with ?payment=1, bring the first-listing payment panel into view.
+  useEffect(() => {
+    if (!shop || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") !== "1") return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("subscription-payment")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [shop?.id]);
+
   // Refresh approval/payment state while the shopkeeper page is open.
   // Admin changes are made from a separate session, so a one-time page load can otherwise stay stale.
   useEffect(() => {
@@ -167,9 +180,12 @@ export default function ShopPage() {
     let active = true;
     const refreshApprovalState = async () => {
       try {
-        const result = await getDocs(query(collection(firestore, "shops"), where("ownerUid", "==", ownerUid)));
-        const owned = result.docs[0];
-        if (!owned || !active) return;
+        // Resolve the shop through the private owner lock; public shop docs
+        // intentionally do not contain ownerUid.
+        const ownerLock = await getDoc(doc(firestore, "shopOwnerLocks", ownerUid));
+        const ownedShopId = ownerLock.exists() ? String(ownerLock.data().shopId || "") : "";
+        const owned = ownedShopId ? await getDoc(doc(firestore, "shops", ownedShopId)) : null;
+        if (!owned || !owned.exists() || !active) return;
         const latest = { id: owned.id, ...owned.data() } as Shop;
         setShop(latest);
         await loadShopAdminNotices(latest.id);
