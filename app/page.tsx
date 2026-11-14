@@ -48,7 +48,7 @@ export default function HomePage() {
     return onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       setShopOwner(false);
-      if (!nextUser) return;
+      if (!nextUser || nextUser.isAnonymous) return;
       // Keep admins on the public marketplace when they visit "/".
       // Their control panel remains available through the Admin Dashboard link.
       if (!db) return;
@@ -157,7 +157,7 @@ export default function HomePage() {
     if (!auth) { setMessage("Firebase setup is pending. Please try again later."); return; }
     setBusy(true); setMessage("");
     try {
-      if (user) {
+      if (user && !user.isAnonymous) {
         await signOut(auth);
       } else {
         const credential = await signInWithPopup(auth, googleProvider);
@@ -194,7 +194,7 @@ export default function HomePage() {
           <a href="#for-shops" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>For shops</a>
           <a href="#about" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>About</a>
           <Link href="/shop/register" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Register your shop</Link>
-          {user && (adminAccount ? <Link href="/admin" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Admin Dashboard</Link> : shopOwner ? <Link href="/shop" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Shop Dashboard</Link> : <Link href="/customer" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>My Account</Link>)}
+          {user && !user.isAnonymous && (adminAccount ? <Link href="/admin" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Admin Dashboard</Link> : shopOwner ? <Link href="/shop" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Shop Dashboard</Link> : <Link href="/customer" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>My Account</Link>)}
           <button onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); handleAuth(); }} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
         </div>
       </details>
