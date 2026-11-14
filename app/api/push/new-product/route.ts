@@ -189,11 +189,17 @@ export async function POST(request: NextRequest) {
   try {
     // These reads are performed with the caller's Firebase ID token, so Firestore Rules
     // independently confirm that this caller can read the shop and its product.
-    const [shop, product] = await Promise.all([
+    const [shop, product, ownerLock, privateOwner] = await Promise.all([
       firestoreDocument(projectId, "shops/" + shopId, idToken),
-      firestoreDocument(projectId, "shops/" + shopId + "/products/" + productId, idToken)
+      firestoreDocument(projectId, "shops/" + shopId + "/products/" + productId, idToken),
+      firestoreDocument(projectId, "shopOwnerLocks/" + uid, idToken),
+      firestoreDocument(projectId, "shopPrivate/" + shopId, idToken)
     ]);
-    if (!shop || !product || shop.ownerUid !== uid || product.ownerUid !== uid || product.shopId !== shopId) {
+    const ownsThisShop = ownerLock?.ownerUid === uid
+      && ownerLock?.shopId === shopId
+      && privateOwner?.ownerUid === uid
+      && privateOwner?.shopId === shopId;
+    if (!shop || !product || !ownsThisShop || product.ownerUid !== uid || product.shopId !== shopId) {
       return jsonError("Only the owner of this shop can send its product notification.", 403);
     }
     if (!["live", "LIVE", "Live"].includes(String(shop.status || ""))) {
