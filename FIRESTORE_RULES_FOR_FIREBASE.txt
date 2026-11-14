@@ -29,9 +29,7 @@ service cloud.firestore {
             exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
             && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
               .data.shopId == shopId
-            && exists(/databases/$(database)/documents/shopPrivate/$(shopId))
-            && get(/databases/$(database)/documents/shopPrivate/$(shopId))
-              .data.ownerUid == request.auth.uid
+
           )
         );
     }
