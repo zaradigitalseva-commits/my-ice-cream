@@ -195,11 +195,12 @@ export async function POST(request: NextRequest) {
       firestoreDocument(projectId, "shopOwnerLocks/" + uid, idToken),
       firestoreDocument(projectId, "shopPrivate/" + shopId, idToken)
     ]);
-    const ownsThisShop = ownerLock?.ownerUid === uid
+    const ownsLegacyShop = shop?.ownerUid === uid;
+    const ownsPrivateShop = ownerLock?.ownerUid === uid
       && ownerLock?.shopId === shopId
       && privateOwner?.ownerUid === uid
       && privateOwner?.shopId === shopId;
-    if (!shop || !product || !ownsThisShop || product.ownerUid !== uid || product.shopId !== shopId) {
+    if (!shop || !product || !(ownsLegacyShop || ownsPrivateShop) || product.ownerUid !== uid || product.shopId !== shopId) {
       return jsonError("Only the owner of this shop can send its product notification.", 403);
     }
     if (!["live", "LIVE", "Live"].includes(String(shop.status || ""))) {
