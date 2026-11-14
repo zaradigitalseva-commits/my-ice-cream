@@ -17,20 +17,18 @@ service cloud.firestore {
         ];
     }
 
+    function ownerLockMatchesShop(shopId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
+        && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId
+        && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.ownerUid == request.auth.uid;
+    }
+
     function ownsShop(shopId) {
       return signedIn()
         && (
-          // Legacy shops keep ownerUid on the public shop document.
-          get(/databases/$(database)/documents/shops/$(shopId))
-            .data.get("ownerUid", "") == request.auth.uid
-          // New registrations keep ownership private and resolve it through
-          // the owner's lock plus shopPrivate/{shopId}.
-          || (
-            exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
-            && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
-              .data.shopId == shopId
-
-          )
+          get(/databases/$(database)/documents/shops/$(shopId)).data.get("ownerUid", "") == request.auth.uid
+          || ownerLockMatchesShop(shopId)
         );
     }
 
@@ -169,15 +167,21 @@ service cloud.firestore {
     match /shops/{shopId} {
 
       allow read: if isAdmin()
-        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || (signedIn() && resource.data.get("ownerUid", "") == request.auth.uid)
+        || ownerLockMatchesShop(shopId)
         // Public can read only shops already marked LIVE by Admin.
         || resource.data.status in ["live", "LIVE", "Live"];
 
       // A shop owner may register only a pending shop.
       // Subscription and admin-activation fields cannot be self-granted.
       allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid
+        // Public shop documents deliberately contain no owner identity.
+        && request.resource.data.keys().hasOnly([
+          "name", "shopName", "phone", "city", "address", "description",
+          "logoUrl", "bannerUrl", "status", "createdAt"
+        ])
         && request.resource.data.status == "pending"
+        && request.resource.data.createdAt is timestamp
         && (
           !("subscriptionStatus" in request.resource.data)
           || request.resource.data.subscriptionStatus in ["inactive", "expired"]
@@ -192,9 +196,9 @@ service cloud.firestore {
         )
         && !("adminActivatedBy" in request.resource.data)
         && !("adminActivatedAt" in request.resource.data)
-        && getAfter(
-          /databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)
-        ).data.shopId == shopId;
+        && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId
+        && getAfter(/databases/$(database)/documents/shopPrivate/$(shopId)).data.shopId == shopId
+        && getAfter(/databases/$(database)/documents/shopPrivate/$(shopId)).data.ownerUid == request.auth.uid;
 
       allow update: if (
           isAdmin()
@@ -212,9 +216,8 @@ service cloud.firestore {
           )
         )
         || (
-          signedIn()
-          && resource.data.ownerUid == request.auth.uid
-          && request.resource.data.ownerUid == resource.data.ownerUid
+          ownsShop(shopId)
+          && request.resource.data.get("ownerUid", "") == resource.data.get("ownerUid", "")
           && request.resource.data.status == resource.data.status
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "name", "shopName", "phone", "city", "address",
@@ -360,6 +363,29 @@ service cloud.firestore {
 
       allow delete: if isAdmin();
     }
+    match /shopPrivate/{shopId} {
+      // Private owner identity is visible only to Admin and the verified owner.
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || ownerLockMatchesShop(shopId);
+
+      // Registration writes the public shop, private owner record and owner lock atomically.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["shopId", "ownerUid", "ownerName", "ownerEmail", "createdAt"])
+        && request.resource.data.shopId == shopId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerName is string
+        && request.resource.data.ownerEmail is string
+        && request.resource.data.createdAt is timestamp
+        && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId
+        && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.status == "pending";
+
+      // Owner identity cannot be reassigned or edited from the client.
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
     match /shopOwnerLocks/{ownerUid} {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == ownerUid);
       allow create: if signedIn()

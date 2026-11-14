@@ -309,6 +309,8 @@ export default function AdminPage() {
       }
 
       const finalBatch = writeBatch(firestore);
+      finalBatch.delete(doc(firestore, "shopPrivate", shop.id));
+      finalBatch.delete(doc(firestore, "paymentPendingLocks", shop.id));
       finalBatch.delete(doc(firestore, "shops", shop.id));
       await finalBatch.commit();
       setShops((current) => current.filter((item) => item.id !== shop.id));
