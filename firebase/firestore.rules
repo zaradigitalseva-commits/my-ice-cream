@@ -76,7 +76,6 @@ service cloud.firestore {
         && item.quantity > 0
         && item.quantity <= 100
         && exists(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId))
-        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.shopId == shopId
         && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.active == true
         && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.name == item.name
         && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.price == item.price;
@@ -118,7 +117,6 @@ service cloud.firestore {
         && item.price is number
         && item.price >= 0
         && exists(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId))
-        && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.shopId == shopId
         && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.active == true
         && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.name == item.name
         && get(/databases/$(database)/documents/shops/$(shopId)/products/$(item.productId)).data.price == item.price;
