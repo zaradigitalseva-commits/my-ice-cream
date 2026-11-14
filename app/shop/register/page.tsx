@@ -11,6 +11,7 @@ export default function ShopRegisterPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [existingShop, setExistingShop] = useState<{ id: string; name?: string; shopName?: string; status?: string; city?: string } | null>(null);
+  const [registrationBlocked, setRegistrationBlocked] = useState(false);
   const [checkingRegistration, setCheckingRegistration] = useState(true);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -29,22 +30,30 @@ export default function ShopRegisterPage() {
     async function checkExistingRegistration() {
       if (!user || !db) { setExistingShop(null); setCheckingRegistration(false); return; }
       setCheckingRegistration(true);
+      let ownerLockFound = false;
+      setRegistrationBlocked(false);
       try {
         const lockSnap = await getDoc(doc(db, "shopOwnerLocks", user.uid));
         if (cancelled) return;
         if (!lockSnap.exists()) { setExistingShop(null); return; }
+        ownerLockFound = true;
+        setRegistrationBlocked(true);
         const shopId = String(lockSnap.data().shopId || "");
-        if (!shopId) { setMessage("Your registration lock exists but has no shop ID. Please contact Admin."); return; }
+        if (!shopId) { setMessage("Aapki purani registration ka owner lock mila hai, lekin shop ID nahi mili. Admin se jaanch karayein; dobara register na karein."); return; }
         const shopSnap = await getDoc(doc(db, "shops", shopId));
         if (cancelled) return;
-        if (!shopSnap.exists()) { setMessage("Your registration record is being checked by Admin. Please contact support before registering again."); return; }
+        if (!shopSnap.exists()) { setMessage("Aapki purani registration ka lock mila hai. Shop record Admin se verify ho raha hai; dobara register na karein."); return; }
         const data = { id: shopSnap.id, ...shopSnap.data() } as { id: string; name?: string; shopName?: string; status?: string; city?: string };
         const status = (data.status || "pending").toLowerCase();
         if (status === "live") { router.replace("/shop"); return; }
         setExistingShop(data);
+        setRegistrationBlocked(false);
       } catch (error) {
         console.error("Shop registration pre-check failed:", error);
-        if (!cancelled) setMessage("Registration check failed: " + (error instanceof Error ? error.message : "Permission denied while checking your existing shop."));
+        if (!cancelled) {
+          setRegistrationBlocked(ownerLockFound);
+          setMessage("Registration check failed: " + (error instanceof Error ? error.message : "Permission denied while checking your existing shop.") + (ownerLockFound ? " Aapka purana owner lock mila hai; dobara register na karein." : ""));
+        }
       } finally {
         if (!cancelled) setCheckingRegistration(false);
       }
@@ -150,6 +159,11 @@ export default function ShopRegisterPage() {
           <Link href="/shop#shop-profile" className="admin-primary role-link">✏️ Edit registration details</Link>
           <Link href="/shop?payment=1" className="admin-secondary role-link">Open payment & registration status →</Link>
         </div>
+      </div> :
+      registrationBlocked ? <div className="register-signin register-existing-status">
+        <h3>पुरानी दुकान की जाँच जारी है</h3>
+        <p>{message || "आपकी पुरानी दुकान का owner lock मिल गया है। कृपया दोबारा रजिस्ट्रेशन न करें। Admin से रिकॉर्ड की जाँच कराएँ।"}</p>
+        <Link href="/shop" className="admin-primary role-link">Shop Dashboard खोलें</Link>
       </div> :
       <form className="register-form register-form-color" onSubmit={submit}>
         <div className="register-signed-in"> <span>✓</span><div><small>Signed in as</small><strong>{user.email}</strong></div></div>
