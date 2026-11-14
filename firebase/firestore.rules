@@ -19,8 +19,21 @@ service cloud.firestore {
 
     function ownsShop(shopId) {
       return signedIn()
-        && get(/databases/$(database)/documents/shops/$(shopId))
-          .data.ownerUid == request.auth.uid;
+        && (
+          // Legacy shops keep ownerUid on the public shop document.
+          get(/databases/$(database)/documents/shops/$(shopId))
+            .data.get("ownerUid", "") == request.auth.uid
+          // New registrations keep ownership private and resolve it through
+          // the owner's lock plus shopPrivate/{shopId}.
+          || (
+            exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
+            && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
+              .data.shopId == shopId
+            && exists(/databases/$(database)/documents/shopPrivate/$(shopId))
+            && get(/databases/$(database)/documents/shopPrivate/$(shopId))
+              .data.ownerUid == request.auth.uid
+          )
+        );
     }
 
     function validSubscription(shopData) {
