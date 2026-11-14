@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
-import { collection, doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore/lite";
+import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, where, writeBatch } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { compressImageToWebP } from "@/lib/image-compression";
 
@@ -35,7 +35,18 @@ export default function ShopRegisterPage() {
       try {
         const lockSnap = await getDoc(doc(db, "shopOwnerLocks", user.uid));
         if (cancelled) return;
-        if (!lockSnap.exists()) { setExistingShop(null); return; }
+        if (!lockSnap.exists()) {
+          // Older shops may still store ownerUid directly on the shop document.
+          const legacyOwned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid), limit(1)));
+          if (cancelled) return;
+          if (legacyOwned.empty) { setExistingShop(null); setRegistrationBlocked(false); return; }
+          const legacyShop = legacyOwned.docs[0];
+          const legacyData = { id: legacyShop.id, ...legacyShop.data() } as { id: string; name?: string; shopName?: string; status?: string; city?: string };
+          if ((legacyData.status || "pending").toLowerCase() === "live") { router.replace("/shop"); return; }
+          setExistingShop(legacyData);
+          setRegistrationBlocked(false);
+          return;
+        }
         ownerLockFound = true;
         setRegistrationBlocked(true);
         const shopId = String(lockSnap.data().shopId || "");
@@ -93,6 +104,14 @@ export default function ShopRegisterPage() {
           return;
         }
         throw new Error("Your registration lock exists but its shop record was not found. Please contact Admin.");
+      }
+      const legacyOwned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid), limit(1)));
+      if (!legacyOwned.empty) {
+        const legacyShop = legacyOwned.docs[0];
+        const data = { id: legacyShop.id, ...legacyShop.data() } as { id: string; name?: string; shopName?: string; status?: string; city?: string };
+        setExistingShop(data);
+        setMessage("Aapki purani shop registration mil gayi. Naya registration banane ke bajaye purani shop ka dashboard kholein.");
+        return;
       }
       registrationStage = "saving shop details and owner lock";
       const shopRef = doc(collection(db, "shops"));
