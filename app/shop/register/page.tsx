@@ -88,15 +88,25 @@ export default function ShopRegisterPage() {
       registrationStage = "saving shop details and owner lock";
       const shopRef = doc(collection(db, "shops"));
       const lockRef = doc(db, "shopOwnerLocks", user.uid);
+      const privateRef = doc(db, "shopPrivate", shopRef.id);
       const batch = writeBatch(db);
+      // Public shop data must not contain owner identity fields. The deployed
+      // Firestore rules require private owner identity and the owner lock to be
+      // created atomically with the pending shop.
       batch.set(shopRef, {
-        name: name.trim(), shopName: name.trim(), ownerUid: user.uid,
-        ownerName: user.displayName || "", ownerEmail: user.email || "",
+        name: name.trim(), shopName: name.trim(),
         phone: phone.trim(), city: city.trim(), address: address.trim(),
         description: description.trim(), logoUrl, bannerUrl,
         status: "pending", createdAt: serverTimestamp()
       });
       batch.set(lockRef, { ownerUid: user.uid, shopId: shopRef.id, createdAt: serverTimestamp() });
+      batch.set(privateRef, {
+        shopId: shopRef.id,
+        ownerUid: user.uid,
+        ownerName: user.displayName || "",
+        ownerEmail: user.email || "",
+        createdAt: serverTimestamp()
+      });
       await batch.commit();
       router.replace("/shop?payment=1");
       return;
