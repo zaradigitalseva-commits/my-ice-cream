@@ -35,8 +35,8 @@ export default function CustomerPage() {
   useEffect(() => {
     if (!auth) { setLoading(false); return; }
     return onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (!u) { router.replace("/"); return; }
+      setUser(u?.isAnonymous ? null : u);
+      if (!u || u.isAnonymous) { router.replace("/"); return; }
       if (isAdminEmail(u.email) && u.emailVerified) { router.replace("/admin"); return; }
       if (!db) { setLoading(false); return; }
       try {
