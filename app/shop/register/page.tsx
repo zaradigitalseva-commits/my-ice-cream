@@ -22,7 +22,7 @@ export default function ShopRegisterPage() {
   const [imageBusy, setImageBusy] = useState<"logo" | "banner" | "">("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  useEffect(() => { if (!auth) { setCheckingRegistration(false); return; } return onAuthStateChanged(auth, setUser); }, []);
+  useEffect(() => { if (!auth) { setCheckingRegistration(false); return; } return onAuthStateChanged(auth, (nextUser) => setUser(nextUser?.isAnonymous ? null : nextUser)); }, []);
 
   useEffect(() => {
     let cancelled = false;
