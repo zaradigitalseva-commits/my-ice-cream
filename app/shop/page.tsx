@@ -583,6 +583,45 @@ export default function ShopPage() {
   // Admin-approved LIVE status is the source of truth for shop access.
   // Do not hide products or dashboard features because older LIVE records lack subscription metadata.
   const live = ["live", "LIVE", "Live"].includes(String(shop?.status || ""));
+  if (!loading && shop && !live) {
+    const registrationStatus = String(shop.status || "pending").toLowerCase();
+    return <main className="admin-wrap">
+      <header className="admin-header">
+        <Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <Link href="/" className="admin-secondary role-link">Home page</Link>
+          <button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button>
+        </div>
+      </header>
+      <section className="admin-heading">
+        <div><p className="admin-kicker">SHOP REGISTRATION</p><h1>{shop.name || shop.shopName || "My Shop"}</h1><p>{shop.city || ""} · Status: <strong className={"admin-status " + registrationStatus}>{registrationStatus.toUpperCase()}</strong></p></div>
+      </section>
+      <section className="admin-panel">
+        <p className="admin-kicker">STEP 1 · REGISTRATION</p>
+        <h2>आपकी दुकान की registration सेव है</h2>
+        <p>दुकान LIVE होने के लिए पहले payment और UTR verification, फिर Admin की final approval जरूरी है।</p>
+        <p><strong>अभी की स्थिति:</strong> {registrationStatus === "rejected" ? "Registration reject हुई है। कृपया Admin से संपर्क करें।" : pendingPayment ? "आपका UTR Admin को मिल गया है। Payment verification चल रही है। दोबारा payment न करें।" : shop.initialPaymentVerified === true && subscriptionExpiry && subscriptionExpiry.getTime() > Date.now() ? "Payment verify हो गया है। अब Admin आपकी दुकान की final approval करके LIVE करेगा।" : "अगला कदम: ₹599 payment करें और receipt में मिला UTR submit करें।"}</p>
+      </section>
+      {subscriptionPaymentDue && !pendingPayment && registrationStatus !== "rejected" && <section className="admin-panel" id="subscription-payment" style={{border:"2px solid #f0a43a",scrollMarginTop:24}}>
+        <p className="admin-kicker">STEP 2 · PAYMENT</p>
+        <h2>पहली दुकान listing फीस · ₹599</h2>
+        <p>पहले 30 दिन ₹599 में शामिल हैं। नीचे Admin का UPI QR scan करके payment करें।</p>
+        {adminUpiQr ? <div style={{textAlign:"center",margin:"12px auto",maxWidth:300}}><img src={adminUpiQr} alt="Admin UPI QR Code" style={{width:"100%",maxWidth:240,objectFit:"contain",borderRadius:12,border:"1px solid #ddd",padding:8,background:"#fff"}}/><p className="admin-muted">UPI QR · ₹599</p></div> : <p className="admin-error">Admin ने अभी UPI QR सेट नहीं किया है। QR उपलब्ध होने तक payment न करें।</p>}
+        {adminUpiQr ? <form className="register-form" onSubmit={submitSubscription}>
+          <label>Payment receipt का UTR नंबर<input required value={utr} onChange={e=>{setUtr(e.target.value.toUpperCase().replace(/\s+/g,""));setPaymentError("");}} placeholder="UPI receipt से UTR नंबर डालें" /></label>
+          <button type="submit" className="admin-primary" disabled={busy||pendingPayment||!utr.trim()}>{busy?"UTR भेजा जा रहा है…":"UTR Submit करें · ₹599"}</button>
+          <p className="admin-muted">Payment करने के बाद receipt में दिख रहा UTR डालें और Submit दबाएँ। Admin पहले payment verify करेगा, फिर दुकान approve करके LIVE करेगा।</p>
+        </form> : null}
+        {paymentError&&<p className="admin-error" role="alert">{paymentError}</p>}
+        {paymentNotice&&<p className="admin-success" role="status">{paymentNotice}</p>}
+      </section>}
+      {pendingPayment && <section className="admin-panel"><p className="admin-kicker">STEP 3 · ADMIN VERIFICATION</p><h2>UTR जमा हो गया</h2><p>Admin आपके payment की जाँच कर रहा है। कृपया दोबारा payment या UTR submit न करें। Verification के बाद Admin final approval करेगा।</p></section>}
+      {registrationStatus === "rejected" && <section className="admin-panel"><h2>Registration rejected</h2><p>कृपया Admin से संपर्क करें।</p></section>}
+      {error && <p className="admin-error" role="alert">{error}</p>}
+      {notice && <p className="admin-success" role="status">{notice}</p>}
+      <p className="admin-muted">Shopkeeper dashboard और product management Admin की approval के बाद खुलेंगे।</p>
+    </main>;
+  }
   return <main className="admin-wrap">
     <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><Link href="/" className="admin-secondary role-link">Home page</Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></div></header>
     {loading ? <section className="admin-panel"><h1>Loading your shop…</h1></section> : !shop ?
