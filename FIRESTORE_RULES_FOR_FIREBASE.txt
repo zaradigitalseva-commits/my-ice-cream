@@ -169,32 +169,26 @@ service cloud.firestore {
     match /shops/{shopId} {
 
       allow read: if isAdmin()
-        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || ownsShop(shopId)
         // Public can read only shops already marked LIVE by Admin.
         || resource.data.status in ["live", "LIVE", "Live"];
 
       // A shop owner may register only a pending shop.
       // Subscription and admin-activation fields cannot be self-granted.
       allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          "name", "shopName", "phone", "city", "address", "description",
+          "logoUrl", "bannerUrl", "status", "createdAt"
+        ])
         && request.resource.data.status == "pending"
-        && (
-          !("subscriptionStatus" in request.resource.data)
-          || request.resource.data.subscriptionStatus in ["inactive", "expired"]
-        )
-        && (
-          !("subscriptionExpiresAt" in request.resource.data)
-          || request.resource.data.subscriptionExpiresAt == null
-        )
-        && (
-          !("adminActivated" in request.resource.data)
-          || request.resource.data.adminActivated == false
-        )
+        && request.resource.data.createdAt is timestamp
+        && !("subscriptionStatus" in request.resource.data)
+        && !("subscriptionExpiresAt" in request.resource.data)
+        && !("adminActivated" in request.resource.data)
         && !("adminActivatedBy" in request.resource.data)
         && !("adminActivatedAt" in request.resource.data)
-        && getAfter(
-          /databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)
-        ).data.shopId == shopId;
+        && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId
+        && getAfter(/databases/$(database)/documents/shopPrivate/$(shopId)).data.ownerUid == request.auth.uid;
 
       allow update: if (
           isAdmin()
@@ -212,9 +206,8 @@ service cloud.firestore {
           )
         )
         || (
-          signedIn()
-          && resource.data.ownerUid == request.auth.uid
-          && request.resource.data.ownerUid == resource.data.ownerUid
+          ownsShop(shopId)
+          && request.resource.data.get("ownerUid", "") == resource.data.get("ownerUid", "")
           && request.resource.data.status == resource.data.status
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "name", "shopName", "phone", "city", "address",
@@ -360,6 +353,21 @@ service cloud.firestore {
 
       allow delete: if isAdmin();
     }
+    match /shopPrivate/{shopId} {
+      // Private owner identity is visible only to the owner and verified admins.
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["shopId", "ownerUid", "ownerName", "ownerEmail", "createdAt"])
+        && request.resource.data.shopId == shopId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.createdAt is timestamp
+        && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.status == "pending"
+        && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
     match /shopOwnerLocks/{ownerUid} {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == ownerUid);
       allow create: if signedIn()
@@ -368,7 +376,9 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(["ownerUid", "shopId", "createdAt"])
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.shopId is string
-        && request.resource.data.shopId.size() > 0;
+        && request.resource.data.shopId.size() > 0
+        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.status == "pending"
+        && getAfter(/databases/$(database)/documents/shopPrivate/$(request.resource.data.shopId)).data.ownerUid == request.auth.uid;
       allow update: if false;
       allow delete: if isAdmin();
     }
