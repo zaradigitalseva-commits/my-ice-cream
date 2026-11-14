@@ -66,20 +66,29 @@ export default function AdminPaymentsPage() {
         const paymentRef = doc(firestore, "subscriptionPayments", payment.id);
         const shopRef = doc(firestore, "shops", payment.shopId!);
         const lockRef = doc(firestore, "paymentPendingLocks", payment.shopId!);
+        const ownerLockRef = doc(firestore, "shopOwnerLocks", payment.ownerUid || "");
+        const privateOwnerRef = doc(firestore, "shopPrivate", payment.shopId!);
         const paymentSnap = await tx.get(paymentRef);
         const shopSnap = await tx.get(shopRef);
         const lockSnap = await tx.get(lockRef);
+        const ownerLockSnap = payment.ownerUid ? await tx.get(ownerLockRef) : null;
+        const privateOwnerSnap = await tx.get(privateOwnerRef);
         if (!paymentSnap.exists() || paymentSnap.data().status !== "pending") throw new Error("This payment is no longer pending.");
         if (!shopSnap.exists()) throw new Error("Shop record was not found.");
-        if (!lockSnap.exists() || lockSnap.data().paymentId !== payment.id) throw new Error("Pending payment lock does not match. Do not approve; inspect the records.");
+        if (!lockSnap.exists() || lockSnap.data().paymentId !== payment.id || lockSnap.data().shopId !== payment.shopId) throw new Error("Pending payment lock does not match. Do not approve; inspect the records.");
         const data = paymentSnap.data();
         const shop = shopSnap.data();
+        const ownerLockMatches = Boolean(ownerLockSnap?.exists() && ownerLockSnap.data().ownerUid === data.ownerUid && ownerLockSnap.data().shopId === payment.shopId);
+        const privateOwnerMatches = Boolean(privateOwnerSnap.exists() && privateOwnerSnap.data().ownerUid === data.ownerUid && privateOwnerSnap.data().shopId === payment.shopId);
+        const legacyOwnerMatches = shop.ownerUid === data.ownerUid;
+        if (data.ownerUid !== payment.ownerUid || data.shopId !== payment.shopId || !(ownerLockMatches && privateOwnerMatches) && !legacyOwnerMatches) {
+          throw new Error("Payment owner does not match the shop's private owner record. Do not approve; inspect the owner records.");
+        }
         const initial = data.paymentType === "initial_listing";
         if (!initial && data.paymentType !== "monthly_renewal") throw new Error("Unknown payment type. Do not approve this payment.");
         const expected = initial ? 599 : 299;
         if (data.amount !== expected) throw new Error(`Payment amount does not match ₹${expected}.`);
         if (typeof data.utr !== "string" || !/^[A-Z0-9]{6,40}$/.test(data.utr)) throw new Error("UTR is missing or invalid.");
-        if (data.ownerUid !== shop.ownerUid || data.shopId !== payment.shopId) throw new Error("Payment owner or shop reference does not match.");
         if (initial && (shop.initialPaymentVerified === true || shop.subscriptionExpiresAt)) throw new Error("This shop already has an initial payment or subscription. Do not approve as first listing.");
         if (!initial && shop.initialPaymentVerified !== true && !shop.subscriptionExpiresAt) throw new Error("The first ₹599 listing payment has not been verified yet.");
         const current = shop.subscriptionExpiresAt?.toDate?.() as Date | undefined;
