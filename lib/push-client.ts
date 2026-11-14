@@ -12,7 +12,7 @@ async function hashToken(token: string): Promise<string> {
 
 export async function registerPushSubscription(uid: string): Promise<void> {
   if (!uid || !firebaseApp || !db || typeof window === "undefined") {
-    throw new Error("Customer sign-in is required before notifications can be registered.");
+    throw new Error("A Firebase session is required before notifications can be registered.");
   }
   if (!(await isSupported())) throw new Error("This browser does not support Firebase web push notifications.");
   if (!("Notification" in window) || Notification.permission !== "granted") {
@@ -67,7 +67,14 @@ export async function enablePushNotifications(): Promise<void> {
 
   let currentUser = auth.currentUser;
   if (!currentUser) {
-    currentUser = (await signInAnonymously(auth)).user;
+    try {
+      currentUser = (await signInAnonymously(auth)).user;
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "auth/operation-not-allowed") {
+        throw new Error("Firebase Console में MY ICE CREAM project के Authentication → Sign-in method में Anonymous Enable करें।");
+      }
+      throw error;
+    }
   }
   await registerPushSubscription(currentUser.uid);
 }
