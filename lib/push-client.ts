@@ -2,7 +2,8 @@
 
 import { getMessaging, getToken, isSupported } from "firebase/messaging";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore/lite";
-import { db, firebaseApp } from "@/lib/firebase";
+import { auth, db, firebaseApp } from "@/lib/firebase";
+import { signInAnonymously } from "firebase/auth";
 
 async function hashToken(token: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
@@ -11,7 +12,7 @@ async function hashToken(token: string): Promise<string> {
 
 export async function registerPushSubscription(uid: string): Promise<void> {
   if (!uid || !firebaseApp || !db || typeof window === "undefined") {
-    throw new Error("Customer sign-in is required before notifications can be registered.");
+    throw new Error("A Firebase session is required before notifications can be registered.");
   }
   if (!(await isSupported())) throw new Error("This browser does not support Firebase web push notifications.");
   if (!("Notification" in window) || Notification.permission !== "granted") {
@@ -37,4 +38,43 @@ export async function registerPushSubscription(uid: string): Promise<void> {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   }, { merge: true });
+}
+
+
+/**
+ * Called only from the customer's explicit notification button.
+ * Keeps Google sign-in optional by creating a Firebase anonymous session
+ * when this browser has no signed-in user.
+ */
+export async function enablePushNotifications(): Promise<void> {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    throw new Error("This browser does not support notifications.");
+  }
+  if (!auth || !firebaseApp || !db) {
+    throw new Error("Firebase setup is incomplete. Please try again later.");
+  }
+
+  // Request permission before other awaited work so browsers still recognize
+  // the call as a direct response to the customer's button tap.
+  const permission = Notification.permission === "granted"
+    ? "granted"
+    : await Notification.requestPermission();
+  if (permission !== "granted") {
+    throw new Error(permission === "denied"
+      ? "Notifications are blocked. Allow them in your browser or phone settings."
+      : "Notification permission was not granted.");
+  }
+
+  let currentUser = auth.currentUser;
+  if (!currentUser) {
+    try {
+      currentUser = (await signInAnonymously(auth)).user;
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "auth/operation-not-allowed") {
+        throw new Error("Firebase Console में MY ICE CREAM project के Authentication → Sign-in method में Anonymous Enable करें।");
+      }
+      throw error;
+    }
+  }
+  await registerPushSubscription(currentUser.uid);
 }

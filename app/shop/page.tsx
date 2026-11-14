@@ -132,7 +132,7 @@ export default function ShopPage() {
     if (!auth) { setLoading(false); return; }
     return onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
-      if (!nextUser) { router.replace("/"); return; }
+      if (!nextUser || nextUser.isAnonymous) { router.replace("/"); return; }
       if (isAdminEmail(nextUser.email) && nextUser.emailVerified) { router.replace("/admin"); return; }
       if (!db) { setLoading(false); return; }
       try {

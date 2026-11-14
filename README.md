@@ -55,7 +55,7 @@ The current landing page is a starter shell, not a complete marketplace. Shop on
 
 ## Customer push notifications (new products)
 
-The app can send Firebase Cloud Messaging (FCM) web-push notifications to customers who are signed in, have granted browser notification permission, and have registered this browser. Notifications are sent when a LIVE shop adds a new **active** product. Editing an existing product does not send another notification. The service worker displays the notification and opens that product when tapped.
+The app can send Firebase Cloud Messaging (FCM) web-push notifications to customers who explicitly enable notifications on a supported browser/device. Customers do not need Google sign-in: the app creates a Firebase Anonymous Authentication session for the device when they tap the notification opt-in button. Notifications are sent when a LIVE shop adds a new **active** product. Editing an existing product does not send another notification. The service worker displays the notification and opens that product when tapped.
 
 ### Required one-time Firebase setup
 
@@ -64,9 +64,10 @@ The app can send Firebase Cloud Messaging (FCM) web-push notifications to custom
 3. In Google Cloud Console, enable the **Firebase Cloud Messaging API** for the same project.
 4. Create a service account for this Firebase project and grant it **Firebase Cloud Messaging API Admin** and **Cloud Datastore User** roles. Create a JSON key.
 5. Add the complete JSON key as the server-only secret `FCM_SERVICE_ACCOUNT_JSON` in the hosting provider. Do not commit it to GitHub and do not prefix it with `NEXT_PUBLIC_`.
-6. Publish `firebase/firestore.rules` in Firebase Console → Firestore Database → Rules. The new `pushSubscriptions` rule allows customers to manage only their own token records; customers cannot read other customers' tokens.
-7. Deploy the application and test with two different customer devices/browsers. Sign in on each, install/open the app, tap **Allow Notifications**, then add a new active product from a LIVE shop.
+6. In Firebase Console → Authentication → Sign-in method, enable **Anonymous**. This does not replace or disable Google sign-in; it lets a browser register a notification token without asking the customer to sign in with Google.
+7. Publish `firebase/firestore.rules` in Firebase Console → Firestore Database → Rules. The `pushSubscriptions` rule allows each Firebase session (including anonymous sessions) to manage only its own token records; customers cannot read other customers' tokens.
+8. Deploy the application and test with two different customer devices/browsers. Open/install the app on each, tap **Notifications चालू करें**, allow the browser permission, then add a new active product from a LIVE shop.
 
 The server verifies the Firebase ID token against Firestore's shop/product access rules before sending. It stores an idempotency record per product so editing a product or retrying the same request does not send duplicate notifications. Invalid FCM tokens are removed after FCM reports them as unregistered.
 
-**Delivery limits:** customers must sign in at least once on each device, grant notification permission, and have a supported browser/OS with internet access. Browser/OS battery and notification settings can delay or suppress delivery. This is web push, not SMS or WhatsApp.
+**Delivery limits:** each device must separately tap the notification opt-in button, complete anonymous registration, and grant browser notification permission. The browser/OS must support Web Push and have internet access. On iPhone/iPad, Web Push generally requires the site to be installed as a Home Screen app and permission to be requested from that installed app. Browser/OS battery and notification settings can delay or suppress delivery. Browser/OS battery and notification settings can delay or suppress delivery. This is web push, not SMS or WhatsApp.

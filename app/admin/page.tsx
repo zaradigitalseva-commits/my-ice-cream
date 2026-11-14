@@ -50,7 +50,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!auth) { setAuthReady(true); setError("Firebase configuration is missing."); return; }
-    return onAuthStateChanged(auth, (nextUser) => { setUser(nextUser); setAuthReady(true); if (nextUser && isAdminEmail(nextUser.email) && nextUser.emailVerified) { void loadAdminAnnouncements(); void loadShopDashboardNotices(); } });
+    return onAuthStateChanged(auth, (nextUser) => { const accountUser = nextUser?.isAnonymous ? null : nextUser; setUser(accountUser); setAuthReady(true); if (accountUser && isAdminEmail(accountUser.email) && accountUser.emailVerified) { void loadAdminAnnouncements(); void loadShopDashboardNotices(); } });
   }, []);
 
   async function loadAdminAnnouncements() {
