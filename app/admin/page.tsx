@@ -56,8 +56,12 @@ export default function AdminPage() {
   async function loadAdminAnnouncements() {
     if (!db) return;
     try {
-      const result = await getDocs(query(collection(db, "notifications"), where("type", "==", "admin"), orderBy("createdAt", "desc"), limit(30)));
-      setAdminAnnouncements(result.docs.map((item) => ({ id: item.id, ...item.data() } as AdminAnnouncement)));
+      // Filter by type in Firestore, then sort locally. This avoids requiring
+      // a composite type + createdAt index just to show the Admin post list.
+      const result = await getDocs(query(collection(db, "notifications"), where("type", "==", "admin"), limit(100)));
+      const posts = result.docs.map((item) => ({ id: item.id, ...item.data() } as AdminAnnouncement));
+      posts.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      setAdminAnnouncements(posts.slice(0, 30));
     } catch (err) {
       setError(err instanceof Error ? "पोस्ट सूची लोड नहीं हुई: " + err.message : "पोस्ट सूची लोड नहीं हुई।");
     }
@@ -87,7 +91,25 @@ export default function AdminPage() {
         throw new Error("Firebase token is not marked email-verified. Sign out and sign in again, then retry.");
       }
       const result = await getDocs(query(collection(firestore, "shops"), orderBy("createdAt", "desc")));
-      const loadedShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
+      const publicShops = result.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
+      // New registrations keep owner identity in shopPrivate/{shopId}, not in
+      // the public shops document. Admin combines both records for its review table.
+      const loadedShops = await Promise.all(publicShops.map(async (shop) => {
+        try {
+          const privateSnapshot = await getDoc(doc(firestore, "shopPrivate", shop.id));
+          if (!privateSnapshot.exists()) return shop;
+          const privateData = privateSnapshot.data();
+          return {
+            ...shop,
+            ownerUid: shop.ownerUid || (typeof privateData.ownerUid === "string" ? privateData.ownerUid : undefined),
+            ownerName: shop.ownerName || (typeof privateData.ownerName === "string" ? privateData.ownerName : undefined),
+            ownerEmail: shop.ownerEmail || (typeof privateData.ownerEmail === "string" ? privateData.ownerEmail : undefined),
+          };
+        } catch {
+          // Keep legacy shop data visible if a private owner record cannot be read.
+          return shop;
+        }
+      }));
       setShops(loadedShops);
       // Load payment records and UTR reservations for the main registrations table.
       // Keep this separate so a payment-read issue does not hide shop registrations.
