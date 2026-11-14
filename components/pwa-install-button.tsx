@@ -48,7 +48,10 @@ export default function PwaInstallButton() {
       }
     }
     if (!("Notification" in window)) setNotificationState("unsupported");
-    else setNotificationState(Notification.permission === "denied" ? "denied" : "default");
+    else if (Notification.permission === "denied") {
+      setNotificationState("denied");
+      setNotificationMessage("Notifications blocked हैं। Phone या browser की Site Settings में MY ICE CREAM के लिए Notifications Allow करें।");
+    } else setNotificationState("default");
     setReady(true);
 
     const onBeforeInstall = (event: Event) => {
@@ -89,7 +92,7 @@ export default function PwaInstallButton() {
     };
   }, []);
 
-  // Ask for browser permission after Google sign-in, then register this phone silently.
+  // If a signed-in user already allowed notifications, keep this browser token registered.
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, async (currentUser) => {
