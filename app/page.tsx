@@ -11,7 +11,6 @@ import { registerPushSubscription } from "@/lib/push-client";
 type Shop = { id: string; name?: string; shopName?: string; city?: string; address?: string; description?: string; logoUrl?: string; bannerUrl?: string; category?: string; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string };
 type MarketplaceProduct = { id: string; shopId: string; shopName: string; city?: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; createdAt?: { toDate?: () => Date } | Date | string | number };
 type CustomerNotice = { id: string; type?: string; shopId?: string; shopName?: string; productId?: string; title?: string; body?: string; createdAt?: { toDate?: () => Date } };
-const categories = ["All treats", "Ice cream", "Kulfi", "Cones", "Family packs", "Party orders"];
 
 export default function HomePage() {
   const router = useRouter();
@@ -29,7 +28,6 @@ export default function HomePage() {
   const [searchText, setSearchText] = useState("");
   const [shopSearchText, setShopSearchText] = useState("");
   const [showLiveShops, setShowLiveShops] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("All treats");
   const [siteLogo, setSiteLogo] = useState("");
   const [showShareSite, setShowShareSite] = useState(false);
   const [sharePhone, setSharePhone] = useState("");
@@ -53,12 +51,16 @@ export default function HomePage() {
       // Their control panel remains available through the Admin Dashboard link.
       if (!db) return;
       try {
-        const owned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
-        if (!owned.empty) {
-          // Keep shop owners on the public customer homepage when they visit "/".
-          // Their dashboard remains available through the Shop Dashboard link.
+        // New registrations resolve ownership through the immutable owner lock.
+        const ownerLock = await getDoc(doc(db, "shopOwnerLocks", nextUser.uid));
+        const lockedShopId = ownerLock.exists() ? String(ownerLock.data().shopId || "") : "";
+        if (lockedShopId) {
           setShopOwner(true);
+          return;
         }
+        // Preserve support for legacy shops that still store ownerUid publicly.
+        const legacyOwned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid)));
+        setShopOwner(!legacyOwned.empty);
       } catch {
         setShopOwner(false);
       }
@@ -81,7 +83,7 @@ export default function HomePage() {
             try {
               const snapshot = await getDocs(query(collection(firestore, "shops", shop.id, "products"), where("active", "==", true)));
               return { products: snapshot.docs.map((item) => ({ id: item.id, shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop", city: shop.city, ...item.data() } as MarketplaceProduct)), error: "" };
-            } catch (productError) {
+            } catch {
               return { products: [], error: shop.name || shop.shopName || shop.id };
             }
           }));
@@ -175,12 +177,10 @@ export default function HomePage() {
   }
 
   const adminAccount = isAdminEmail(user?.email);
-  const visibleShops = shops.filter((shop) => {
-    const haystack = [shop.name, shop.shopName, shop.city, shop.address, shop.description, shop.category].filter(Boolean).join(" ").toLowerCase();
-    const matchesSearch = haystack.includes(searchText.trim().toLowerCase());
-    const matchesCategory = activeCategory === "All treats" || (shop.category || "").toLowerCase().includes(activeCategory.toLowerCase());
-    return matchesSearch && matchesCategory;
-  });
+  const visibleProducts = marketProducts.filter((product) => {
+    const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
+    return haystack.includes(searchText.trim().toLowerCase());
+  }).slice(0, 2);
   const filteredBottomShops = shops.filter((shop) => [shop.name, shop.shopName, shop.city, shop.address, shop.description, shop.category].filter(Boolean).join(" ").toLowerCase().includes(shopSearchText.trim().toLowerCase()));
   return <main className="site-shell marketplace-3d">
     <header className="topbar">
@@ -234,21 +234,14 @@ export default function HomePage() {
 
       <div className="marketplace-tools"><label className="marketplace-search"><input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search ice cream, kulfi, cones…" /></label></div>
 
-      {productLoadError && <p className="admin-error" role="alert">{productLoadError}</p>}{loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : marketProducts.filter((product) => {
-        const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
-        return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
-      }).length === 0 ? <div className="empty-panel"><h3>अभी कोई प्रोडक्ट उपलब्ध नहीं है</h3><p>LIVE दुकानों के उपलब्ध प्रोडक्ट यहाँ दिखाई देंगे।</p></div> :
-      <div className="shop-grid marketplace-product-grid">{marketProducts.filter((product) => {
-        const haystack = [product.name, product.description, product.category, product.shopName, product.city].filter(Boolean).join(" ").toLowerCase();
-        return haystack.includes(searchText.trim().toLowerCase()) && (activeCategory === "All treats" || (product.category || "").toLowerCase().includes(activeCategory.toLowerCase()));
-      }).map((product) => <article className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
+      {message && <p className="admin-error" role="alert">{message}</p>}
+      {productLoadError && <p className="admin-error" role="alert">{productLoadError}</p>}
+      {loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : visibleProducts.length === 0 ? <div className="empty-panel"><h3>अभी कोई प्रोडक्ट उपलब्ध नहीं है</h3><p>LIVE दुकानों के उपलब्ध प्रोडक्ट यहाँ दिखाई देंगे।</p></div> :
+      <div className="shop-grid marketplace-product-grid">{visibleProducts.map((product) => <article className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
         <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="marketplace-product-open" aria-label={"Open " + (product.name || "product") + " in its shop"}>
           {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
-          <div className="shop-card-body marketplace-product-summary"><h3>{product.name || "Ice cream treat"}</h3><strong>₹{Number(product.price || 0).toFixed(2)}</strong><span className="admin-muted">{product.shopName}</span></div>
+          <div className="shop-card-body marketplace-product-summary"><strong>₹{Number(product.price || 0).toFixed(2)}</strong></div>
         </Link>
-        <div className="shop-card-body" style={{paddingTop:0}}>
-          <Link href={"/shop/" + product.shopId + "?product=" + encodeURIComponent(product.id)} className="admin-primary customer-add-button">＋ Add to cart</Link>
-        </div>
       </article>)}</div>}
     </section>
 
