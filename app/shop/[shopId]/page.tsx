@@ -70,6 +70,23 @@ export default function ShopDetailsPage(){
   const whatsappWindow=window.open("about:blank","_blank");
   try{
     const customerUser=auth.currentUser||(await signInAnonymously(auth)).user;
+
+    // Check the exact per-shop product documents before creating an order.
+    // This gives customers a useful diagnosis instead of Firestore's generic
+    // "Missing or insufficient permissions" message.
+    for (const item of items) {
+      const productRef = doc(db,"shops",shop.id,"products",item.productId);
+      const productSnapshot = await getDoc(productRef);
+      if (!productSnapshot.exists()) {
+        throw new Error("दुकान के प्रोडक्ट रिकॉर्ड में समस्या है: "+item.name+" ("+item.productId+") दुकान के products में नहीं मिला। Shopkeeper dashboard में My Products खोलकर इसे दोबारा जाँचें।");
+      }
+      const savedProduct = productSnapshot.data();
+      if (savedProduct.shopId !== shop.id || savedProduct.active !== true ||
+          savedProduct.name !== item.name || Number(savedProduct.price) !== item.price) {
+        throw new Error("प्रोडक्ट "+item.name+" की Firestore जानकारी वेबसाइट से मेल नहीं खाती (shopId/name/price/active)। Shopkeeper dashboard में प्रोडक्ट को Edit करके फिर Save करें।");
+      }
+    }
+
     const orderRef=doc(collection(db,"orders"));
     const orderData={
       shopId:shop.id,
@@ -96,8 +113,29 @@ export default function ShopDetailsPage(){
     else window.location.href=whatsappUrl;
     setCart({});
   }catch(e){
-    if(whatsappWindow)whatsappWindow.close();
-    setMessage(e instanceof Error?"ऑर्डर सेव नहीं हुआ: "+e.message:"ऑर्डर सेव नहीं हो सका। कृपया दोबारा कोशिश करें।");
+    const reason=e instanceof Error?e.message:"ऑर्डर सेव नहीं हो सका।";
+    // Keep WhatsApp as a clearly labelled manual fallback. Never tell the
+    // customer that the website order was saved when Firestore rejected it.
+    const fallbackMessage=[
+      "⚠️ *MY ICE CREAM - MANUAL ORDER REQUEST*",
+      "Website order save nahi ho saka; please shopkeeper manually confirm karein.",
+      "Shop: "+(shop.name||shop.shopName||"Ice Cream Shop"),
+      "Customer: "+cleanCustomerName,
+      "Mobile: "+cleanPhone,
+      "Order method: "+(fulfillmentType==="pickup"?"Shop pickup":"Home delivery"),
+      ...(fulfillmentType==="delivery"?["Delivery address: "+address.trim()]:[]),
+      "",
+      ...orderLines,
+      "",
+      "Items subtotal: ₹"+subtotal.toFixed(2),
+      "Delivery charge: ₹"+deliveryFee.toFixed(2),
+      "*Total: ₹"+total.toFixed(2)+"*",
+      "Please contact customer and confirm manually."
+    ].join("\n");
+    const fallbackUrl="https://wa.me/"+whatsappNumber+"?text="+encodeURIComponent(fallbackMessage);
+    setMessage("वेबसाइट पर ऑर्डर सेव नहीं हुआ: "+reason+" WhatsApp में मैन्युअल अनुरोध खोल रहे हैं—दुकानदार से पुष्टि जरूरी है।");
+    if(whatsappWindow) whatsappWindow.location.href=fallbackUrl;
+    else window.location.href=fallbackUrl;
   }finally{setBusy(false);}
  }
  return <main className="admin-wrap customer-store"><header className="admin-header customer-store-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM</Link><Link href="/" className="admin-secondary">← Back to shops</Link></header>
