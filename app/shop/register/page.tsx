@@ -62,8 +62,9 @@ export default function ShopRegisterPage() {
       } catch (error) {
         console.error("Shop registration pre-check failed:", error);
         if (!cancelled) {
-          setRegistrationBlocked(ownerLockFound);
-          setMessage("Registration check failed: " + (error instanceof Error ? error.message : "Permission denied while checking your existing shop.") + (ownerLockFound ? " Aapka purana owner lock mila hai; dobara register na karein." : ""));
+          // If Firebase cannot verify whether an old registration exists, never invite a duplicate registration.
+          setRegistrationBlocked(true);
+          setMessage("Purani registration verify nahi ho saki: " + (error instanceof Error ? error.message : "Firebase permission/network error") + (ownerLockFound ? " Aapka purana owner lock mila hai; dobara register na karein." : " Admin se pehle purani registration check karayein; dobara register na karein."));
         }
       } finally {
         if (!cancelled) setCheckingRegistration(false);
