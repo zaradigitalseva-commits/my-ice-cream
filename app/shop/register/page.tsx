@@ -40,7 +40,8 @@ export default function ShopRegisterPage() {
           setExistingShop(data);
         } else setExistingShop(null);
       } catch (error) {
-        if (!cancelled) setMessage(error instanceof Error ? error.message : "Registration status could not be checked.");
+        console.error("Shop registration pre-check failed:", error);
+        if (!cancelled) setMessage("Registration check failed: " + (error instanceof Error ? error.message : "Permission denied while checking your existing shop."));
       } finally {
         if (!cancelled) setCheckingRegistration(false);
       }
@@ -65,6 +66,7 @@ export default function ShopRegisterPage() {
     event.preventDefault();
     if (!user || !db) return;
     setBusy(true); setMessage("");
+    let registrationStage = "checking existing shop registration";
     try {
       const existing = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid)));
       if (!existing.empty) {
@@ -75,6 +77,7 @@ export default function ShopRegisterPage() {
         setMessage("Aapki purani registration mil gayi. Neeche status dekhein ya details edit karein.");
         return;
       }
+      registrationStage = "saving shop details and owner lock";
       const shopRef = doc(collection(db, "shops"));
       const lockRef = doc(db, "shopOwnerLocks", user.uid);
       const batch = writeBatch(db);
@@ -91,7 +94,9 @@ export default function ShopRegisterPage() {
       return;
       setName(""); setPhone(""); setCity(""); setAddress(""); setDescription(""); setLogoUrl(""); setBannerUrl("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Registration could not be submitted.");
+      console.error("Shop registration failed at stage:", registrationStage, error);
+      const code = error && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code || "") : "";
+      setMessage("Registration failed while " + registrationStage + ": " + (code || (error instanceof Error ? error.message : "Unknown error")));
     } finally { setBusy(false); }
   }
 
