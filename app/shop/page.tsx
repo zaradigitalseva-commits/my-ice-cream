@@ -151,7 +151,12 @@ export default function ShopPage() {
         // Shop ownership is stored in shopOwnerLocks, not in the public shops document.
         const ownerLock = await getDoc(doc(db, "shopOwnerLocks", nextUser.uid));
         const ownedShopId = ownerLock.exists() ? String(ownerLock.data().shopId || "") : "";
-        const owned = ownedShopId ? await getDoc(doc(db, "shops", ownedShopId)) : null;
+        let owned = ownedShopId ? await getDoc(doc(db, "shops", ownedShopId)) : null;
+        if (!ownedShopId) {
+          // Legacy shops may still store ownerUid on the public shop document.
+          const legacyOwned = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", nextUser.uid), limit(1)));
+          owned = legacyOwned.empty ? null : legacyOwned.docs[0];
+        }
         if (owned && owned.exists()) {
           const data = { id: owned.id, ...owned.data() } as Shop;
           const isLiveShop = ["live", "LIVE", "Live"].includes(String(data.status || ""));
@@ -196,7 +201,11 @@ export default function ShopPage() {
         // intentionally do not contain ownerUid.
         const ownerLock = await getDoc(doc(firestore, "shopOwnerLocks", ownerUid));
         const ownedShopId = ownerLock.exists() ? String(ownerLock.data().shopId || "") : "";
-        const owned = ownedShopId ? await getDoc(doc(firestore, "shops", ownedShopId)) : null;
+        let owned = ownedShopId ? await getDoc(doc(firestore, "shops", ownedShopId)) : null;
+        if (!ownedShopId) {
+          const legacyOwned = await getDocs(query(collection(firestore, "shops"), where("ownerUid", "==", ownerUid), limit(1)));
+          owned = legacyOwned.empty ? null : legacyOwned.docs[0];
+        }
         if (!owned || !owned.exists() || !active) return;
         const latest = { id: owned.id, ...owned.data() } as Shop;
         setShop(latest);
