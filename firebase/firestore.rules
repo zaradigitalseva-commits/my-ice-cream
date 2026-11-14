@@ -608,7 +608,7 @@ service cloud.firestore {
       allow write: if isAdmin() && settingId == "branding";
     }
 
-    // Each signed-in customer can manage only their own browser FCM token records.
+    // Each Firebase-authenticated browser session (including anonymous customers) can manage only its own FCM token records.
     // Server-side notification delivery uses a private service account.
     match /pushSubscriptions/{subscriptionId} {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
