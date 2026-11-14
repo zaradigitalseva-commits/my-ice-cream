@@ -290,7 +290,7 @@ export default function AdminPage() {
       const productSnap = await getDocs(collection(firestore, "shops", shop.id, "products"));
       await deleteInChunks(productSnap.docs.map((item) => item.ref));
 
-      const relatedCollections = ["orders", "sales", "subscriptionPayments", "utrReservations"] as const;
+      const relatedCollections = ["orders", "sales", "subscriptionPayments", "utrReservations", "notifications"] as const;
       for (const collectionName of relatedCollections) {
         const related = await getDocs(query(collection(firestore, collectionName), where("shopId", "==", shop.id)));
         await deleteInChunks(related.docs.map((item) => item.ref));
