@@ -110,6 +110,13 @@ export default function PwaInstallButton() {
     });
   }, []);
 
+  // Show the successful opt-in confirmation briefly, then keep the page clean.
+  useEffect(() => {
+    if (notificationState !== "enabled" || !notificationMessage) return;
+    const timeout = window.setTimeout(() => setNotificationMessage(""), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [notificationState, notificationMessage]);
+
   const handleEnableNotifications = async () => {
     setNotificationState("busy");
     setNotificationMessage("");
