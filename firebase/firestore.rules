@@ -244,10 +244,12 @@ service cloud.firestore {
             "description", "logoUrl", "bannerUrl", "category",
             "pickupAvailable", "deliveryAvailable",
             "openingTime", "closingTime", "closedDays",
-            "manualClosed", "deliveryFee", "minimumOrder",
+            "manualClosed", "deliveryFee", "minimumOrder", "upiQrUrl",
             "offerTitle", "offerDescription", "offerExpiresAt",
             "updatedAt"
           ])
+          && (!("upiQrUrl" in request.resource.data)
+            || (request.resource.data.upiQrUrl is string && request.resource.data.upiQrUrl.size() <= 175000))
         );
 
       allow delete: if isAdmin();
@@ -439,7 +441,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           "shopId", "shopName", "deliveryFee", "subtotal", "customerUid",
           "customerName", "customerEmail", "customerPhone", "fulfillmentType",
-          "deliveryAddress", "items", "total", "status", "paymentStatus", "createdAt"
+          "deliveryAddress", "items", "total", "status", "paymentStatus", "paymentMethod", "createdAt"
         ])
         && request.resource.data.customerUid == request.auth.uid
         && request.resource.data.shopName is string
@@ -453,6 +455,10 @@ service cloud.firestore {
         && request.resource.data.status == "placed"
         && request.resource.data.paymentStatus == "unpaid"
         && request.resource.data.shopId is string
+        && (!("paymentMethod" in request.resource.data) || request.resource.data.paymentMethod in ["cash", "upi"])
+        && (request.resource.data.get("paymentMethod", "cash") != "upi"
+          || (get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.get("upiQrUrl", "") is string
+            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.get("upiQrUrl", "").size() > 0))
         && liveShop(request.resource.data.shopId)
         && request.resource.data.fulfillmentType in ["pickup", "delivery"]
         && request.resource.data.subtotal is number
@@ -507,6 +513,22 @@ service cloud.firestore {
           && request.resource.data.status == "cancelled"
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(["status", "updatedAt"])
+        )
+        || (
+          signedIn()
+          && resource.data.customerUid == request.auth.uid
+          && resource.data.paymentMethod == "upi"
+          && resource.data.paymentStatus == "unpaid"
+          && request.resource.data.paymentStatus == "unpaid"
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.shopId == resource.data.shopId
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.paymentScreenshotDataUrl is string
+          && request.resource.data.paymentScreenshotDataUrl.size() <= 260000
+          && request.resource.data.paymentScreenshotDataUrl.matches('^data:image/jpeg;base64,.*')
+          && request.resource.data.paymentScreenshotSubmittedAt is timestamp
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["paymentScreenshotDataUrl", "paymentScreenshotSubmittedAt"])
         );
 
       allow delete: if isAdmin();
