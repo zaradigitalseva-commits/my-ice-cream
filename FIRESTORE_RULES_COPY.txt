@@ -45,10 +45,14 @@ service cloud.firestore {
       // unexpectedly hiding existing shops until Admin reviews their records.
       return shop.status in ["live", "LIVE", "Live"]
         && (
-          !("subscriptionExpiresAt" in shop)
+          // Grandfather only records with neither subscription field (pre-enforcement shops).
+          (
+            !("subscriptionExpiresAt" in shop)
+            && !("subscriptionStatus" in shop)
+          )
           || (
             shop.subscriptionExpiresAt is timestamp
-            && shop.get("subscriptionStatus", "") == "active"
+            && shop.subscriptionStatus == "active"
             && request.time < shop.subscriptionExpiresAt
           )
         );
