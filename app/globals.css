@@ -1218,3 +1218,10 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 @media(prefers-reduced-motion:reduce){
   .shop-owner-scrolling-ticker>div>div{animation:none;white-space:normal;width:auto}
 }
+
+
+/* Clear back navigation on customer and marketplace pages */
+.home-back-button{flex:0 0 auto;border:1px solid var(--line);border-radius:999px;background:#fffaf4;color:var(--ink);padding:9px 13px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 3px 0 #eaded2}
+.home-back-button:hover{background:#fff0e3}
+.admin-header .admin-secondary[aria-label="होम पेज पर वापस जाएँ"]{white-space:nowrap}
+@media(max-width:560px){.home-back-button{padding:8px 10px;font-size:11px}.topbar{gap:8px}.brand-logo-image{max-width:125px}}
