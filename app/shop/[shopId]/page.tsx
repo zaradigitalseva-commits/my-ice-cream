@@ -87,7 +87,7 @@ export default function ShopDetailsPage(){
     "Delivery charge: ₹"+deliveryFee.toFixed(2),
     "*Total: ₹"+total.toFixed(2)+"*",
     "Payment method: "+(paymentMethod==="upi"?"UPI QR":"Cash at shop / on delivery"),
-    ...(paymentMethod==="upi"?["UPI reference / UTR: "+(paymentReference.trim()||"Not provided"),"Customer will pay using the shop QR. Shopkeeper must verify payment before marking Paid."]:[]),
+    ...(paymentMethod==="upi"?["Customer will upload the payment screenshot on the website. Shopkeeper must verify payment before marking Paid."]:[]),
     "Payment status: Unpaid - shopkeeper will verify the payment.",
     "Please confirm this order."
   ].join("\n");
