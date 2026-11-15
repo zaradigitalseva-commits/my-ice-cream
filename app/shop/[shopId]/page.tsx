@@ -120,26 +120,10 @@ export default function ShopDetailsPage(){
     setCart({});
   }catch(e){
     const reason=e instanceof Error?e.message:"ऑर्डर सेव नहीं हो सका। कृपया दोबारा कोशिश करें।";
-    const manualMessage=[
-      "⚠️ *MY ICE CREAM - MANUAL ORDER REQUEST*",
-      "Website par order save nahi hua. Yeh manual request hai; shopkeeper ki confirmation zaroori hai.",
-      "Shop: "+(shop.name||shop.shopName||"Ice Cream Shop"),
-      "Customer: "+cleanCustomerName,
-      "Mobile: "+cleanPhone,
-      "Order method: "+(fulfillmentType==="pickup"?"Shop pickup":"Home delivery"),
-      ...(fulfillmentType==="delivery"?["Delivery address: "+address.trim()]:[]),
-      "",
-      ...orderLines,
-      "",
-      "Items subtotal: ₹"+subtotal.toFixed(2),
-      "Delivery charge: ₹"+deliveryFee.toFixed(2),
-      "*Total: ₹"+total.toFixed(2)+"*",
-      "Please contact customer and confirm manually."
-    ].join("\n");
-    const fallbackUrl="https://wa.me/"+whatsappNumber+"?text="+encodeURIComponent(manualMessage);
-    setMessage("वेबसाइट पर ऑर्डर सेव नहीं हुआ: "+reason+" WhatsApp में मैन्युअल अनुरोध खोल रहे हैं। दुकान से पुष्टि जरूरी है।");
-    if(whatsappWindow)whatsappWindow.location.href=fallbackUrl;
-    else window.location.href=fallbackUrl;
+    // Never turn a failed website order into a WhatsApp-only manual request.
+    // Close the reserved tab and keep the customer on the checkout page.
+    if(whatsappWindow&&!whatsappWindow.closed)whatsappWindow.close();
+    setMessage("❌ वेबसाइट पर ऑर्डर सेव नहीं हुआ: "+reason+" WhatsApp नहीं खोला गया। कृपया समस्या ठीक करके दोबारा ऑर्डर करें।");
   }finally{setBusy(false);}
  }
  return <main className="admin-wrap customer-store"><header className="admin-header customer-store-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM</Link><Link href="/" className="admin-secondary">← Back to shops</Link></header>
