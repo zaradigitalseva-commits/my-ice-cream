@@ -110,6 +110,7 @@ export default function CustomerPage() {
   return (
     <main className="admin-wrap">
       <header className="admin-header">
+        <Link href="/" className="admin-secondary" aria-label="होम पेज पर वापस जाएँ">← Back to Home</Link>
         <Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>CUSTOMER</span></Link>
         <button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button>
       </header>
