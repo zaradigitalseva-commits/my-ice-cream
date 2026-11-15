@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { onAuthStateChanged, signInAnonymously, signInWithPopup, type User } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
@@ -69,7 +69,10 @@ export default function ShopDetailsPage(){
   setBusy(true);setMessage("ऑर्डर सेव किया जा रहा है…");
   const whatsappWindow=window.open("about:blank","_blank");
   try{
-    const customerUser=auth.currentUser||(await signInAnonymously(auth)).user;
+    const customerUser=auth.currentUser;
+    if(!customerUser||customerUser.isAnonymous){
+      throw new Error("खरीदारी हिस्ट्री में ऑर्डर सेव करने के लिए Google से Login करें। अभी WhatsApp से मैन्युअल ऑर्डर भेज सकते हैं।");
+    }
 
     // Verify every cart item against its canonical per-shop product record.
     // If a product is missing or stale, explain it and still send a manual
