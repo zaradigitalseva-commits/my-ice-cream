@@ -377,9 +377,21 @@ service cloud.firestore {
         && request.resource.data.ownerName is string
         && request.resource.data.ownerEmail is string
         && request.resource.data.createdAt is timestamp
-        && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId
-        && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.ownerUid == request.auth.uid
-        && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.status == "pending";
+        && (
+          // New registration: all three documents are created atomically.
+          (
+            getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId
+            && getAfter(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.ownerUid == request.auth.uid
+            && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.status == "pending"
+          )
+          // Existing shop: the authenticated owner may create only their missing private identity record.
+          || (
+            exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
+            && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId == shopId
+            && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.ownerUid == request.auth.uid
+            && exists(/databases/$(database)/documents/shops/$(shopId))
+          )
+        );
 
       // Owner identity cannot be reassigned or edited from the client.
       allow update: if false;
