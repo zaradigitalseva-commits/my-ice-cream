@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import PwaInstallButton from "../components/pwa-install-button";
+import GlobalBackButton from "../components/global-back-button";
 import "./globals.css";
 
 const siteUrl = "https://my-ice-cream-alpha.vercel.app";
@@ -88,6 +89,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         {children}
+        <GlobalBackButton />
         <PwaInstallButton />
       </body>
     </html>
