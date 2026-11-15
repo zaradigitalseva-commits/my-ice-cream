@@ -10,8 +10,8 @@ import { isAdminEmail } from "@/lib/admin";
 type Item = { name: string; quantity: number; price?: number };
 type FirestoreDate = { toDate?: () => Date };
 type Sale = { id: string; shopName?: string; items?: Item[]; subtotal?: number; discount?: number; discountType?: string; total?: number; paymentStatus?: string; createdAt?: FirestoreDate };
-type OnlineOrder = { id: string; shopName?: string; items?: Item[]; subtotal?: number; deliveryFee?: number; total?: number; status?: string; paymentStatus?: string; createdAt?: FirestoreDate };
-type Purchase = { id: string; kind: "Online Order" | "Shop Bill"; shopName: string; items: Item[]; subtotal: number; discount: number; deliveryFee: number; total: number; status: string; paymentStatus: string; createdAt?: FirestoreDate };
+type OnlineOrder = { id: string; shopName?: string; items?: Item[]; subtotal?: number; deliveryFee?: number; total?: number; status?: string; paymentStatus?: string; paymentMethod?: string; createdAt?: FirestoreDate };
+type Purchase = { id: string; kind: "Online Order" | "Shop Bill"; shopName: string; items: Item[]; subtotal: number; discount: number; deliveryFee: number; total: number; status: string; paymentStatus: string; paymentMethod: string; createdAt?: FirestoreDate };
 
 function dateValue(value?: FirestoreDate) {
   try { return value?.toDate?.() || null; } catch { return null; }
@@ -97,13 +97,14 @@ export default function CustomerPage() {
       items: o.items || [], subtotal: Number(o.subtotal || 0), discount: 0,
       deliveryFee: Number(o.deliveryFee || 0), total: Number(o.total || 0),
       status: o.status || "placed", paymentStatus: o.paymentStatus || "unpaid",
+      paymentMethod: o.paymentMethod === "upi" ? "UPI QR" : "Cash / पुराना रिकॉर्ड",
       createdAt: o.createdAt,
     })),
     ...sales.map((s) => ({
       id: s.id, kind: "Shop Bill" as const, shopName: s.shopName || "दुकान",
       items: s.items || [], subtotal: Number(s.subtotal || 0),
       discount: Number(s.discount || 0), deliveryFee: 0, total: Number(s.total || 0),
-      status: "बिल", paymentStatus: s.paymentStatus || "unpaid", createdAt: s.createdAt,
+      status: "बिल", paymentStatus: s.paymentStatus || "unpaid", paymentMethod: "दुकान पर", createdAt: s.createdAt,
     })),
   ].sort((a, b) => (dateValue(b.createdAt)?.getTime() || 0) - (dateValue(a.createdAt)?.getTime() || 0));
 
@@ -137,7 +138,7 @@ export default function CustomerPage() {
           purchases.length === 0 ? <p className="admin-muted">अभी कोई खरीदारी दर्ज नहीं है। खरीदारी करने के बाद उसका रिकॉर्ड यहाँ दिखेगा।</p> :
           <div className="admin-table-wrap">
             <table className="admin-table">
-              <thead><tr><th>दुकान / सामान</th><th>प्रकार</th><th>कुल</th><th>स्थिति</th><th>पेमेंट</th><th>तारीख और समय</th></tr></thead>
+              <thead><tr><th>दुकान / सामान</th><th>प्रकार</th><th>कुल</th><th>स्थिति</th><th>पेमेंट तरीका</th><th>पेमेंट स्थिति</th><th>तारीख और समय</th></tr></thead>
               <tbody>
                 {purchases.map((purchase) => {
                   const date = dateValue(purchase.createdAt);
@@ -151,7 +152,8 @@ export default function CustomerPage() {
                     <td>{purchase.kind === "Online Order" ? "ऑनलाइन ऑर्डर" : "दुकान का बिल"}</td>
                     <td><strong>{money(purchase.total)}</strong>{purchase.deliveryFee > 0 && <small>Delivery: {money(purchase.deliveryFee)}</small>}{purchase.discount > 0 && <small>छूट: {money(purchase.discount)}{purchase.kind === "Shop Bill" && purchase.subtotal > 0 ? " · " + (sales.find((s) => s.id === purchase.id)?.discountType === "percent" ? "%" : "") : ""}</small>}</td>
                     <td>{purchase.status}</td>
-                    <td>{purchase.paymentStatus === "paid" ? "Paid" : "Unpaid"}</td>
+                    <td>{purchase.paymentMethod}</td>
+                    <td>{purchase.paymentStatus === "paid" ? "Paid / Verified" : "Unpaid"}</td>
                     <td>{date ? date.toLocaleString("en-IN") : "तारीख उपलब्ध नहीं"}</td>
                   </tr>;
                 })}
