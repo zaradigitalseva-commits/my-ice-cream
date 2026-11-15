@@ -16,6 +16,7 @@ export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [shopOwner, setShopOwner] = useState(false);
+  const [authResolved, setAuthResolved] = useState(false);
   const [shops, setShops] = useState<Shop[]>([]);
   const [marketProducts, setMarketProducts] = useState<MarketplaceProduct[]>([]);
   const [customerNotices, setCustomerNotices] = useState<CustomerNotice[]>([]);
@@ -42,14 +43,15 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) { setAuthResolved(true); return; }
     return onAuthStateChanged(auth, async (nextUser) => {
+      setAuthResolved(false);
       setUser(nextUser);
       setShopOwner(false);
-      if (!nextUser || nextUser.isAnonymous) return;
+      if (!nextUser || nextUser.isAnonymous) { setAuthResolved(true); return; }
       // Keep admins on the public marketplace when they visit "/".
       // Their control panel remains available through the Admin Dashboard link.
-      if (!db) return;
+      if (!db) { setAuthResolved(true); return; }
       try {
         // New registrations resolve ownership through the immutable owner lock.
         const ownerLock = await getDoc(doc(db, "shopOwnerLocks", nextUser.uid));
@@ -63,6 +65,8 @@ export default function HomePage() {
         setShopOwner(!legacyOwned.empty);
       } catch {
         setShopOwner(false);
+      } finally {
+        setAuthResolved(true);
       }
     });
   }, [router]);
@@ -193,8 +197,10 @@ export default function HomePage() {
           <a href="#shops" onClick={(event) => { setShowLiveShops(true); event.currentTarget.closest("details")?.removeAttribute("open"); }}>All Shops</a>
           <a href="#for-shops" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>For shops</a>
           <a href="#about" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>About</a>
-          <Link href="/shop/register" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Register your shop</Link>
-          {user && !user.isAnonymous && (adminAccount ? <Link href="/admin" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Admin Dashboard</Link> : shopOwner ? <Link href="/shop" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Shop Dashboard</Link> : <Link href="/customer" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>My Account</Link>)}
+          {authResolved && (adminAccount ? <Link href="/admin" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Admin Dashboard</Link> : shopOwner ? <Link href="/shop" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Shop Dashboard</Link> : <>
+            <Link href="/shop/register" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Register your shop</Link>
+            {user && !user.isAnonymous && <Link href="/customer" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>My Account</Link>}
+          </>)}
           <button onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); handleAuth(); }} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
         </div>
       </details>
