@@ -196,7 +196,6 @@ export default function HomePage() {
         <div className="header-menu-panel">
           <a href="#discover" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Product</a>
           <a href="#shops" onClick={(event) => { setShowLiveShops(true); event.currentTarget.closest("details")?.removeAttribute("open"); }}>All Shops</a>
-          <a href="#for-shops" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>For shops</a>
           {authResolved && <>
             {adminAccount && <Link href="/admin" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Admin Dashboard</Link>}
             {shopOwner && <Link href="/shop" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Shop Dashboard</Link>}
