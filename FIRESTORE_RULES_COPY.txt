@@ -244,10 +244,15 @@ service cloud.firestore {
             "description", "logoUrl", "bannerUrl", "category",
             "pickupAvailable", "deliveryAvailable",
             "openingTime", "closingTime", "closedDays",
-            "manualClosed", "deliveryFee", "minimumOrder",
+            "manualClosed", "deliveryFee", "minimumOrder", "upiQrUrl",
             "offerTitle", "offerDescription", "offerExpiresAt",
             "updatedAt"
           ])
+          && (
+            !("upiQrUrl" in request.resource.data)
+            || (request.resource.data.upiQrUrl is string
+              && request.resource.data.upiQrUrl.size() <= 180000)
+          )
         );
 
       allow delete: if isAdmin();
@@ -439,7 +444,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           "shopId", "shopName", "deliveryFee", "subtotal", "customerUid",
           "customerName", "customerEmail", "customerPhone", "fulfillmentType",
-          "deliveryAddress", "items", "total", "status", "paymentStatus", "createdAt"
+          "deliveryAddress", "items", "total", "status", "paymentStatus",
+          "paymentMethod", "paymentReference", "createdAt"
         ])
         && request.resource.data.customerUid == request.auth.uid
         && request.resource.data.shopName is string
@@ -453,6 +459,22 @@ service cloud.firestore {
         && request.resource.data.status == "placed"
         && request.resource.data.paymentStatus == "unpaid"
         && request.resource.data.shopId is string
+        && (
+          !("paymentMethod" in request.resource.data)
+          || request.resource.data.paymentMethod in ["cash", "upi"]
+        )
+        && (
+          request.resource.data.get("paymentMethod", "cash") != "upi"
+          || (
+            get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.get("upiQrUrl", "") is string
+            && get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.get("upiQrUrl", "").size() > 0
+          )
+        )
+        && (
+          !("paymentReference" in request.resource.data)
+          || (request.resource.data.paymentReference is string
+            && request.resource.data.paymentReference.size() <= 60)
+        )
         && liveShop(request.resource.data.shopId)
         && request.resource.data.fulfillmentType in ["pickup", "delivery"]
         && request.resource.data.subtotal is number
