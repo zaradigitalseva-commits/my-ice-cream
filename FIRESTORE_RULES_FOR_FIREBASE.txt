@@ -525,7 +525,7 @@ service cloud.firestore {
           && request.resource.data.customerUid == resource.data.customerUid
           && request.resource.data.paymentScreenshotDataUrl is string
           && request.resource.data.paymentScreenshotDataUrl.size() <= 260000
-          && request.resource.data.paymentScreenshotDataUrl.matches('^data:image/jpeg;base64,')
+          && request.resource.data.paymentScreenshotDataUrl.matches('^data:image/jpeg;base64,.*')
           && request.resource.data.paymentScreenshotSubmittedAt is timestamp
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(["paymentScreenshotDataUrl", "paymentScreenshotSubmittedAt"])
