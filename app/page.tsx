@@ -200,7 +200,7 @@ export default function HomePage() {
             {adminAccount && <Link href="/admin" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Admin Dashboard</Link>}
             {shopOwner && <Link href="/shop" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Shop Dashboard</Link>}
             {!adminAccount && !shopOwner && <Link href="/shop/register" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Register your shop</Link>}
-            {user && !user.isAnonymous && !adminAccount && <Link href="/customer" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Customer Dashboard</Link>}
+            {user && !user.isAnonymous && !adminAccount && !shopOwner && <Link href="/customer" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Customer Dashboard</Link>}
           </>}
           <button onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); handleAuth(); }} disabled={busy}>{busy ? "Please wait…" : user ? "Sign out" : "Google sign in"}</button>
         </div>
