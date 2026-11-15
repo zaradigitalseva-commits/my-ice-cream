@@ -193,10 +193,9 @@ export default function HomePage() {
       <details className="header-menu-dropdown">
         <summary aria-label="Open website menu"><span className="header-menu-icon">☰</span><span>Menu</span></summary>
         <div className="header-menu-panel">
-          <a href="#discover" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Discover</a>
+          <a href="#discover" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Product</a>
           <a href="#shops" onClick={(event) => { setShowLiveShops(true); event.currentTarget.closest("details")?.removeAttribute("open"); }}>All Shops</a>
           <a href="#for-shops" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>For shops</a>
-          <a href="#about" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>About</a>
           {authResolved && (adminAccount ? <Link href="/admin" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Admin Dashboard</Link> : shopOwner ? <Link href="/shop" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Shop Dashboard</Link> : <>
             <Link href="/shop/register" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Register your shop</Link>
             {user && !user.isAnonymous && <Link href="/customer" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Customer Dashboard</Link>}
