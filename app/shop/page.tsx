@@ -159,6 +159,23 @@ export default function ShopPage() {
         }
         if (owned && owned.exists()) {
           const data = { id: owned.id, ...owned.data() } as Shop;
+          // Backfill a missing private owner record from the authenticated Google account.
+          // Never overwrite an existing private identity record.
+          try {
+            const privateOwnerRef = doc(db, "shopPrivate", data.id);
+            const privateOwner = await getDoc(privateOwnerRef);
+            if (!privateOwner.exists() && ownerLock.exists() && ownedShopId === data.id && nextUser.email) {
+              await setDoc(privateOwnerRef, {
+                shopId: data.id,
+                ownerUid: nextUser.uid,
+                ownerName: nextUser.displayName || "",
+                ownerEmail: nextUser.email,
+                createdAt: serverTimestamp(),
+              });
+            }
+          } catch (privateOwnerError) {
+            console.warn("Could not backfill private Google owner details:", privateOwnerError);
+          }
           const isLiveShop = ["live", "LIVE", "Live"].includes(String(data.status || ""));
           setShop(data);
           await loadShopAdminNotices(data.id);
