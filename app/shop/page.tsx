@@ -9,7 +9,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
 type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; upiQrUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
-type Order = { id: string; shopName?: string; customerName?: string; customerPhone?: string; deliveryAddress?: string; fulfillmentType?: "pickup" | "delivery"; paymentMethod?: "cash" | "upi"; paymentReference?: string; items?: { name: string; quantity: number; price?: number }[]; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
+type Order = { id: string; shopName?: string; customerName?: string; customerPhone?: string; deliveryAddress?: string; fulfillmentType?: "pickup" | "delivery"; paymentMethod?: "cash" | "upi"; paymentReference?: string; paymentScreenshotDataUrl?: string; items?: { name: string; quantity: number; price?: number }[]; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
 type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
@@ -127,6 +127,13 @@ export default function ShopPage() {
     }
   }
 
+
+  async function verifyOnlineOrderPayment(order: Order){
+    if(!db||!shop||!order.id||order.paymentStatus==="paid")return;
+    setError("");setNotice("");
+    try{await updateDoc(doc(db,"orders",order.id),{paymentStatus:"paid",updatedAt:serverTimestamp()});setOrders(current=>current.map(item=>item.id===order.id?{...item,paymentStatus:"paid"}:item));setNotice("भुगतान Verified / Paid कर दिया गया।");}
+    catch(e){setError(e instanceof Error?e.message:"भुगतान अपडेट नहीं हो सका।");}
+  }
   async function refreshProducts() {
     if (!shop || productsRefreshing) return;
     setProductsRefreshing(true);
@@ -775,7 +782,7 @@ export default function ShopPage() {
               return <tr key={order.id}>
                 <td><strong>{order.customerName||"ग्राहक"}</strong><small>{order.customerPhone||"मोबाइल उपलब्ध नहीं"}</small><small>ID: {order.id}</small><small>{order.fulfillmentType==="delivery"?"Home delivery":"Shop pickup"}{order.deliveryAddress?" · "+order.deliveryAddress:""}</small><small>{order.createdAt?.toDate?order.createdAt.toDate().toLocaleString("hi-IN"):""}</small></td>
                 <td>{(order.items||[]).map(item=>item.name+" × "+item.quantity).join(", ")||"विवरण उपलब्ध नहीं"}</td>
-                <td><strong>₹{Number(order.total||0).toFixed(2)}</strong><small>तरीका: {order.paymentMethod==="upi"?"UPI QR":"Cash / पुराना ऑर्डर"}</small><small>{order.paymentStatus==="paid"?"Paid":"Unpaid"}</small>{order.paymentMethod==="upi"&&order.paymentReference&&<small>UTR: {order.paymentReference}</small>}</td>
+                <td><strong>₹{Number(order.total||0).toFixed(2)}</strong><small>तरीका: {order.paymentMethod==="upi"?"UPI QR":"Cash / पुराना ऑर्डर"}</small><small>{order.paymentStatus==="paid"?"Paid / Verified":"Unpaid"}</small>{order.paymentMethod==="upi"&&order.paymentScreenshotDataUrl&&<><a href={order.paymentScreenshotDataUrl} target="_blank" rel="noopener noreferrer"><img src={order.paymentScreenshotDataUrl} alt="Customer payment screenshot" style={{display:"block",width:110,maxHeight:150,objectFit:"contain",marginTop:8,border:"1px solid #ddd",borderRadius:8}}/></a><small>ग्राहक का Payment Screenshot</small></>}{order.paymentStatus!=="paid"&&order.paymentMethod==="upi"&&<button type="button" className="admin-primary small" onClick={()=>void verifyOnlineOrderPayment(order)}>जाँचकर Paid करें</button>}</td>
                 <td>{order.status||"placed"}</td>
                 <td>{nextStatus?<button type="button" className="admin-primary small" onClick={()=>void updateOnlineOrderStatus(order,nextStatus)}>{nextLabel}</button>:<span className="admin-muted">{order.status==="completed"?"पूरा हुआ":order.status==="cancelled"?"रद्द":"—"}</span>}</td>
               </tr>;
