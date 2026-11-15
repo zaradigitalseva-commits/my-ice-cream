@@ -40,10 +40,18 @@ service cloud.firestore {
 
     function liveShop(shopId) {
       let shop = get(/databases/$(database)/documents/shops/$(shopId)).data;
-      // Existing LIVE shops were already approved by Admin before subscription enforcement.
-      // New registrations can only become LIVE through the Admin update rule below,
-      // which requires a valid subscription.
-      return shop.status in ["live", "LIVE", "Live"];
+      // Enforce expiry whenever a subscription expiry has been recorded.
+      // Legacy LIVE shops with no expiry field are grandfathered to avoid
+      // unexpectedly hiding existing shops until Admin reviews their records.
+      return shop.status in ["live", "LIVE", "Live"]
+        && (
+          !("subscriptionExpiresAt" in shop)
+          || (
+            shop.subscriptionExpiresAt is timestamp
+            && shop.get("subscriptionStatus", "") == "active"
+            && request.time < shop.subscriptionExpiresAt
+          )
+        );
     }
 
     // Match the shop name stored on the shop document without failing when
@@ -119,15 +127,16 @@ service cloud.firestore {
     }
 
     function validSaleItems(shopId, items) {
-      return items is list && items.size() > 0 && items.size() <= 8
+      // Seven distinct products keep the rule's document-access calls within
+      // Firestore's per-write limit after shop, owner-lock and customer checks.
+      return items is list && items.size() > 0 && items.size() <= 7
         && validSaleItem(shopId, items[0])
         && (items.size() < 2 || validSaleItem(shopId, items[1]))
         && (items.size() < 3 || validSaleItem(shopId, items[2]))
         && (items.size() < 4 || validSaleItem(shopId, items[3]))
         && (items.size() < 5 || validSaleItem(shopId, items[4]))
         && (items.size() < 6 || validSaleItem(shopId, items[5]))
-        && (items.size() < 7 || validSaleItem(shopId, items[6]))
-        && (items.size() < 8 || validSaleItem(shopId, items[7]));
+        && (items.size() < 7 || validSaleItem(shopId, items[6]));
     }
 
     function saleItemsSubtotal(items) {
@@ -137,8 +146,7 @@ service cloud.firestore {
         + (items.size() > 3 ? items[3].price * items[3].quantity : 0)
         + (items.size() > 4 ? items[4].price * items[4].quantity : 0)
         + (items.size() > 5 ? items[5].price * items[5].quantity : 0)
-        + (items.size() > 6 ? items[6].price * items[6].quantity : 0)
-        + (items.size() > 7 ? items[7].price * items[7].quantity : 0);
+        + (items.size() > 6 ? items[6].price * items[6].quantity : 0);
     }
 
     function validProduct(data, shopId) {
@@ -170,7 +178,7 @@ service cloud.firestore {
         || (signedIn() && resource.data.get("ownerUid", "") == request.auth.uid)
         || ownerLockMatchesShop(shopId)
         // Public can read only shops already marked LIVE by Admin.
-        || resource.data.status in ["live", "LIVE", "Live"];
+        || liveShop(shopId);
 
       // A shop owner may register only a pending shop.
       // Subscription and admin-activation fields cannot be self-granted.
@@ -601,6 +609,9 @@ service cloud.firestore {
         && request.resource.data.body is string
         && request.resource.data.body.size() <= 300
         && request.resource.data.createdAt is timestamp
+        // If supplied, the notice owner must be the signed-in shop owner.
+        && (!("ownerUid" in request.resource.data)
+          || request.resource.data.ownerUid == request.auth.uid)
         && (
           (
             request.resource.data.type == "product"
