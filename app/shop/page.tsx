@@ -8,8 +8,8 @@ import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
-type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
-type Order = { id: string; shopName?: string; customerName?: string; customerPhone?: string; deliveryAddress?: string; fulfillmentType?: "pickup" | "delivery"; items?: { name: string; quantity: number; price?: number }[]; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
+type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; upiQrUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
+type Order = { id: string; shopName?: string; customerName?: string; customerPhone?: string; deliveryAddress?: string; fulfillmentType?: "pickup" | "delivery"; paymentMethod?: "cash" | "upi"; paymentScreenshotDataUrl?: string; items?: { name: string; quantity: number; price?: number }[]; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
 type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
@@ -33,6 +33,7 @@ export default function ShopPage() {
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [bannerUrl, setBannerUrl] = useState("");
+  const [upiQrUrl, setUpiQrUrl] = useState("");
   const [pickupAvailable, setPickupAvailable] = useState(true);
   const [deliveryAvailable, setDeliveryAvailable] = useState(false);
   const [openingTime, setOpeningTime] = useState("10:00");
@@ -126,6 +127,17 @@ export default function ShopPage() {
     }
   }
 
+
+  async function verifyOnlineOrderPayment(order: Order) {
+    if (!db || !shop || !order.id || order.paymentStatus === "paid") return;
+    setError(""); setNotice("");
+    try {
+      await updateDoc(doc(db, "orders", order.id), { paymentStatus: "paid", updatedAt: serverTimestamp() });
+      setOrders(current => current.map(item => item.id === order.id ? { ...item, paymentStatus: "paid" } : item));
+      setNotice("भुगतान बैंक / UPI रिकॉर्ड में जाँचकर Paid कर दिया गया।");
+    } catch (e) { setError(e instanceof Error ? e.message : "भुगतान अपडेट नहीं हो सका।"); }
+  }
+
   async function refreshProducts() {
     if (!shop || productsRefreshing) return;
     setProductsRefreshing(true);
@@ -182,7 +194,7 @@ export default function ShopPage() {
           if (window.location.hash === "#shop-profile") setActiveShopSection("profile");
           const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
           setPendingPayment(lock.exists() && !isLiveShop); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
-          setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
+          setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setUpiQrUrl(data.upiQrUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
           if (isLiveShop) {
             await loadProducts(data.id);
             const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", data.id)));
@@ -464,8 +476,8 @@ export default function ShopPage() {
     if (!db || !shop) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      await updateDoc(doc(db, "shops", shop.id), { name: name.trim(), shopName: name.trim(), phone: phone.trim(), city: city.trim(), address: address.trim(), description: description.trim(), logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), updatedAt: serverTimestamp() });
-      setShop({ ...shop, name: name.trim(), shopName: name.trim(), phone, city, address, description, logoUrl, bannerUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0) });
+      await updateDoc(doc(db, "shops", shop.id), { name: name.trim(), shopName: name.trim(), phone: phone.trim(), city: city.trim(), address: address.trim(), description: description.trim(), logoUrl, bannerUrl, upiQrUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), updatedAt: serverTimestamp() });
+      setShop({ ...shop, name: name.trim(), shopName: name.trim(), phone, city, address, description, logoUrl, bannerUrl, upiQrUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0) });
       setNotice("सेव हो गया। दुकान की जानकारी सफलतापूर्वक अपडेट हो गई है।");
     } catch (e) { setError(e instanceof Error ? e.message : "Profile update failed."); }
     finally { setBusy(false); }
@@ -533,6 +545,28 @@ export default function ShopPage() {
       setNotice((target === "logo" ? "Logo" : "Banner") + " automatically compressed to WebP. Save shop profile to apply it.");
     } catch (e) { setError(e instanceof Error ? e.message : "Image compression failed."); }
     finally { setImageBusy(false); }
+  }
+
+
+  async function compressUpiQr(file: File) {
+    setImageBusy(true); setError("");
+    const imageUrl = URL.createObjectURL(file);
+    try {
+      if (!file.type.startsWith("image/") || file.type === "image/svg+xml" || file.type === "image/gif") throw new Error("कृपया QR Code की PNG, JPG या WebP image चुनें।");
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("QR image खुल नहीं सकी।")); image.src = imageUrl; });
+      let scale = Math.min(1, 1000 / Math.max(image.naturalWidth, image.naturalHeight));
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext("2d"); if (!context) throw new Error("QR image तैयार नहीं हो सकी।");
+        context.imageSmoothingEnabled = false; context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const result = canvas.toDataURL("image/png");
+        if (result.length <= 175000) { setUpiQrUrl(result); setNotice("UPI QR तैयार है। दुकान की जानकारी सेव करें।"); return; }
+        scale *= 0.86;
+      }
+      throw new Error("QR image बहुत बड़ी है। साफ और छोटी image चुनें।");
+    } catch (e) { setError(e instanceof Error ? e.message : "QR image तैयार नहीं हुई।"); }
+    finally { URL.revokeObjectURL(imageUrl); setImageBusy(false); }
   }
 
   function resetProduct() { setProductId(""); setProductName(""); setProductDescription(""); setPrice(""); setImageUrl(""); setProductActive(true); setProductCategory("Ice cream"); setOriginalPrice(""); }
@@ -738,7 +772,7 @@ export default function ShopPage() {
               return <tr key={order.id}>
                 <td><strong>{order.customerName||"ग्राहक"}</strong><small>{order.customerPhone||"मोबाइल उपलब्ध नहीं"}</small><small>ID: {order.id}</small><small>{order.fulfillmentType==="delivery"?"Home delivery":"Shop pickup"}{order.deliveryAddress?" · "+order.deliveryAddress:""}</small><small>{order.createdAt?.toDate?order.createdAt.toDate().toLocaleString("hi-IN"):""}</small></td>
                 <td>{(order.items||[]).map(item=>item.name+" × "+item.quantity).join(", ")||"विवरण उपलब्ध नहीं"}</td>
-                <td><strong>₹{Number(order.total||0).toFixed(2)}</strong><small>{order.paymentStatus==="paid"?"Paid":"Unpaid"}</small></td>
+                <td><strong>₹{Number(order.total||0).toFixed(2)}</strong><small>तरीका: {order.paymentMethod==="upi"?"UPI QR":"Cash / पुराना ऑर्डर"}</small><small>{order.paymentStatus==="paid"?"Paid / Verified":"Unpaid"}</small>{order.paymentMethod==="upi"&&order.paymentScreenshotDataUrl&&<><a href={order.paymentScreenshotDataUrl} target="_blank" rel="noopener noreferrer"><img src={order.paymentScreenshotDataUrl} alt="Customer payment screenshot" style={{display:"block",width:110,maxHeight:150,objectFit:"contain",marginTop:8,border:"1px solid #ddd",borderRadius:8}}/></a><small>ग्राहक का Payment Screenshot</small></>}{order.paymentMethod==="upi"&&order.paymentStatus!=="paid"&&<button type="button" className="admin-primary small" onClick={()=>void verifyOnlineOrderPayment(order)}>जाँचकर Paid करें</button>}</td>
                 <td>{order.status||"placed"}</td>
                 <td>{nextStatus?<button type="button" className="admin-primary small" onClick={()=>void updateOnlineOrderStatus(order,nextStatus)}>{nextLabel}</button>:<span className="admin-muted">{order.status==="completed"?"पूरा हुआ":order.status==="cancelled"?"रद्द":"—"}</span>}</td>
               </tr>;
@@ -796,6 +830,9 @@ export default function ShopPage() {
           <label>Minimum order (₹)<input type="number" min="0" step="1" value={minimumOrder} onChange={e=>setMinimumOrder(e.target.value)} /></label>
           <label>Shop logo (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"logo");}} /></label>{logoUrl&&<img src={logoUrl} alt="Shop logo preview" style={{width:80,height:80,objectFit:"cover",borderRadius:14}}/>}
           <label>Shop banner (WebP compressed, max 300 KB)<input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"banner");}} /></label>{bannerUrl&&<img src={bannerUrl} alt="Shop banner preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:14}}/>}
+          <h3>ग्राहक के ऑनलाइन ऑर्डर का UPI QR</h3><p className="admin-muted">अपनी दुकान का QR अपलोड करें। ग्राहक UPI चुनने पर यही QR देखेंगे। भुगतान अपने बैंक / UPI ऐप में जाँचकर ही Paid करें।</p>
+          <label>अपनी दुकान का UPI QR Code<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files?.[0];if(file)void compressUpiQr(file);}} /></label>
+          {upiQrUrl&&<div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}><img src={upiQrUrl} alt="Shop UPI QR preview" style={{width:150,height:150,objectFit:"contain",borderRadius:12,border:"1px solid #ddd",padding:8,background:"#fff"}}/><button type="button" className="admin-secondary small" onClick={()=>setUpiQrUrl("")}>QR हटाएँ</button></div>}
           <button className="admin-primary" disabled={busy||imageBusy}>{busy ? "सेव हो रहा है…" : "दुकान की जानकारी सेव करें"}</button>
         </form></section>}
         
