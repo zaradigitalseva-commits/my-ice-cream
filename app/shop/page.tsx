@@ -538,16 +538,38 @@ export default function ShopPage() {
 
   async function compressUpiQr(file: File) {
     setImageBusy(true); setError("");
+    const imageUrl = URL.createObjectURL(file);
     try {
-      const result = await compressImageToWebP(file, {
-        maxDimension: 900,
-        maxBytes: 120 * 1024,
-        initialQuality: 0.88,
+      if (!file.type.startsWith("image/") || file.type === "image/svg+xml" || file.type === "image/gif") {
+        throw new Error("कृपया QR Code की PNG, JPG या WebP image चुनें।");
+      }
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("QR image खुल नहीं सकी। दूसरी साफ image चुनें।"));
+        image.src = imageUrl;
       });
-      setUpiQrUrl(result);
-      setNotice("UPI QR Code compress हो गया है। दुकान की जानकारी सेव करें।");
+      let scale = Math.min(1, 1000 / Math.max(image.naturalWidth, image.naturalHeight));
+      for (let attempt = 0; attempt < 7; attempt += 1) {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("इस browser में QR image process नहीं हो सकी।");
+        // PNG keeps QR edges crisp; avoid lossy WebP artifacts that can make codes hard to scan.
+        context.imageSmoothingEnabled = false;
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const result = canvas.toDataURL("image/png");
+        if (result.length <= 175000) {
+          setUpiQrUrl(result);
+          setNotice("UPI QR Code सुरक्षित PNG format में तैयार है। दुकान की जानकारी सेव करें।");
+          return;
+        }
+        scale *= 0.88;
+      }
+      throw new Error("QR image का आकार बड़ा है। कृपया साफ और छोटी QR PNG image चुनें।");
     } catch (e) { setError(e instanceof Error ? e.message : "UPI QR compression failed."); }
-    finally { setImageBusy(false); }
+    finally { URL.revokeObjectURL(imageUrl); setImageBusy(false); }
   }
 
   function resetProduct() { setProductId(""); setProductName(""); setProductDescription(""); setPrice(""); setImageUrl(""); setProductActive(true); setProductCategory("Ice cream"); setOriginalPrice(""); }
