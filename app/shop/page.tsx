@@ -270,7 +270,7 @@ export default function ShopPage() {
         getDoc(doc(db, "customers", digits)).catch(() => null),
         getDocs(query(collection(db, "sales"), where("shopId", "==", shop.id), where("ownerUid", "==", user?.uid || ""), where("customerPhone", "==", digits))),
       ]);
-      const profile = customerSnap?.exists() ? customerSnap.data() : {};
+      const profile: Record<string, unknown> = customerSnap?.exists() ? customerSnap.data() : {};
       // Online orders are already loaded for this authenticated shop only.
       // Combine them with this shop's counter-sale bills for the phone search.
       const saleRows = salesResult.docs.map(d => ({ id: d.id, ...d.data(), orderType: "sale" as const } as CustomerOrder));
