@@ -43,13 +43,17 @@ export default function CustomerPage() {
       if (!db) { setLoading(false); return; }
       try {
         const existing = await getDocs(query(collection(db, "customers"), where("uid", "==", u.uid)));
+        const linkedPhone = existing.empty ? "" : String(existing.docs[0].data().phone || "");
         if (!existing.empty) {
           const profile = existing.docs[0].data();
           setName(String(profile.name || u.displayName || ""));
-          setPhone(String(profile.phone || ""));
+          setPhone(linkedPhone);
+          setClaimPhone(linkedPhone);
         }
         const [salesResult, ordersResult] = await Promise.all([
-          getDocs(query(collection(db, "sales"), where("customerUid", "==", u.uid))),
+          linkedPhone
+            ? getDocs(query(collection(db, "sales"), where("customerPhone", "==", linkedPhone)))
+            : getDocs(query(collection(db, "sales"), where("customerUid", "==", u.uid))),
           getDocs(query(collection(db, "orders"), where("customerUid", "==", u.uid))),
         ]);
         setSales(salesResult.docs.map((d) => ({ id: d.id, ...d.data() } as Sale)));
@@ -65,8 +69,8 @@ export default function CustomerPage() {
   async function claimPreviousBills(e: React.FormEvent) {
     e.preventDefault();
     if (!db || !user) return;
-    const digits = claimPhone.replace(/\\D/g, "");
-    const code = claimCode.replace(/\\D/g, "");
+    const digits = claimPhone.replace(/\D/g, "");
+    const code = claimCode.replace(/\D/g, "");
     if (!/^\\d{10}$/.test(digits) || !/^\\d{8}$/.test(code)) { setError("10 अंकों का मोबाइल नंबर और 8 अंकों का Claim Code भरें।"); return; }
     setSaving(true); setError(""); setNotice("");
     try {
@@ -149,8 +153,8 @@ export default function CustomerPage() {
         <form className="register-form" onSubmit={claimPreviousBills}>
           <h3>दुकान के पुराने बिल जोड़ें</h3>
           <p className="admin-muted">दुकानदार से मिला 8 अंकों का Claim Code और वही मोबाइल नंबर भरें। कोड एक बार ही इस्तेमाल होगा।</p>
-          <label>मोबाइल नंबर<input required inputMode="numeric" maxLength={10} value={claimPhone} onChange={(e) => setClaimPhone(e.target.value.replace(/\\D/g, "").slice(0, 10))} /></label>
-          <label>8 अंकों का Claim Code<input required inputMode="numeric" maxLength={8} value={claimCode} onChange={(e) => setClaimCode(e.target.value.replace(/\\D/g, "").slice(0, 8))} /></label>
+          <label>मोबाइल नंबर<input required inputMode="numeric" maxLength={10} value={claimPhone} onChange={(e) => setClaimPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} /></label>
+          <label>8 अंकों का Claim Code<input required inputMode="numeric" maxLength={8} value={claimCode} onChange={(e) => setClaimCode(e.target.value.replace(/\D/g, "").slice(0, 8))} /></label>
           <button className="admin-primary" disabled={saving || claimPhone.length !== 10 || claimCode.length !== 8}>{saving ? "जोड़ रहे हैं…" : "पुराने बिल जोड़ें"}</button>
         </form>
         {error && <p className="admin-error">{error}</p>}
