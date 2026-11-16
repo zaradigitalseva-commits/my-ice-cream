@@ -702,7 +702,7 @@ export default function ShopPage() {
     </main>;
   }
   return <main className="admin-wrap">
-    <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><Link href="/shop/orders" className="admin-primary role-link">🛒 Customer Orders</Link><Link href="/" className="admin-secondary role-link">Home page</Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></div></header>
+    <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>SHOP</span></Link><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><Link href="/shop/orders" className="admin-primary role-link">🧾 ONLINE ORDERS</Link><Link href="/shop#shop-management" className="admin-secondary role-link">⚙️ SHOP MANAGEMENT</Link><Link href="/" className="admin-secondary role-link">Home page</Link><button className="admin-secondary" onClick={() => auth && signOut(auth)}>Sign out</button></div></header>
     {loading ? <section className="admin-panel"><h1>Loading your shop…</h1></section> : !shop ?
       <section className="admin-panel"><h1>Register your shop</h1><p>Shopkeeper access starts with a separate shop registration. Admin approval is required before your shop is LIVE.</p><Link href="/shop/register" className="admin-primary role-link">Register Shop</Link></section> :
       <>
@@ -781,26 +781,7 @@ export default function ShopPage() {
             </div>
           </>}
         </section>
-        {live && <section className="admin-panel" id="shop-online-orders">
-          <p className="admin-kicker">ONLINE ORDERS</p>
-          <div className="admin-panel-head"><div><h2>ऑनलाइन ऑर्डर</h2><p className="admin-muted">ग्राहकों के वेबसाइट ऑर्डर यहाँ देखें और स्थिति अपडेट करें।</p></div><strong>{orders.length} ऑर्डर</strong></div>
-          {orders.length===0 ? <p className="admin-muted">अभी कोई ऑनलाइन ऑर्डर नहीं आया है।</p> : <div className="admin-table-wrap"><table className="admin-table">
-            <thead><tr><th>ऑर्डर / ग्राहक</th><th>सामान</th><th>कुल</th><th>स्थिति</th><th>अगला कदम</th></tr></thead>
-            <tbody>{[...orders].sort((a,b)=>(b.createdAt?.toDate?.().getTime()||0)-(a.createdAt?.toDate?.().getTime()||0)).map(order=>{
-              const nextStatus=order.status==="placed"?"accepted":order.status==="accepted"?"preparing":order.status==="preparing"?"ready":order.status==="ready"?"completed":null;
-              const nextLabel=order.status==="placed"?"स्वीकार करें":order.status==="accepted"?"तैयार करना शुरू करें":order.status==="preparing"?"तैयार है":order.status==="ready"?"पूरा करें":"";
-              return <tr key={order.id}>
-                <td><strong>{order.customerName||"ग्राहक"}</strong><small>{order.customerPhone||"मोबाइल उपलब्ध नहीं"}</small><small>ID: {order.id}</small><small>{order.fulfillmentType==="delivery"?"Home delivery":"Shop pickup"}{order.deliveryAddress?" · "+order.deliveryAddress:""}</small><small>{order.createdAt?.toDate?order.createdAt.toDate().toLocaleString("hi-IN"):""}</small></td>
-                <td>{(order.items||[]).map(item=>item.name+" × "+item.quantity).join(", ")||"विवरण उपलब्ध नहीं"}</td>
-                <td><strong>₹{Number(order.total||0).toFixed(2)}</strong><small>{order.paymentStatus==="paid"?"Paid":"Unpaid"}</small></td>
-                <td>{order.status||"placed"}</td>
-                <td>{nextStatus?<button type="button" className="admin-primary small" onClick={()=>void updateOnlineOrderStatus(order,nextStatus)}>{nextLabel}</button>:<span className="admin-muted">{order.status==="completed"?"पूरा हुआ":order.status==="cancelled"?"रद्द":"—"}</span>}</td>
-              </tr>;
-            })}</tbody>
-          </table></div>}
-          <button type="button" className="admin-secondary" onClick={async()=>{if(!db||!shop)return;try{const result=await getDocs(query(collection(db,"orders"),where("shopId","==",shop.id)));setOrders(result.docs.map(item=>({id:item.id,...item.data()} as Order)));}catch(e){setError(e instanceof Error?e.message:"ऑर्डर refresh नहीं हो सके।");}}}>ऑर्डर Refresh करें</button>
-        </section>}
-        <section className="admin-panel">
+                <section className="admin-panel" id="shop-management" style={{scrollMarginTop:20}}>
           <p className="admin-kicker">SHOP MANAGEMENT</p><h2>Shopkeeper menu</h2>
           <p>Har option par click karke uski details alag se kholen.</p>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
