@@ -256,8 +256,13 @@ service cloud.firestore {
             "openingTime", "closingTime", "closedDays",
             "manualClosed", "deliveryFee", "minimumOrder",
             "offerTitle", "offerDescription", "offerExpiresAt",
-            "updatedAt"
+            "shopUpiQrDataUrl", "updatedAt"
           ])
+          && (
+            !("shopUpiQrDataUrl" in request.resource.data)
+            || (request.resource.data.shopUpiQrDataUrl is string
+              && request.resource.data.shopUpiQrDataUrl.size() <= 250000)
+          )
         );
 
       allow delete: if isAdmin();
