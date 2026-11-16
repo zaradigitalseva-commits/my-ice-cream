@@ -1,0 +1,40 @@
+name: Firestore Rules Emulator Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "firebase/firestore.rules"
+      - "firebase.json"
+      - "tests/firestore.rules.test.mjs"
+      - ".github/workflows/firestore-rules.yml"
+  push:
+    branches: ["fix/customer-bill-datetime-whatsapp"]
+    paths:
+      - "firebase/firestore.rules"
+      - "firebase.json"
+      - "tests/firestore.rules.test.mjs"
+      - ".github/workflows/firestore-rules.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  firestore-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install test tools
+        run: npm install --no-save firebase-tools @firebase/rules-unit-testing firebase
+      - name: Run Firestore emulator tests
+        run: npx firebase emulators:exec --only firestore --project demo-my-ice-cream-rules "node --test tests/firestore.rules.test.mjs"
