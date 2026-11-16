@@ -278,7 +278,7 @@ export default function ShopPage() {
         .filter(order => (order.customerPhone || "").replace(/\D/g, "") === digits)
         .map(order => ({ ...order, orderType: "online" as const } as CustomerOrder));
       const matchedOrder = onlineRows[0] || saleRows[0];
-      if (!matchedOrder && !customerSnap?.exists()) {
+      if (!matchedOrder) {
         setCustomerMessage("इस मोबाइल नंबर से इस दुकान पर अभी कोई ऑर्डर या खरीदारी नहीं मिली।");
         return;
       }
