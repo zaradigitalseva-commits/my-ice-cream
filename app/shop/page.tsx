@@ -10,7 +10,7 @@ import { compressImageToWebP } from "@/lib/image-compression";
 
 type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
 type Order = { id: string; shopName?: string; customerName?: string; customerPhone?: string; deliveryAddress?: string; fulfillmentType?: "pickup" | "delivery"; items?: { name: string; quantity: number; price?: number }[]; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
-type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
+type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean; claimCode?: string };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
 type SubscriptionPayment = { id: string; amount?: number; paymentType?: string; utr?: string; status?: string; createdAt?: { toDate?: () => Date } };
@@ -268,7 +268,7 @@ export default function ShopPage() {
       const customerSnap = await getDoc(doc(db, "customers", digits));
       if (!customerSnap.exists()) { setCustomerMessage("इस नंबर का रिकॉर्ड नहीं मिला। नीचे नाम भरकर नया ग्राहक जोड़ सकते हैं।"); return; }
       const data = customerSnap.data();
-      setCustomer({ id: customerSnap.id, phone: digits, uid: String(data.uid || ""), name: String(data.name || ""), registered: Boolean(data.uid) });
+      setCustomer({ id: customerSnap.id, phone: digits, uid: String(data.uid || ""), name: String(data.name || ""), registered: Boolean(data.uid), claimCode: String(data.claimCode || "") });
       setCustomerFound(true);
       const salesResult = await getDocs(query(collection(db, "sales"), where("shopId", "==", shop.id), where("ownerUid", "==", user?.uid || ""), where("customerPhone", "==", digits)));
       setCustomerOrders(salesResult.docs.map(d => ({ id:d.id, ...d.data() } as CustomerOrder)).sort((x,y)=>(y.createdAt?.toDate?.().getTime()||0)-(x.createdAt?.toDate?.().getTime()||0)));
@@ -290,11 +290,24 @@ export default function ShopPage() {
       const ref = doc(db, "customers", digits);
       const existing = await getDoc(ref);
       if (existing.exists()) throw new Error("यह मोबाइल नंबर पहले से दर्ज है। ग्राहक खोजें।");
-      await setDoc(ref, { phone: digits, name: newCustomerName.trim(), uid: "", registered: false, createdByShopId: shop.id, createdByShopName: shop.name || shop.shopName || "", createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-      setCustomer({ id: digits, phone: digits, uid: "", name: newCustomerName.trim(), registered: false });
+      const claimCode = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, "0");
+      await setDoc(ref, { phone: digits, name: newCustomerName.trim(), uid: "", registered: false, claimCode, createdByShopId: shop.id, createdByShopName: shop.name || shop.shopName || "", createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      setCustomer({ id: digits, phone: digits, uid: "", name: newCustomerName.trim(), registered: false, claimCode });
       setCustomerFound(true);
       setCustomerMessage("ग्राहक रिकॉर्ड बन गया। ग्राहक को ऐप install करना जरूरी नहीं है।");
     } catch (e) { setCustomerMessage(e instanceof Error ? e.message : "ग्राहक रिकॉर्ड नहीं बन सका।"); }
+    finally { setCustomerLoading(false); }
+  }
+
+  async function generateCustomerClaimCode() {
+    if (!db || !shop || !user || !customer || customer.registered) return;
+    setCustomerLoading(true); setCustomerMessage("");
+    try {
+      const claimCode = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, "0");
+      await updateDoc(doc(db, "customers", customer.phone), { claimCode, claimCodeCreatedAt: serverTimestamp(), claimCodeCreatedByShopId: shop.id, updatedAt: serverTimestamp() });
+      setCustomer({ ...customer, claimCode });
+      setCustomerMessage("ग्राहक का Claim Code बन गया। इसे ग्राहक को निजी तौर पर दें।");
+    } catch (e) { setCustomerMessage(e instanceof Error ? e.message : "Claim Code नहीं बन सका।"); }
     finally { setCustomerLoading(false); }
   }
 
@@ -738,7 +751,8 @@ export default function ShopPage() {
           </form>
           {customerMessage && <p className={customerFound?"admin-success":"admin-muted"} role="status">{customerMessage}</p>}
           {!customerFound && customerPhone.length===10 && customerMessage.includes("नया ग्राहक जोड़") && <form className="register-form" onSubmit={createCustomerRecord}><label>ग्राहक का नाम<input required value={newCustomerName} onChange={e=>setNewCustomerName(e.target.value)} placeholder="ग्राहक का नाम" /></label><button className="admin-primary" disabled={customerLoading}>{customerLoading?"सेव हो रहा है…":"नया ग्राहक सेव करें"}</button></form>}\n          {customerFound && customer && <>
-            <h3>{customer.name || "ग्राहक"} · {customer.phone}</h3>{!customer.registered && <p className="admin-muted">यह रिकॉर्ड दुकानदार ने बनाया है। ग्राहक ने अभी ऐप से अकाउंट link नहीं किया है।</p>}\n            <button type="button" className="admin-primary" onClick={sendOfferOnWhatsApp}>WhatsApp पर ऑफर भेजें</button>
+            <h3>{customer.name || "ग्राहक"} · {customer.phone}</h3>{!customer.registered && <p className="admin-muted">यह रिकॉर्ड दुकानदार ने बनाया है। ग्राहक ने अभी ऐप से अकाउंट link नहीं किया है।</p>}\n            {!customer.registered && <><p className="admin-muted">ग्राहक अपने Google अकाउंट से Claim Code डालकर पुराने बिल जोड़ सकता है।</p>{customer.claimCode ? <p className="admin-success">Claim Code: <strong>{customer.claimCode}</strong> — ग्राहक को निजी तौर पर दें।</p> : <button type="button" className="admin-primary" disabled={customerLoading} onClick={()=>void generateCustomerClaimCode()}>{customerLoading ? "कोड बन रहा है…" : "ग्राहक के लिए Claim Code बनाएँ"}</button>}</>}
+            <button type="button" className="admin-primary" onClick={sendOfferOnWhatsApp}>WhatsApp पर ऑफर भेजें</button>
             <h3>इस दुकान की पुरानी खरीदारी</h3>
             {customerOrders.length===0?<p className="admin-muted">इस दुकान से अभी कोई खरीदारी नहीं हुई।</p>:customerOrders.map(o=><p key={o.id}>
               <strong>{o.createdAt?.toDate?o.createdAt.toDate().toLocaleString("hi-IN"):"तारीख उपलब्ध नहीं"}</strong>
