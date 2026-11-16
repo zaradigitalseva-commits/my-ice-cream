@@ -71,7 +71,7 @@ export default function CustomerPage() {
     if (!db || !user) return;
     const digits = claimPhone.replace(/\D/g, "");
     const code = claimCode.replace(/\D/g, "");
-    if (!/^\\d{10}$/.test(digits) || !/^\\d{8}$/.test(code)) { setError("10 अंकों का मोबाइल नंबर और 8 अंकों का Claim Code भरें।"); return; }
+    if (!/^\d{10}$/.test(digits) || !/^\d{8}$/.test(code)) { setError("10 अंकों का मोबाइल नंबर और 8 अंकों का Claim Code भरें।"); return; }
     setSaving(true); setError(""); setNotice("");
     try {
       await updateDoc(doc(db, "customers", digits), { uid: user.uid, registered: true, email: user.email || "", claimCode: code, claimCodeUsed: true, claimedAt: serverTimestamp(), updatedAt: serverTimestamp() });
