@@ -64,6 +64,18 @@ async function seed() {
       uid: "customer-2",
       registered: true,
     });
+    await setDoc(doc(db, "sales/sale-1"), {
+      shopId: "shop1", shopName: "Test Ice Cream", ownerUid: "owner-1",
+      customerUid: "customer-1", customerPhone: "9000000001",
+      customerName: "Customer One", items: [], subtotal: 0, discount: 0,
+      discountType: "amount", total: 0, paymentStatus: "paid",
+    });
+    await setDoc(doc(db, "sales/sale-2"), {
+      shopId: "shop1", shopName: "Test Ice Cream", ownerUid: "owner-1",
+      customerUid: "customer-2", customerPhone: "9000000002",
+      customerName: "Customer Two", items: [], subtotal: 0, discount: 0,
+      discountType: "amount", total: 0, paymentStatus: "paid",
+    });
     await setDoc(doc(db, "pushSubscriptions/sub-1"), {
       uid: "customer-1",
       token: "token-customer-one-long-enough-for-rules",
@@ -140,102 +152,36 @@ test("an online order with a forged product price is rejected", async () => {
   }));
 });
 
-test("a shop owner can create a walk-in customer record with an 8-digit claim code", async () => {
+test("a customer can register an unused phone number to their own Google account", async () => {
   await seed();
-  const db = testEnv.authenticatedContext("owner-1").firestore();
+  const db = testEnv.authenticatedContext("customer-3").firestore();
   await assertSucceeds(setDoc(doc(db, "customers/9000000003"), {
     phone: "9000000003",
-    name: "Walk-in Customer",
-    uid: "",
-    registered: false,
-    claimCode: "12345678",
-    createdByShopId: "shop1",
-    createdByShopName: "Test Ice Cream",
+    name: "Customer Three",
+    uid: "customer-3",
+    registered: true,
+    email: "three@example.com",
     createdAt: new Date(),
     updatedAt: new Date(),
   }));
 });
 
-test("a customer can claim their own walk-in record with the exact code", async () => {
+test("a customer cannot register a phone number already linked to another account", async () => {
   await seed();
-  await testEnv.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), "customers/9000000003"), {
-      phone: "9000000003",
-      name: "Walk-in Customer",
-      uid: "",
-      registered: false,
-      claimCode: "12345678",
-      createdByShopId: "shop1",
-      createdByShopName: "Test Ice Cream",
-    });
-  });
   const db = testEnv.authenticatedContext("customer-3").firestore();
-  await assertSucceeds(updateDoc(doc(db, "customers/9000000003"), {
+  await assertFails(setDoc(doc(db, "customers/9000000001"), {
+    phone: "9000000001",
+    name: "Impersonator",
     uid: "customer-3",
     registered: true,
-    email: "customer@example.com",
-    claimCode: "12345678",
-    claimCodeUsed: true,
-    claimedAt: new Date(),
-    updatedAt: new Date(),
-  }));
-  await assertSucceeds(getDoc(doc(db, "customers/9000000003")));
-});
-
-test("a customer cannot claim a walk-in record with a wrong code", async () => {
-  await seed();
-  await testEnv.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), "customers/9000000003"), {
-      phone: "9000000003",
-      name: "Walk-in Customer",
-      uid: "",
-      registered: false,
-      claimCode: "12345678",
-      createdByShopId: "shop1",
-      createdByShopName: "Test Ice Cream",
-    });
-  });
-  const db = testEnv.authenticatedContext("customer-3").firestore();
-  await assertFails(updateDoc(doc(db, "customers/9000000003"), {
-    uid: "customer-3",
-    registered: true,
-    email: "customer@example.com",
-    claimCode: "87654321",
-    claimCodeUsed: true,
-    claimedAt: new Date(),
-    updatedAt: new Date(),
   }));
 });
 
-test("a claimed walk-in record cannot be claimed by a second account", async () => {
+test("a customer can read only shop bills linked to their Google UID", async () => {
   await seed();
-  await testEnv.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), "customers/9000000003"), {
-      phone: "9000000003",
-      name: "Walk-in Customer",
-      uid: "",
-      registered: false,
-      claimCode: "12345678",
-      createdByShopId: "shop1",
-      createdByShopName: "Test Ice Cream",
-    });
-  });
-  const firstDb = testEnv.authenticatedContext("customer-3").firestore();
-  await assertSucceeds(updateDoc(doc(firstDb, "customers/9000000003"), {
-    uid: "customer-3",
-    registered: true,
-    claimCode: "12345678",
-    claimCodeUsed: true,
-    claimedAt: new Date(),
-    updatedAt: new Date(),
-  }));
-  const secondDb = testEnv.authenticatedContext("customer-4").firestore();
-  await assertFails(updateDoc(doc(secondDb, "customers/9000000003"), {
-    uid: "customer-4",
-    registered: true,
-    claimCode: "12345678",
-    claimCodeUsed: true,
-    claimedAt: new Date(),
-    updatedAt: new Date(),
-  }));
+  const ownDb = testEnv.authenticatedContext("customer-1").firestore();
+  const otherDb = testEnv.authenticatedContext("customer-2").firestore();
+  await assertSucceeds(getDoc(doc(ownDb, "sales/sale-1")));
+  await assertFails(getDoc(doc(ownDb, "sales/sale-2")));
+  await assertFails(getDoc(doc(otherDb, "sales/sale-1")));
 });
