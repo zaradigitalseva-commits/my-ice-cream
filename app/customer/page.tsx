@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore/lite";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
@@ -31,8 +31,6 @@ export default function CustomerPage() {
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [claimPhone, setClaimPhone] = useState("");
-  const [claimCode, setClaimCode] = useState("");
 
   useEffect(() => {
     if (!auth) { setLoading(false); return; }
@@ -48,12 +46,9 @@ export default function CustomerPage() {
           const profile = existing.docs[0].data();
           setName(String(profile.name || u.displayName || ""));
           setPhone(linkedPhone);
-          setClaimPhone(linkedPhone);
         }
         const [salesResult, ordersResult] = await Promise.all([
-          linkedPhone
-            ? getDocs(query(collection(db, "sales"), where("customerPhone", "==", linkedPhone)))
-            : getDocs(query(collection(db, "sales"), where("customerUid", "==", u.uid))),
+          getDocs(query(collection(db, "sales"), where("customerUid", "==", u.uid))),
           getDocs(query(collection(db, "orders"), where("customerUid", "==", u.uid))),
         ]);
         setSales(salesResult.docs.map((d) => ({ id: d.id, ...d.data() } as Sale)));
@@ -65,27 +60,6 @@ export default function CustomerPage() {
       }
     });
   }, [router]);
-
-  async function claimPreviousBills(e: React.FormEvent) {
-    e.preventDefault();
-    if (!db || !user) return;
-    const digits = claimPhone.replace(/\D/g, "");
-    const code = claimCode.replace(/\D/g, "");
-    if (!/^\d{10}$/.test(digits) || !/^\d{8}$/.test(code)) { setError("10 अंकों का मोबाइल नंबर और 8 अंकों का Claim Code भरें।"); return; }
-    setSaving(true); setError(""); setNotice("");
-    try {
-      await updateDoc(doc(db, "customers", digits), { uid: user.uid, registered: true, email: user.email || "", claimCode: code, claimCodeUsed: true, claimedAt: serverTimestamp(), updatedAt: serverTimestamp() });
-      setPhone(digits); setClaimPhone(digits); setClaimCode("");
-      const [salesResult, ordersResult] = await Promise.all([
-        getDocs(query(collection(db, "sales"), where("customerPhone", "==", digits))),
-        getDocs(query(collection(db, "orders"), where("customerUid", "==", user.uid))),
-      ]);
-      setSales(salesResult.docs.map((d) => ({ id: d.id, ...d.data() } as Sale)));
-      setOnlineOrders(ordersResult.docs.map((d) => ({ id: d.id, ...d.data() } as OnlineOrder)));
-      setNotice("पुराने दुकान के बिल आपके अकाउंट से सुरक्षित रूप से जुड़ गए।");
-    } catch { setError("Claim Code गलत, इस्तेमाल हो चुका, या इस रिकॉर्ड के लिए उपलब्ध नहीं है। दुकान से नया कोड लें।"); }
-    finally { setSaving(false); }
-  }
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -107,7 +81,13 @@ export default function CustomerPage() {
         registered: true, updatedAt: serverTimestamp(),
       }, { merge: true });
       setPhone(digits);
-      setNotice("आपकी जानकारी सेव हो गई।");
+      const [salesResult, ordersResult] = await Promise.all([
+        getDocs(query(collection(db, "sales"), where("customerUid", "==", user.uid))),
+        getDocs(query(collection(db, "orders"), where("customerUid", "==", user.uid))),
+      ]);
+      setSales(salesResult.docs.map((d) => ({ id: d.id, ...d.data() } as Sale)));
+      setOnlineOrders(ordersResult.docs.map((d) => ({ id: d.id, ...d.data() } as OnlineOrder)));
+      setNotice("आपकी जानकारी सेव हो गई। अब इस मोबाइल नंबर पर बनने वाले बिल आपके खाते में दिखेंगे।");
     } catch (e) {
       const detail = e instanceof Error ? e.message : "";
       setError(detail.toLowerCase().includes("permission")
@@ -150,13 +130,6 @@ export default function CustomerPage() {
           <label>10 अंकों का मोबाइल नंबर<input required inputMode="numeric" maxLength={10} value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} /></label>
           <button className="admin-primary" disabled={saving}>{saving ? "सेव हो रहा है…" : "जानकारी सेव करें"}</button>
         </form>
-        <form className="register-form" onSubmit={claimPreviousBills}>
-          <h3>दुकान के पुराने बिल जोड़ें</h3>
-          <p className="admin-muted">दुकानदार से मिला 8 अंकों का Claim Code और वही मोबाइल नंबर भरें। कोड एक बार ही इस्तेमाल होगा।</p>
-          <label>मोबाइल नंबर<input required inputMode="numeric" maxLength={10} value={claimPhone} onChange={(e) => setClaimPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} /></label>
-          <label>8 अंकों का Claim Code<input required inputMode="numeric" maxLength={8} value={claimCode} onChange={(e) => setClaimCode(e.target.value.replace(/\D/g, "").slice(0, 8))} /></label>
-          <button className="admin-primary" disabled={saving || claimPhone.length !== 10 || claimCode.length !== 8}>{saving ? "जोड़ रहे हैं…" : "पुराने बिल जोड़ें"}</button>
-        </form>
         {error && <p className="admin-error">{error}</p>}
         {notice && <p className="admin-success">{notice}</p>}
         <Link href="/" className="admin-primary role-link">Explore all shops</Link>
@@ -168,7 +141,7 @@ export default function CustomerPage() {
         </div>
         <p className="admin-muted">Online Orders और दुकान पर बने Bills — सभी दुकानों की खरीदारी नई से पुरानी तारीख के क्रम में।</p>
         {loading ? <p className="admin-muted">खरीदारी लोड हो रही है…</p> :
-          purchases.length === 0 ? <p className="admin-muted">अभी कोई खरीदारी दर्ज नहीं है। खरीदारी करने के बाद उसका रिकॉर्ड यहाँ दिखेगा।</p> :
+          purchases.length === 0 ? <p className="admin-muted">अभी कोई खरीदारी दर्ज नहीं है। मोबाइल नंबर सेव करने के बाद बनने वाले बिल यहाँ दिखेंगे। पुराने बिना अकाउंट वाले बिल अपने-आप नहीं जुड़ेंगे।</p> :
           <div className="admin-table-wrap">
             <table className="admin-table">
               <thead><tr><th>दुकान / सामान</th><th>प्रकार</th><th>कुल</th><th>स्थिति</th><th>पेमेंट</th><th>तारीख और समय</th></tr></thead>
