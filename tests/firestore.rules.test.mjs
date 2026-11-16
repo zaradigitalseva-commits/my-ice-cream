@@ -185,3 +185,23 @@ test("a customer can read only shop bills linked to their Google UID", async () 
   await assertFails(getDoc(doc(ownDb, "sales/sale-2")));
   await assertFails(getDoc(doc(otherDb, "sales/sale-1")));
 });
+
+
+test("a valid shop owner can look up one customer profile by exact phone", async () => {
+  await seed();
+  const db = testEnv.authenticatedContext("owner-1").firestore();
+  await assertSucceeds(getDoc(doc(db, "customers/9000000001")));
+});
+
+test("a shop owner cannot list the customer directory", async () => {
+  await seed();
+  const { collection, getDocs } = await import("firebase/firestore");
+  const db = testEnv.authenticatedContext("owner-1").firestore();
+  await assertFails(getDocs(collection(db, "customers")));
+});
+
+test("a signed-in non-shop customer cannot look up another customer's phone profile", async () => {
+  await seed();
+  const db = testEnv.authenticatedContext("customer-3").firestore();
+  await assertFails(getDoc(doc(db, "customers/9000000001")));
+});
