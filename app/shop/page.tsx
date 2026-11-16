@@ -791,6 +791,7 @@ export default function ShopPage() {
             <button type="button" className={activeShopSection === "myProducts" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "myProducts" ? "" : "myProducts")}>My Products</button>
             <button type="button" className={activeShopSection === "promotion" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "promotion" ? "" : "promotion")}>Offer / Promotion</button>
             <button type="button" className={activeShopSection === "qr" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "qr" ? "" : "qr")}>💳 Customer UPI QR</button>
+            <Link href="/shop/orders" className="admin-secondary role-link">🧾 ONLINE ORDERS</Link>
           </div>
         </section>
         {activeShopSection === "promotion" && <section className="admin-panel" id="shop-promotion" style={{scrollMarginTop:20}}>
