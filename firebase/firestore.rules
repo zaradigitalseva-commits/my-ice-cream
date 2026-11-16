@@ -63,6 +63,13 @@ service cloud.firestore {
       return shop.status in ["live", "LIVE", "Live"];
     }
 
+    // Customer UPI checkout is allowed only when the shop has a usable QR
+    // saved on its shop document. This mirrors the checkout UI requirement.
+    function shopHasCustomerUpiQr(shopId) {
+      let qr = get(/databases/$(database)/documents/shops/$(shopId)).data.get("shopUpiQrDataUrl", "");
+      return qr is string && qr.size() > 0 && qr.size() <= 250000;
+    }
+
     // Match the shop name stored on the shop document without failing when
     // one of the supported name fields is absent.
     // Match checkout defaults when older shop documents do not yet contain
@@ -468,6 +475,9 @@ service cloud.firestore {
           "deliveryAddress", "items", "total", "status", "paymentStatus", "paymentUtr", "createdAt"
         ])
         && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.shopId is string
+        && request.resource.data.shopId.size() > 0
+        && shopHasCustomerUpiQr(request.resource.data.shopId)
         && request.resource.data.shopName is string
         && request.resource.data.customerName is string
         && request.resource.data.customerName.size() > 0
@@ -480,6 +490,7 @@ service cloud.firestore {
         && request.resource.data.paymentStatus == "unpaid"
         && request.resource.data.paymentUtr is string
         && request.resource.data.paymentUtr.matches('^[A-Z0-9]{6,40}$')
+        && request.resource.data.createdAt is timestamp
         && liveShop(request.resource.data.shopId)
         && request.resource.data.fulfillmentType in ["pickup", "delivery"]
         && request.resource.data.subtotal is number
