@@ -32,6 +32,16 @@ service cloud.firestore {
         );
     }
 
+    // Customer phone lookup is available only to a verified owner lock that
+    // still points to a shop the signed-in account owns.
+    function canLookupCustomerByPhone() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
+        && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.ownerUid == request.auth.uid
+        && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId is string
+        && ownsShop(get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId);
+    }
+
     function validSubscription(shopData) {
       return shopData.subscriptionStatus == "active"
         && shopData.subscriptionExpiresAt is timestamp
@@ -306,8 +316,7 @@ service cloud.firestore {
       // one exact phone number, but cannot list the customer directory.
       allow get: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid)
-        || (signedIn()
-          && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)));
+        || canLookupCustomerByPhone();
       allow list: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid);
 
