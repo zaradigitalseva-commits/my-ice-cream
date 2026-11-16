@@ -29,6 +29,13 @@ service cloud.firestore {
         && (
           get(/databases/$(database)/documents/shops/$(shopId)).data.get("ownerUid", "") == request.auth.uid
           || ownerLockMatchesShop(shopId)
+          // Fallback to the private owner record if an older shop's owner lock
+          // is missing or inconsistent. This does not expose private data.
+          || (
+            exists(/databases/$(database)/documents/shopPrivate/$(shopId))
+            && get(/databases/$(database)/documents/shopPrivate/$(shopId)).data.shopId == shopId
+            && get(/databases/$(database)/documents/shopPrivate/$(shopId)).data.ownerUid == request.auth.uid
+          )
         );
     }
 
