@@ -315,7 +315,43 @@ service cloud.firestore {
         && !exists(/databases/$(database)/documents/customers/$(phoneNumber))
         && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid));
       allow create: if signedIn()
-        && phoneNumber.matches('^[0-9]{10}
+        && phoneNumber.matches('^[0-9]{10}$')
+        && request.resource.data.keys().hasOnly([
+          "phone", "name", "uid", "email", "registered",
+          "claimCode", "createdByShopId", "createdByShopName",
+          "createdAt", "updatedAt"
+        ])
+        && request.resource.data.phone == phoneNumber
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.uid is string
+        && request.resource.data.registered is bool
+        && (!("email" in request.resource.data)
+          || (request.resource.data.email is string
+            && request.resource.data.email.size() <= 254))
+        && (!("createdAt" in request.resource.data)
+          || request.resource.data.createdAt is timestamp)
+        && (!("updatedAt" in request.resource.data)
+          || request.resource.data.updatedAt is timestamp)
+        && (
+          // A customer may create only their own signed-in profile.
+          (request.resource.data.uid == request.auth.uid
+            && request.resource.data.registered == true
+            && !("claimCode" in request.resource.data)
+            && !("createdByShopId" in request.resource.data)
+            && !exists(/databases/$(database)/documents/customers/$(phoneNumber)))
+          // A shop may create a walk-in customer record only for its own shop.
+          || (request.resource.data.uid == ""
+            && request.resource.data.registered == false
+            && request.resource.data.claimCode is string
+            && request.resource.data.claimCode.matches("^[0-9]{8}$")
+            && request.resource.data.createdByShopId is string
+            && request.resource.data.createdByShopName is string
+            && request.resource.data.createdByShopName.size() <= 120
+            && ownsShop(request.resource.data.createdByShopId)
+            && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)))
+        );
       // Shop owners can issue a one-time code only for their own unclaimed walk-in record.
       allow update: if (
           signedIn() && resource.data.uid == "" && resource.data.registered == false
