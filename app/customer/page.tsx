@@ -41,10 +41,11 @@ export default function CustomerPage() {
       if (!db) { setLoading(false); return; }
       try {
         const existing = await getDocs(query(collection(db, "customers"), where("uid", "==", u.uid)));
+        const linkedPhone = existing.empty ? "" : String(existing.docs[0].data().phone || "");
         if (!existing.empty) {
           const profile = existing.docs[0].data();
           setName(String(profile.name || u.displayName || ""));
-          setPhone(String(profile.phone || ""));
+          setPhone(linkedPhone);
         }
         const [salesResult, ordersResult] = await Promise.all([
           getDocs(query(collection(db, "sales"), where("customerUid", "==", u.uid))),
@@ -80,7 +81,13 @@ export default function CustomerPage() {
         registered: true, updatedAt: serverTimestamp(),
       }, { merge: true });
       setPhone(digits);
-      setNotice("आपकी जानकारी सेव हो गई।");
+      const [salesResult, ordersResult] = await Promise.all([
+        getDocs(query(collection(db, "sales"), where("customerUid", "==", user.uid))),
+        getDocs(query(collection(db, "orders"), where("customerUid", "==", user.uid))),
+      ]);
+      setSales(salesResult.docs.map((d) => ({ id: d.id, ...d.data() } as Sale)));
+      setOnlineOrders(ordersResult.docs.map((d) => ({ id: d.id, ...d.data() } as OnlineOrder)));
+      setNotice("आपकी जानकारी सेव हो गई। अब इस मोबाइल नंबर पर बनने वाले बिल आपके खाते में दिखेंगे।");
     } catch (e) {
       const detail = e instanceof Error ? e.message : "";
       setError(detail.toLowerCase().includes("permission")
@@ -134,7 +141,7 @@ export default function CustomerPage() {
         </div>
         <p className="admin-muted">Online Orders और दुकान पर बने Bills — सभी दुकानों की खरीदारी नई से पुरानी तारीख के क्रम में।</p>
         {loading ? <p className="admin-muted">खरीदारी लोड हो रही है…</p> :
-          purchases.length === 0 ? <p className="admin-muted">अभी कोई खरीदारी दर्ज नहीं है। खरीदारी करने के बाद उसका रिकॉर्ड यहाँ दिखेगा।</p> :
+          purchases.length === 0 ? <p className="admin-muted">अभी कोई खरीदारी दर्ज नहीं है। मोबाइल नंबर सेव करने के बाद बनने वाले बिल यहाँ दिखेंगे। पुराने बिना अकाउंट वाले बिल अपने-आप नहीं जुड़ेंगे।</p> :
           <div className="admin-table-wrap">
             <table className="admin-table">
               <thead><tr><th>दुकान / सामान</th><th>प्रकार</th><th>कुल</th><th>स्थिति</th><th>पेमेंट</th><th>तारीख और समय</th></tr></thead>

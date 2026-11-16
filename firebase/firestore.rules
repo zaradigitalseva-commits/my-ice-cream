@@ -32,6 +32,16 @@ service cloud.firestore {
         );
     }
 
+    // Customer phone lookup is available only to a verified owner lock that
+    // still points to a shop the signed-in account owns.
+    function canLookupCustomerByPhone() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid))
+        && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.ownerUid == request.auth.uid
+        && get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId is string
+        && ownsShop(get(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)).data.shopId);
+    }
+
     function validSubscription(shopData) {
       return shopData.subscriptionStatus == "active"
         && shopData.subscriptionExpiresAt is timestamp
@@ -302,48 +312,49 @@ service cloud.firestore {
     }
 
     match /customers/{phoneNumber} {
-      // Admins can read the complete customer collection for the dashboard.
-      // Customers and shop owners remain limited to their own related records.
-      allow read: if isAdmin()
+      // A customer can read only their own profile. Shop owners can look up
+      // one exact phone number, but cannot list the customer directory.
+      allow get: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid)
-        || (signedIn()
-          && resource.data.createdByShopId is string
-          && ownsShop(resource.data.createdByShopId));
+        || canLookupCustomerByPhone();
+      allow list: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
 
-      // Shop owners may check a not-yet-created phone record during customer creation.
-      allow get: if signedIn()
-        && !exists(/databases/$(database)/documents/customers/$(phoneNumber))
-        && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid));
+      // Only the signed-in customer can register an unused phone number.
       allow create: if signedIn()
         && phoneNumber.matches('^[0-9]{10}$')
+        && request.resource.data.keys().hasOnly([
+          "phone", "name", "uid", "email", "registered", "createdAt", "updatedAt"
+        ])
         && request.resource.data.phone == phoneNumber
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
-        && (
-          (request.resource.data.uid == request.auth.uid
-            && !exists(/databases/$(database)/documents/customers/$(phoneNumber)))
-          || (request.resource.data.uid == ""
-            && request.resource.data.registered == false
-            && request.resource.data.createdByShopId is string
-            && ownsShop(request.resource.data.createdByShopId)
-            && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)))
-        );
-      // A phone number entered by itself is not proof of ownership.
-      // Existing shop-created customer records cannot be claimed by a Google account.
-      // Only the account already linked to this record may update its profile.
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.registered == true
+        && (!("email" in request.resource.data)
+          || (request.resource.data.email is string
+            && request.resource.data.email.size() <= 254))
+        && (!("createdAt" in request.resource.data)
+          || request.resource.data.createdAt is timestamp)
+        && (!("updatedAt" in request.resource.data)
+          || request.resource.data.updatedAt is timestamp)
+        && !exists(/databases/$(database)/documents/customers/$(phoneNumber));
+
+      // Phone numbers cannot be transferred to another Google account.
       allow update: if signedIn()
         && resource.data.uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.phone == resource.data.phone
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["name", "email", "updatedAt", "registered"]);
+          .hasOnly(["name", "email", "updatedAt", "registered"])
+        && request.resource.data.registered == true;
       allow delete: if isAdmin();
     }
     match /sales/{saleId} {
       allow read: if isAdmin()
         || (signedIn() && resource.data.customerUid == request.auth.uid)
-        || (signedIn() && resource.data.ownerUid == request.auth.uid
-          && ownsShop(resource.data.shopId));
+        || (signedIn() && resource.data.ownerUid == request.auth.uid && ownsShop(resource.data.shopId));
 
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
@@ -357,8 +368,11 @@ service cloud.firestore {
         && liveShop(request.resource.data.shopId)
         && request.resource.data.customerPhone is string
         && request.resource.data.customerPhone.matches('^[0-9]{10}$')
-        && request.resource.data.customerUid
-          == get(/databases/$(database)/documents/customers/$(request.resource.data.customerPhone)).data.uid
+        && request.resource.data.customerUid is string
+        && request.resource.data.customerUid.size() > 0
+        && exists(/databases/$(database)/documents/customers/$(request.resource.data.customerPhone))
+        && get(/databases/$(database)/documents/customers/$(request.resource.data.customerPhone)).data.uid == request.resource.data.customerUid
+        && get(/databases/$(database)/documents/customers/$(request.resource.data.customerPhone)).data.registered == true
         && request.resource.data.shopName is string
         && request.resource.data.customerName is string
         && validSaleItems(request.resource.data.shopId, request.resource.data.items)
