@@ -660,6 +660,13 @@ service cloud.firestore {
         && ownsShop(resource.data.shopId));
     }
 
+    // Collection-group queries need a recursive rule for the adminNotices group.
+    // Only verified Admin accounts may list notices across all shops.
+    // Per-shop reads remain governed by the more specific shop rule above.
+    match /{path=**}/adminNotices/{noticeId} {
+      allow list: if isAdmin();
+    }
+
     match /siteSettings/{settingId} {
       allow read: if settingId == "branding";
       allow write: if isAdmin() && settingId == "branding";
