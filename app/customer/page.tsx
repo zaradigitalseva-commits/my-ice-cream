@@ -2,9 +2,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
 type Item = { name: string; quantity: number; price?: number };
@@ -27,6 +27,7 @@ export default function CustomerPage() {
   const [onlineOrders, setOnlineOrders] = useState<OnlineOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
@@ -36,7 +37,7 @@ export default function CustomerPage() {
     if (!auth) { setLoading(false); return; }
     return onAuthStateChanged(auth, async (u) => {
       setUser(u?.isAnonymous ? null : u);
-      if (!u || u.isAnonymous) { router.replace("/"); return; }
+      if (!u || u.isAnonymous) { setLoading(false); return; }
       if (isAdminEmail(u.email) && u.emailVerified) { router.replace("/admin"); return; }
       if (!db) { setLoading(false); return; }
       try {
@@ -60,6 +61,18 @@ export default function CustomerPage() {
       }
     });
   }, [router]);
+
+  async function handleGoogleSignIn() {
+    if (!auth) { setError("अभी Google Login उपलब्ध नहीं है। कृपया बाद में प्रयास करें।"); return; }
+    setSigningIn(true); setError("");
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Google Login पूरा नहीं हो सका।");
+    } finally {
+      setSigningIn(false);
+    }
+  }
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -113,6 +126,22 @@ export default function CustomerPage() {
       status: "बिल", paymentStatus: s.paymentStatus || "unpaid", createdAt: s.createdAt,
     })),
   ].sort((a, b) => (dateValue(b.createdAt)?.getTime() || 0) - (dateValue(a.createdAt)?.getTime() || 0));
+
+  if (!loading && !user) {
+    return (
+      <main className="admin-wrap">
+        <header className="admin-header"><Link href="/" className="admin-brand">🍦 MY ICE CREAM <span>CUSTOMER</span></Link></header>
+        <section className="admin-panel">
+          <p className="admin-kicker">CUSTOMER ACCOUNT</p>
+          <h1>Customer Dashboard</h1>
+          <p>अपनी खरीदारी और ग्राहक जानकारी देखने के लिए Google से Login करें।</p>
+          {error && <p className="admin-error">{error}</p>}
+          <button className="admin-primary" onClick={handleGoogleSignIn} disabled={signingIn}>{signingIn ? "Login हो रहा है…" : "Google से Login करें"}</button>
+          <Link href="/" className="admin-secondary role-link">वापस Home पर जाएँ</Link>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="admin-wrap">
