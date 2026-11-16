@@ -125,6 +125,52 @@ test("a shop owner cannot change admin-controlled shop status", async () => {
   }, { merge: true }));
 });
 
+
+test("a customer can submit a UPI order with a valid payment UTR while it remains unpaid", async () => {
+  await seed();
+  const db = testEnv.authenticatedContext("customer-1").firestore();
+  await assertSucceeds(setDoc(doc(db, "orders/upi-order"), {
+    shopId: "shop1",
+    shopName: "Test Ice Cream",
+    deliveryFee: 0,
+    subtotal: 30,
+    customerUid: "customer-1",
+    customerName: "Customer One",
+    customerEmail: "customer@example.com",
+    customerPhone: "9000000001",
+    fulfillmentType: "pickup",
+    deliveryAddress: "",
+    items: [{ productId: "product1", name: "Butter Scotch", price: 30, quantity: 1 }],
+    total: 30,
+    status: "placed",
+    paymentStatus: "unpaid",
+    paymentUtr: "123456789012",
+    createdAt: new Date(),
+  }));
+});
+
+test("a customer cannot submit an online order without a payment UTR", async () => {
+  await seed();
+  const db = testEnv.authenticatedContext("customer-1").firestore();
+  await assertFails(setDoc(doc(db, "orders/missing-utr"), {
+    shopId: "shop1",
+    shopName: "Test Ice Cream",
+    deliveryFee: 0,
+    subtotal: 30,
+    customerUid: "customer-1",
+    customerName: "Customer One",
+    customerEmail: "customer@example.com",
+    customerPhone: "9000000001",
+    fulfillmentType: "pickup",
+    deliveryAddress: "",
+    items: [{ productId: "product1", name: "Butter Scotch", price: 30, quantity: 1 }],
+    total: 30,
+    status: "placed",
+    paymentStatus: "unpaid",
+    createdAt: new Date(),
+  }));
+});
+
 test("an online order with a forged product price is rejected", async () => {
   await seed();
   const db = testEnv.authenticatedContext("customer-1").firestore();
