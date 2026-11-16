@@ -332,6 +332,10 @@ export default function ShopPage() {
     const discount = Math.min(subtotal, discountType === "percent" ? subtotal*Math.min(rawDiscount,100)/100 : rawDiscount);
     const total = Math.max(0,subtotal-discount);
     setCustomerBusy(true); setCustomerMessage("");
+    // Open a blank tab directly from the button click so the browser does not
+    // block WhatsApp after the Firestore save finishes asynchronously.
+    const whatsappWindow = window.open("about:blank", "_blank");
+    const billCreatedAt = new Date();
     try {
       const saleRef = doc(collection(firestore, "sales"));
       const productRefs = items.map((item) => ({
@@ -365,14 +369,35 @@ export default function ShopPage() {
       });
 
       const lines = items.map(i=>i.name+" x "+i.quantity+" = ₹"+(i.price*i.quantity).toFixed(2)).join("\n");
-      const message = "MY ICE CREAM BILL\n"+(shop.name||shop.shopName||"Shop")+"\nCustomer: "+(customer.name||customer.phone)+"\n"+lines+"\nSubtotal: ₹"+subtotal.toFixed(2)+"\nDiscount: ₹"+discount.toFixed(2)+"\nTotal: ₹"+total.toFixed(2)+"\nPayment: "+salePayment+"\nBill: "+saleRef.id;
+      const billDateTime = billCreatedAt.toLocaleString("hi-IN");
+      const message = "🍦 MY ICE CREAM BILL\n"+
+        "दुकान: "+(shop.name||shop.shopName||"Shop")+"\n"+
+        "ग्राहक: "+(customer.name||customer.phone)+"\n"+
+        "मोबाइल: "+customer.phone+"\n"+
+        "तारीख और समय: "+billDateTime+"\n\n"+
+        "सामान:\n"+lines+"\n\n"+
+        "Subtotal: ₹"+subtotal.toFixed(2)+"\n"+
+        "Discount: ₹"+discount.toFixed(2)+"\n"+
+        "Total: ₹"+total.toFixed(2)+"\n"+
+        "Payment: "+(salePayment==="paid"?"Paid":"Unpaid")+"\n"+
+        "Bill ID: "+saleRef.id;
       const billWhatsAppUrl = "https://wa.me/91"+customer.phone+"?text="+encodeURIComponent(message);
       setWhatsAppUrl(billWhatsAppUrl);
-      window.open(billWhatsAppUrl,"_blank","noopener,noreferrer");
-      setCustomerMessage("बिल सेव हो गया। WhatsApp share window खुल गई है।");
-      setCustomerOrders(current=>[{id:saleRef.id,customerName:customer.name,customerPhone:customer.phone,total,items,paymentStatus:salePayment},...current]);
+      if (whatsappWindow) {
+        whatsappWindow.location.href = billWhatsAppUrl;
+        setCustomerMessage("बिल सेव हो गया। WhatsApp में तैयार संदेश खुल गया है। भेजने के लिए Send दबाएँ।");
+      } else {
+        setCustomerMessage("बिल सेव हो गया। नीचे WhatsApp पर बिल भेजें लिंक दबाएँ।");
+      }
+      setCustomerOrders(current=>[{
+        id:saleRef.id,customerName:customer.name,customerPhone:customer.phone,total,items,
+        paymentStatus:salePayment,createdAt:{toDate:()=>billCreatedAt},
+      },...current]);
       setSaleQty({});setDiscountValue("0");
-    } catch(e) { setCustomerMessage(e instanceof Error?e.message:"बिल सेव नहीं हो सका।"); }
+    } catch(e) {
+      if (whatsappWindow && !whatsappWindow.closed) whatsappWindow.close();
+      setCustomerMessage(e instanceof Error?e.message:"बिल सेव नहीं हो सका।");
+    }
     finally { setCustomerBusy(false); }
   }
 
@@ -715,7 +740,11 @@ export default function ShopPage() {
           {!customerFound && customerPhone.length===10 && customerMessage.includes("नया ग्राहक जोड़") && <form className="register-form" onSubmit={createCustomerRecord}><label>ग्राहक का नाम<input required value={newCustomerName} onChange={e=>setNewCustomerName(e.target.value)} placeholder="ग्राहक का नाम" /></label><button className="admin-primary" disabled={customerLoading}>{customerLoading?"सेव हो रहा है…":"नया ग्राहक सेव करें"}</button></form>}\n          {customerFound && customer && <>
             <h3>{customer.name || "ग्राहक"} · {customer.phone}</h3>{!customer.registered && <p className="admin-muted">यह रिकॉर्ड दुकानदार ने बनाया है। ग्राहक ने अभी ऐप से अकाउंट link नहीं किया है।</p>}\n            <button type="button" className="admin-primary" onClick={sendOfferOnWhatsApp}>WhatsApp पर ऑफर भेजें</button>
             <h3>इस दुकान की पुरानी खरीदारी</h3>
-            {customerOrders.length===0?<p className="admin-muted">इस दुकान से अभी कोई खरीदारी नहीं हुई।</p>:customerOrders.map(o=><p key={o.id}>{(o.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")} · ₹{Number(o.total||0).toFixed(2)} · {o.paymentStatus||"unpaid"}</p>)}
+            {customerOrders.length===0?<p className="admin-muted">इस दुकान से अभी कोई खरीदारी नहीं हुई।</p>:customerOrders.map(o=><p key={o.id}>
+              <strong>{o.createdAt?.toDate?o.createdAt.toDate().toLocaleString("hi-IN"):"तारीख उपलब्ध नहीं"}</strong>
+              <br/>{(o.items||[]).map(i=>i.name+" × "+i.quantity).join(", ")} · ₹{Number(o.total||0).toFixed(2)} · {o.paymentStatus==="paid"?"Paid":"Unpaid"}
+              <br/><small>Bill ID: {o.id}</small>
+            </p>)}
             <h3>नया बिल</h3>
             <div className="register-form">
               {products.filter(p=>p.active!==false).map(p=><label key={p.id}>{p.name} · ₹{Number(p.price||0).toFixed(2)}<input type="number" min="0" step="1" value={saleQty[p.id]||0} onChange={e=>setSaleQty(v=>({...v,[p.id]:Math.max(0,Number(e.target.value)||0)}))}/></label>)}
