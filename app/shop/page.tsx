@@ -10,7 +10,7 @@ import { compressImageToWebP } from "@/lib/image-compression";
 
 type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
 type Order = { id: string; shopName?: string; customerName?: string; customerPhone?: string; deliveryAddress?: string; fulfillmentType?: "pickup" | "delivery"; items?: { name: string; quantity: number; price?: number }[]; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
-type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean; claimCode?: string };
+type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean; claimCode?: string; createdByShopId?: string };
 type CustomerOrder = { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
 type SubscriptionPayment = { id: string; amount?: number; paymentType?: string; utr?: string; status?: string; createdAt?: { toDate?: () => Date } };
@@ -268,7 +268,7 @@ export default function ShopPage() {
       const customerSnap = await getDoc(doc(db, "customers", digits));
       if (!customerSnap.exists()) { setCustomerMessage("इस नंबर का रिकॉर्ड नहीं मिला। नीचे नाम भरकर नया ग्राहक जोड़ सकते हैं।"); return; }
       const data = customerSnap.data();
-      setCustomer({ id: customerSnap.id, phone: digits, uid: String(data.uid || ""), name: String(data.name || ""), registered: Boolean(data.uid), claimCode: String(data.claimCode || "") });
+      setCustomer({ id: customerSnap.id, phone: digits, uid: String(data.uid || ""), name: String(data.name || ""), registered: Boolean(data.uid), claimCode: String(data.claimCode || ""), createdByShopId: String(data.createdByShopId || "") });
       setCustomerFound(true);
       const salesResult = await getDocs(query(collection(db, "sales"), where("shopId", "==", shop.id), where("ownerUid", "==", user?.uid || ""), where("customerPhone", "==", digits)));
       setCustomerOrders(salesResult.docs.map(d => ({ id:d.id, ...d.data() } as CustomerOrder)).sort((x,y)=>(y.createdAt?.toDate?.().getTime()||0)-(x.createdAt?.toDate?.().getTime()||0)));
@@ -292,7 +292,7 @@ export default function ShopPage() {
       if (existing.exists()) throw new Error("यह मोबाइल नंबर पहले से दर्ज है। ग्राहक खोजें।");
       const claimCode = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, "0");
       await setDoc(ref, { phone: digits, name: newCustomerName.trim(), uid: "", registered: false, claimCode, createdByShopId: shop.id, createdByShopName: shop.name || shop.shopName || "", createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-      setCustomer({ id: digits, phone: digits, uid: "", name: newCustomerName.trim(), registered: false, claimCode });
+      setCustomer({ id: digits, phone: digits, uid: "", name: newCustomerName.trim(), registered: false, claimCode, createdByShopId: shop.id });
       setCustomerFound(true);
       setCustomerMessage("ग्राहक रिकॉर्ड बन गया। ग्राहक को ऐप install करना जरूरी नहीं है।");
     } catch (e) { setCustomerMessage(e instanceof Error ? e.message : "ग्राहक रिकॉर्ड नहीं बन सका।"); }
@@ -300,7 +300,7 @@ export default function ShopPage() {
   }
 
   async function generateCustomerClaimCode() {
-    if (!db || !shop || !user || !customer || customer.registered) return;
+    if (!db || !shop || !user || !customer || customer.registered || customer.createdByShopId !== shop.id) return;
     setCustomerLoading(true); setCustomerMessage("");
     try {
       const claimCode = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, "0");
