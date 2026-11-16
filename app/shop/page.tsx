@@ -9,7 +9,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
 type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
-type Order = { id: string; shopName?: string; customerName?: string; customerPhone?: string; deliveryAddress?: string; fulfillmentType?: "pickup" | "delivery"; items?: { name: string; quantity: number; price?: number }[]; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
+type Order = { id: string; shopName?: string; customerName?: string; customerEmail?: string; customerUid?: string; customerPhone?: string; deliveryAddress?: string; fulfillmentType?: "pickup" | "delivery"; items?: { name: string; quantity: number; price?: number }[]; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
 type Customer = { id: string; phone: string; uid: string; name?: string; email?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; orderType?: "sale" | "online"; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; subtotal?: number; discount?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number; price?: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
@@ -282,8 +282,8 @@ export default function ShopPage() {
         setCustomerMessage("इस मोबाइल नंबर से इस दुकान पर अभी कोई ऑर्डर या खरीदारी नहीं मिली।");
         return;
       }
-      const customerUid = String(profile.uid || (matchedOrder as any)?.customerUid || "");
-      const customerEmail = String(profile.email || (matchedOrder as any)?.customerEmail || "");
+      const customerUid = String(profile.uid || matchedOrder?.customerUid || "");
+      const customerEmail = String(profile.email || matchedOrder?.customerEmail || "");
       const customerDisplayName = String(profile.name || matchedOrder?.customerName || "");
       setCustomer({
         id: digits,
