@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
@@ -31,6 +31,8 @@ export default function CustomerPage() {
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [claimPhone, setClaimPhone] = useState("");
+  const [claimCode, setClaimCode] = useState("");
 
   useEffect(() => {
     if (!auth) { setLoading(false); return; }
@@ -59,6 +61,27 @@ export default function CustomerPage() {
       }
     });
   }, [router]);
+
+  async function claimPreviousBills(e: React.FormEvent) {
+    e.preventDefault();
+    if (!db || !user) return;
+    const digits = claimPhone.replace(/\\D/g, "");
+    const code = claimCode.replace(/\\D/g, "");
+    if (!/^\\d{10}$/.test(digits) || !/^\\d{8}$/.test(code)) { setError("10 अंकों का मोबाइल नंबर और 8 अंकों का Claim Code भरें।"); return; }
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await updateDoc(doc(db, "customers", digits), { uid: user.uid, registered: true, email: user.email || "", claimCode: code, claimCodeUsed: true, claimedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      setPhone(digits); setClaimPhone(digits); setClaimCode("");
+      const [salesResult, ordersResult] = await Promise.all([
+        getDocs(query(collection(db, "sales"), where("customerPhone", "==", digits))),
+        getDocs(query(collection(db, "orders"), where("customerUid", "==", user.uid))),
+      ]);
+      setSales(salesResult.docs.map((d) => ({ id: d.id, ...d.data() } as Sale)));
+      setOnlineOrders(ordersResult.docs.map((d) => ({ id: d.id, ...d.data() } as OnlineOrder)));
+      setNotice("पुराने दुकान के बिल आपके अकाउंट से सुरक्षित रूप से जुड़ गए।");
+    } catch { setError("Claim Code गलत, इस्तेमाल हो चुका, या इस रिकॉर्ड के लिए उपलब्ध नहीं है। दुकान से नया कोड लें।"); }
+    finally { setSaving(false); }
+  }
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -122,6 +145,13 @@ export default function CustomerPage() {
           <label>आपका नाम<input required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label>10 अंकों का मोबाइल नंबर<input required inputMode="numeric" maxLength={10} value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} /></label>
           <button className="admin-primary" disabled={saving}>{saving ? "सेव हो रहा है…" : "जानकारी सेव करें"}</button>
+        </form>
+        <form className="register-form" onSubmit={claimPreviousBills}>
+          <h3>दुकान के पुराने बिल जोड़ें</h3>
+          <p className="admin-muted">दुकानदार से मिला 8 अंकों का Claim Code और वही मोबाइल नंबर भरें। कोड एक बार ही इस्तेमाल होगा।</p>
+          <label>मोबाइल नंबर<input required inputMode="numeric" maxLength={10} value={claimPhone} onChange={(e) => setClaimPhone(e.target.value.replace(/\\D/g, "").slice(0, 10))} /></label>
+          <label>8 अंकों का Claim Code<input required inputMode="numeric" maxLength={8} value={claimCode} onChange={(e) => setClaimCode(e.target.value.replace(/\\D/g, "").slice(0, 8))} /></label>
+          <button className="admin-primary" disabled={saving || claimPhone.length !== 10 || claimCode.length !== 8}>{saving ? "जोड़ रहे हैं…" : "पुराने बिल जोड़ें"}</button>
         </form>
         {error && <p className="admin-error">{error}</p>}
         {notice && <p className="admin-success">{notice}</p>}
