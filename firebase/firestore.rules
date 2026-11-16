@@ -465,7 +465,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           "shopId", "shopName", "deliveryFee", "subtotal", "customerUid",
           "customerName", "customerEmail", "customerPhone", "fulfillmentType",
-          "deliveryAddress", "items", "total", "status", "paymentStatus", "createdAt"
+          "deliveryAddress", "items", "total", "status", "paymentStatus", "paymentUtr", "createdAt"
         ])
         && request.resource.data.customerUid == request.auth.uid
         && request.resource.data.shopName is string
@@ -478,6 +478,8 @@ service cloud.firestore {
         && request.resource.data.customerPhone.matches('^[0-9]{10}$')
         && request.resource.data.status == "placed"
         && request.resource.data.paymentStatus == "unpaid"
+        && request.resource.data.paymentUtr is string
+        && request.resource.data.paymentUtr.matches("^[A-Z0-9]{6,40}$")
         && request.resource.data.shopId is string
         && liveShop(request.resource.data.shopId)
         && request.resource.data.fulfillmentType in ["pickup", "delivery"]
