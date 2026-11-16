@@ -328,22 +328,37 @@ service cloud.firestore {
             && ownsShop(request.resource.data.createdByShopId)
             && exists(/databases/$(database)/documents/shopOwnerLocks/$(request.auth.uid)))
         );
-      // A phone number entered by itself is not proof of ownership.
-      // Existing shop-created customer records cannot be claimed by a Google account.
-      // Only the account already linked to this record may update its profile.
-      allow update: if signedIn()
-        && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.phone == resource.data.phone
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["name", "email", "updatedAt", "registered"]);
+      // Shop owners can issue a one-time code only for their own unclaimed walk-in record.
+      allow update: if (
+          signedIn() && resource.data.uid == "" && resource.data.registered == false
+          && resource.data.createdByShopId is string && ownsShop(resource.data.createdByShopId)
+          && request.resource.data.uid == ""
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["claimCode", "claimCodeCreatedAt", "claimCodeCreatedByShopId", "updatedAt"])
+          && request.resource.data.claimCode is string && request.resource.data.claimCode.matches("^[0-9]{8}$")
+          && request.resource.data.claimCodeCreatedByShopId == resource.data.createdByShopId
+          && request.resource.data.claimCodeCreatedAt is timestamp
+        ) || (
+          signedIn() && resource.data.uid == "" && resource.data.registered == false
+          && resource.data.claimCode is string && request.resource.data.claimCode == resource.data.claimCode
+          && request.resource.data.claimCodeUsed == true && request.resource.data.uid == request.auth.uid
+          && request.resource.data.registered == true && request.resource.data.phone == resource.data.phone
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["uid", "registered", "email", "claimCodeUsed", "claimedAt", "updatedAt"])
+          && request.resource.data.claimedAt is timestamp
+        ) || (
+          signedIn() && resource.data.uid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.phone == resource.data.phone
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["name", "email", "updatedAt", "registered"])
+        );
       allow delete: if isAdmin();
     }
     match /sales/{saleId} {
       allow read: if isAdmin()
         || (signedIn() && resource.data.customerUid == request.auth.uid)
-        || (signedIn() && resource.data.ownerUid == request.auth.uid
-          && ownsShop(resource.data.shopId));
+        || (signedIn() && resource.data.customerPhone is string
+          && exists(/databases/$(database)/documents/customers/$(resource.data.customerPhone))
+          && get(/databases/$(database)/documents/customers/$(resource.data.customerPhone)).data.uid == request.auth.uid)
+        || (signedIn() && resource.data.ownerUid == request.auth.uid && ownsShop(resource.data.shopId));
 
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
