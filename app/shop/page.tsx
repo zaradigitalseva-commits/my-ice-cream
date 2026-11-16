@@ -10,7 +10,7 @@ import { compressImageToWebP } from "@/lib/image-compression";
 
 type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
 type Order = { id: string; shopName?: string; customerName?: string; customerPhone?: string; deliveryAddress?: string; fulfillmentType?: "pickup" | "delivery"; items?: { name: string; quantity: number; price?: number }[]; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
-type Customer = { id: string; phone: string; uid: string; name?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
+type Customer = { id: string; phone: string; uid: string; name?: string; email?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; orderType?: "sale" | "online"; customerName?: string; customerEmail?: string; customerPhone?: string; deliveryAddress?: string; total?: number; subtotal?: number; discount?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number; price?: number }[] };
 type Product = { id: string; name?: string; description?: string; price?: number; originalPrice?: number; category?: string; imageUrl?: string; active?: boolean };
 type SubscriptionPayment = { id: string; amount?: number; paymentType?: string; utr?: string; status?: string; createdAt?: { toDate?: () => Date } };
@@ -264,21 +264,38 @@ export default function ShopPage() {
     if (!/^\d{10}$/.test(digits)) { setCustomerMessage("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।"); return; }
     setCustomerLoading(true); setCustomerMessage(""); setCustomer(null); setCustomerOrders([]); setCustomerFound(false); setSaleQty({}); setWhatsAppUrl("");
     try {
-      const customerSnap = await getDoc(doc(db, "customers", digits));
-      if (!customerSnap.exists()) { setCustomerMessage("यह ग्राहक अभी पंजीकृत नहीं है। ग्राहक से पहले MY ICE CREAM में Google Login करके अपना मोबाइल नंबर सेव करवाएँ।"); return; }
-      const data = customerSnap.data();
-      if (!data.uid || data.registered !== true) { setCustomerMessage("इस नंबर का ग्राहक खाता अभी सक्रिय नहीं है। ग्राहक से पहले Google Login करके मोबाइल नंबर सेव करवाएँ।"); return; }
-      setCustomer({ id: customerSnap.id, phone: digits, uid: String(data.uid), name: String(data.name || ""), registered: true });
-      setCustomerFound(true);
-      const salesResult = await getDocs(query(collection(db, "sales"), where("shopId", "==", shop.id), where("ownerUid", "==", user?.uid || ""), where("customerPhone", "==", digits)));
+      // A customer only needs Google Login plus the phone number entered at checkout.
+      // Do not require a separate customer-profile registration before the shop can find orders.
+      const [customerSnap, salesResult] = await Promise.all([
+        getDoc(doc(db, "customers", digits)).catch(() => null),
+        getDocs(query(collection(db, "sales"), where("shopId", "==", shop.id), where("ownerUid", "==", user?.uid || ""), where("customerPhone", "==", digits))),
+      ]);
+      const profile = customerSnap?.exists() ? customerSnap.data() : {};
       // Online orders are already loaded for this authenticated shop only.
-      // Combine them with counter-sale bills so one phone search shows both.
+      // Combine them with this shop's counter-sale bills for the phone search.
       const saleRows = salesResult.docs.map(d => ({ id: d.id, ...d.data(), orderType: "sale" as const } as CustomerOrder));
       const onlineRows = orders
         .filter(order => (order.customerPhone || "").replace(/\D/g, "") === digits)
         .map(order => ({ ...order, orderType: "online" as const } as CustomerOrder));
+      const matchedOrder = onlineRows[0] || saleRows[0];
+      if (!matchedOrder && !customerSnap?.exists()) {
+        setCustomerMessage("इस मोबाइल नंबर से इस दुकान पर अभी कोई ऑर्डर या खरीदारी नहीं मिली।");
+        return;
+      }
+      const customerUid = String(profile.uid || (matchedOrder as any)?.customerUid || "");
+      const customerEmail = String(profile.email || (matchedOrder as any)?.customerEmail || "");
+      const customerDisplayName = String(profile.name || matchedOrder?.customerName || "");
+      setCustomer({
+        id: digits,
+        phone: digits,
+        uid: customerUid,
+        name: customerDisplayName,
+        email: customerEmail,
+        registered: Boolean(profile.registered),
+      });
+      setCustomerFound(true);
       setCustomerOrders([...saleRows, ...onlineRows].sort((x,y)=>(y.createdAt?.toDate?.().getTime()||0)-(x.createdAt?.toDate?.().getTime()||0)));
-      setCustomerMessage("ग्राहक मिल गया। अब बिल बना सकते हैं।");
+      setCustomerMessage("ग्राहक मिल गया। अब इस दुकान की खरीदारी और बिल देख सकते हैं।");
     } catch (e) { setCustomerMessage(e instanceof Error ? e.message : "ग्राहक की जानकारी नहीं मिल सकी।"); }
     finally { setCustomerLoading(false); }
   }
@@ -724,6 +741,7 @@ export default function ShopPage() {
           {customerMessage && <p className={customerFound?"admin-success":"admin-muted"} role="status">{customerMessage}</p>}
           {customerFound && customer && <>
             <h3>{customer.name || "ग्राहक"} · {customer.phone}</h3>
+            {customer.email && <p className="admin-muted">Google ID: {customer.email}</p>}
             <button type="button" className="admin-primary" onClick={sendOfferOnWhatsApp}>WhatsApp पर ऑफर भेजें</button>
             <h3>इस दुकान की पुरानी खरीदारी</h3>
             {customerOrders.length===0?<p className="admin-muted">इस दुकान से अभी कोई खरीदारी नहीं हुई।</p>:customerOrders.map(o=>{
