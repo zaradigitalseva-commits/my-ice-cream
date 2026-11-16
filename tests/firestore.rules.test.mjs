@@ -35,6 +35,7 @@ async function seed() {
       minimumOrder: 20,
       pickupAvailable: true,
       deliveryAvailable: false,
+      shopUpiQrDataUrl: "data:image/png;base64,AA==",
       offerTitle: "",
       offerDescription: "",
     });
@@ -130,6 +131,33 @@ test("a customer can submit a UPI order with a valid payment UTR while it remain
   await seed();
   const db = testEnv.authenticatedContext("customer-1").firestore();
   await assertSucceeds(setDoc(doc(db, "orders/upi-order"), {
+    shopId: "shop1",
+    shopName: "Test Ice Cream",
+    deliveryFee: 0,
+    subtotal: 30,
+    customerUid: "customer-1",
+    customerName: "Customer One",
+    customerEmail: "customer@example.com",
+    customerPhone: "9000000001",
+    fulfillmentType: "pickup",
+    deliveryAddress: "",
+    items: [{ productId: "product1", name: "Butter Scotch", price: 30, quantity: 1 }],
+    total: 30,
+    status: "placed",
+    paymentStatus: "unpaid",
+    paymentUtr: "123456789012",
+    createdAt: new Date(),
+  }));
+});
+
+test("a customer cannot submit an online order when the shop has no UPI QR", async () => {
+  await seed();
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await updateDoc(doc(db, "shops/shop1"), { shopUpiQrDataUrl: "" });
+  });
+  const db = testEnv.authenticatedContext("customer-1").firestore();
+  await assertFails(setDoc(doc(db, "orders/no-shop-qr"), {
     shopId: "shop1",
     shopName: "Test Ice Cream",
     deliveryFee: 0,
