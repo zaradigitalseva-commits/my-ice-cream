@@ -184,7 +184,6 @@ service cloud.firestore {
         + (items.size() > 6 ? items[6].price * items[6].quantity : 0)
         + (items.size() > 7 ? items[7].price * items[7].quantity : 0);
     }
-
     function validProduct(data, shopId) {
       return data.keys().hasOnly([
           "shopId", "ownerUid", "name", "description", "price",
@@ -364,8 +363,7 @@ service cloud.firestore {
       allow update: if signedIn()
         && resource.data.uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.phone == resource.data.phone
-        && request.resource.data.diff(resource.data).affectedKeys()
+        && request.resource.data.phone == resource.data.phone        && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(["name", "email", "updatedAt", "registered"])
         && request.resource.data.registered == true;
       allow delete: if isAdmin();
@@ -545,8 +543,7 @@ service cloud.firestore {
         );
 
       allow delete: if isAdmin();
-    }
-    match /subscriptionPayments/{paymentId} {
+    }    match /subscriptionPayments/{paymentId} {
       allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create: if signedIn()
         // Accept only the fields used by the subscription payment workflow.
@@ -729,8 +726,7 @@ service cloud.firestore {
       allow read, write: if false;
     }
   }
-}
-)
+})
         && request.resource.data.createdAt is timestamp
         && liveShop(request.resource.data.shopId)
         && request.resource.data.fulfillmentType in ["pickup", "delivery"]
@@ -789,8 +785,7 @@ service cloud.firestore {
         );
 
       allow delete: if isAdmin();
-    }
-    match /subscriptionPayments/{paymentId} {
+    }    match /subscriptionPayments/{paymentId} {
       allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow create: if signedIn()
         // Accept only the fields used by the subscription payment workflow.
