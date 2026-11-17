@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, getDocs, query, where, doc, getDoc, orderBy, limit } from "firebase/firestore/lite";
+import { collection, getDocs, query, where, doc, getDoc, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { registerPushSubscription } from "@/lib/push-client";
@@ -72,57 +72,57 @@ export default function HomePage() {
   }, [router]);
 
   useEffect(() => {
+    if (!db) { setLoadingShops(false); return; }
     let active = true;
-    if (db) getDoc(doc(db, "siteSettings", "branding")).then((snapshot) => { if (active && snapshot.exists()) setSiteLogo(String(snapshot.data().logoDataUrl || "")); }).catch(() => {});
-    async function loadLiveShops() {
-      if (!db) { setLoadingShops(false); return; }
-      const firestore = db;
-      try {
-        // Admin-approved LIVE shops include legacy records without subscription metadata.
-        const liveResult = await getDocs(query(collection(firestore, "shops"), where("status", "in", ["live", "LIVE", "Live"])));
-        if (active) {
-          const liveShops = liveResult.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
-          setShops(liveShops);
-          const groups = await Promise.all(liveShops.map(async (shop) => {
-            try {
-              const snapshot = await getDocs(query(collection(firestore, "shops", shop.id, "products"), where("active", "==", true)));
-              return { products: snapshot.docs.map((item) => ({ id: item.id, shopId: shop.id, shopName: shop.name || shop.shopName || "Ice Cream Shop", city: shop.city, ...item.data() } as MarketplaceProduct)), error: "" };
-            } catch {
-              return { products: [], error: shop.name || shop.shopName || shop.id };
-            }
-          }));
-          if (active) {
-            const newestFirst = groups.flatMap((group) => group.products).sort((a, b) => {
-              const getTime = (value: MarketplaceProduct["createdAt"]): number => {
-                if (value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function") return value.toDate().getTime();
-                if (value instanceof Date) return value.getTime();
-                if (typeof value === "number") return value;
-                if (typeof value === "string") { const parsed = new Date(value).getTime(); return Number.isNaN(parsed) ? 0 : parsed; }
-                return 0;
-              };
-              return getTime(b.createdAt) - getTime(a.createdAt);
-            });
-            setMarketProducts(newestFirst);
-            const failedShops = groups.filter((group) => group.error).map((group) => group.error);
-            setProductLoadError(failedShops.length ? "Product read permission issue for: " + failedShops.join(", ") + ". Firebase Console mein firebase/firestore.rules publish karein." : "");
-          }
-        }
-      } catch (error) {
-        if (active) setMessage(error instanceof Error ? error.message : "Shops could not be loaded.");
-      } finally {
-        if (active) setLoadingShops(false);
+    const productStops = new Map<string, () => void>();
+    const productGroups = new Map<string, MarketplaceProduct[]>();
+    const stopBranding = onSnapshot(doc(db, "siteSettings", "branding"), snap => {
+      if (active) setSiteLogo(snap.exists() ? String(snap.data().logoDataUrl || "") : "");
+    }, () => {});
+    const stopShops = onSnapshot(query(collection(db, "shops"), where("status", "in", ["live", "LIVE", "Live"])), snapshot => {
+      if (!active) return;
+      const liveShops = snapshot.docs.map(item => ({ id:item.id, ...item.data() } as Shop));
+      setShops(liveShops);
+      const ids = new Set(liveShops.map(shop => shop.id));
+      for (const [id, stop] of productStops) {
+        if (!ids.has(id)) { stop(); productStops.delete(id); productGroups.delete(id); }
       }
-    }
-    void loadLiveShops();
-    if (db) {
-      getDocs(query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(20)))
-        .then((snapshot) => {
-          if (active) setCustomerNotices(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as CustomerNotice)));
-        })
-        .catch(() => { if (active) setCustomerNotices([]); });
-    }
-    return () => { active = false; };
-  }, []);
+      for (const shop of liveShops) {
+        if (productStops.has(shop.id)) continue;
+        const stop = onSnapshot(query(collection(db, "shops", shop.id, "products"), where("active", "==", true)), productsSnapshot => {
+          if (!active) return;
+          productGroups.set(shop.id, productsSnapshot.docs.map(item => ({
+            id:item.id, shopId:shop.id, shopName:shop.name || shop.shopName || "Ice Cream Shop", city:shop.city, ...item.data()
+          } as MarketplaceProduct)));
+          const newestFirst = Array.from(productGroups.values()).flat().sort((x,y) => {
+            const time = (value: MarketplaceProduct["createdAt"]): number => {
+              if (value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function") return value.toDate().getTime();
+              if (value instanceof Date) return value.getTime();
+              if (typeof value === "number") return value;
+              if (typeof value === "string") { const parsed = new Date(value).getTime(); return Number.isNaN(parsed) ? 0 : parsed; }
+              return 0;
+            };
+            return time(y.createdAt)-time(x.createdAt);
+          });
+          setMarketProducts(newestFirst);
+          setProductLoadError("");
+        }, () => {
+          if (active) setProductLoadError("कुछ दुकानों के Products लाइव अपडेट नहीं हो सके।");
+        });
+        productStops.set(shop.id, stop);
+      }
+      setLoadingShops(false);
+    }, error => {
+      if (active) { setMessage(error.message || "Shops could not be loaded."); setLoadingShops(false); }
+    });
+    const stopNotices = onSnapshot(query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(20)), snapshot => {
+      if (active) setCustomerNotices(snapshot.docs.map(item => ({ id:item.id, ...item.data() } as CustomerNotice)));
+    }, () => { if (active) setCustomerNotices([]); });
+    return () => {
+      active = false; stopBranding(); stopShops(); stopNotices();
+      productStops.forEach(stop => stop()); productStops.clear();
+    };
+
 
   useEffect(() => {
     try {
