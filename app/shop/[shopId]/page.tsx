@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
+import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
 type Shop={id:string;name?:string;shopName?:string;city?:string;address?:string;phone?:string;description?:string;offerTitle?:string;offerDescription?:string;offerExpiresAt?:string;scrollingText?:string;bannerUrl?:string;logoUrl?:string;status?:string;pickupAvailable?:boolean;deliveryAvailable?:boolean;openingTime?:string;closingTime?:string;closedDays?:string[];manualClosed?:boolean;deliveryFee?:number;minimumOrder?:number};
@@ -15,7 +15,19 @@ export default function ShopDetailsPage(){
  const [phone,setPhone]=useState(""); const [customerName,setCustomerName]=useState(""); const [address,setAddress]=useState(""); const [fulfillmentType,setFulfillmentType]=useState<"pickup"|"delivery">("pickup"); const [busy,setBusy]=useState(false); const [signingIn,setSigningIn]=useState(false); const [message,setMessage]=useState("");
  useEffect(()=>{if(!auth)return;return onAuthStateChanged(auth,setUser)},[]);
  useEffect(()=>{if(!selectedProductId||!products.some(p=>p.id===selectedProductId))return;const target=document.getElementById("product-"+selectedProductId);target?.scrollIntoView({behavior:"smooth",block:"center"});},[selectedProductId,products]);
- useEffect(()=>{let active=true; async function load(){if(!db)return;try{const s=await getDoc(doc(db,"shops",shopId));if(!s.exists()||!["live","LIVE","Live"].includes(String(s.data().status||""))){setMessage("This shop is not available.");return;}const p=await getDocs(query(collection(db,"shops",shopId,"products"),where("active","==",true)));if(active){setShop({id:s.id,...s.data()} as Shop);setProducts(p.docs.map(x=>({id:x.id,...x.data()} as Product)));}}catch(e){setMessage(e instanceof Error?e.message:"Could not load shop.");}}void load();return()=>{active=false}},[shopId]);
+ useEffect(()=>{
+  if(!db)return;
+  let stopProducts:(()=>void)|undefined;
+  const stopShop=onSnapshot(doc(db,"shops",shopId),snap=>{
+   if(!snap.exists()||!["live","LIVE","Live"].includes(String(snap.data().status||""))){
+    setShop(null);setProducts([]);setMessage("This shop is not available.");stopProducts?.();return;
+   }
+   setMessage("");setShop({id:snap.id,...snap.data()} as Shop);
+   stopProducts?.();
+   stopProducts=onSnapshot(query(collection(db,"shops",shopId,"products"),where("active","==",true)),p=>setProducts(p.docs.map(x=>({id:x.id,...x.data()} as Product))),err=>setMessage("Products live update नहीं हो सके: "+err.message));
+  },err=>setMessage(err.message||"Could not load shop."));
+  return()=>{stopShop();stopProducts?.();};
+ },[shopId]);
  const searchResults=useMemo(()=>{const term=productSearch.trim().toLocaleLowerCase();if(!term)return [];return products.filter(p=>[p.name,p.category,p.description].some(value=>String(value||"").toLocaleLowerCase().includes(term))).slice(0,8);},[products,productSearch]); // Suggestions are built automatically from this shop\u2019s active products.
  const subtotal=useMemo(()=>products.reduce((sum,p)=>sum+(cart[p.id]||0)*Number(p.price||0),0),[products,cart]);
  const deliveryFee=fulfillmentType==="delivery"?Number(shop?.deliveryFee||0):0;
