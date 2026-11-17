@@ -122,7 +122,7 @@ export default function HomePage() {
       active = false; stopBranding(); stopShops(); stopNotices();
       productStops.forEach(stop => stop()); productStops.clear();
     };
-
+  }, []);
 
   useEffect(() => {
     try {
