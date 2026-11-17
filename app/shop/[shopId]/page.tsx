@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, type User } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, where } from "firebase/firestore";
-import { auth, db, googleProvider } from "@/lib/firebase";
+import { auth, realtimeDb as db, googleProvider } from "@/lib/firebase";
 
 type Shop={id:string;name?:string;shopName?:string;city?:string;address?:string;phone?:string;description?:string;offerTitle?:string;offerDescription?:string;offerExpiresAt?:string;scrollingText?:string;bannerUrl?:string;logoUrl?:string;status?:string;pickupAvailable?:boolean;deliveryAvailable?:boolean;openingTime?:string;closingTime?:string;closedDays?:string[];manualClosed?:boolean;deliveryFee?:number;minimumOrder?:number};
 type Product={id:string;name?:string;description?:string;price?:number;originalPrice?:number;category?:string;imageUrl?:string;active?:boolean};
