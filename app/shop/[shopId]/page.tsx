@@ -16,15 +16,15 @@ export default function ShopDetailsPage(){
  useEffect(()=>{if(!auth)return;return onAuthStateChanged(auth,setUser)},[]);
  useEffect(()=>{if(!selectedProductId||!products.some(p=>p.id===selectedProductId))return;const target=document.getElementById("product-"+selectedProductId);target?.scrollIntoView({behavior:"smooth",block:"center"});},[selectedProductId,products]);
  useEffect(()=>{
-  if(!db)return;
+  const firestore=db;if(!firestore)return;
   let stopProducts:(()=>void)|undefined;
-  const stopShop=onSnapshot(doc(db,"shops",shopId),snap=>{
+  const stopShop=onSnapshot(doc(firestore,"shops",shopId),snap=>{
    if(!snap.exists()||!["live","LIVE","Live"].includes(String(snap.data().status||""))){
     setShop(null);setProducts([]);setMessage("This shop is not available.");stopProducts?.();return;
    }
    setMessage("");setShop({id:snap.id,...snap.data()} as Shop);
    stopProducts?.();
-   stopProducts=onSnapshot(query(collection(db,"shops",shopId,"products"),where("active","==",true)),p=>setProducts(p.docs.map(x=>({id:x.id,...x.data()} as Product))),err=>setMessage("Products live update नहीं हो सके: "+err.message));
+   stopProducts=onSnapshot(query(collection(firestore,"shops",shopId,"products"),where("active","==",true)),p=>setProducts(p.docs.map(x=>({id:x.id,...x.data()} as Product))),err=>setMessage("Products live update नहीं हो सके: "+err.message));
   },err=>setMessage(err.message||"Could not load shop."));
   return()=>{stopShop();stopProducts?.();};
  },[shopId]);
