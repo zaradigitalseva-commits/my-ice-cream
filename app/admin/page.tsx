@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { collection, collectionGroup, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc, where, writeBatch, deleteDoc, limit, onSnapshot } from "firebase/firestore";
-import { auth, db, googleProvider } from "@/lib/firebase";
+import { auth, realtimeDb as db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
