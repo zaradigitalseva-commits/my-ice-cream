@@ -41,15 +41,16 @@ export default function CustomerPage() {
       setUser(u?.isAnonymous ? null : u); setSales([]); setOnlineOrders([]);
       if (!u || u.isAnonymous) { setLoading(false); return; }
       if (isAdminEmail(u.email) && u.emailVerified) { router.replace("/admin"); return; }
-      if (!db) { setLoading(false); return; }
+      const firestore = db;
+      if (!firestore) { setLoading(false); return; }
       setLoading(true); setError("");
       try {
-        const existing = await getDocs(query(collection(db, "customers"), where("uid", "==", u.uid)));
+        const existing = await getDocs(query(collection(firestore, "customers"), where("uid", "==", u.uid)));
         if (!active) return;
         if (!existing.empty) { const profile = existing.docs[0].data(); setName(String(profile.name || u.displayName || "")); setPhone(String(profile.phone || "")); }
         else setName(u.displayName || "");
-        stopSales = onSnapshot(query(collection(db, "sales"), where("customerUid", "==", u.uid)), snap => setSales(snap.docs.map(d => ({ id:d.id, ...d.data() } as Sale))), err => setError("खरीदारी लाइव अपडेट नहीं हो सकी: "+err.message));
-        stopOrders = onSnapshot(query(collection(db, "orders"), where("customerUid", "==", u.uid)), snap => setOnlineOrders(snap.docs.map(d => ({ id:d.id, ...d.data() } as OnlineOrder))), err => setError("ऑर्डर लाइव अपडेट नहीं हो सके: "+err.message));
+        stopSales = onSnapshot(query(collection(firestore, "sales"), where("customerUid", "==", u.uid)), snap => setSales(snap.docs.map(d => ({ id:d.id, ...d.data() } as Sale))), err => setError("खरीदारी लाइव अपडेट नहीं हो सकी: "+err.message));
+        stopOrders = onSnapshot(query(collection(firestore, "orders"), where("customerUid", "==", u.uid)), snap => setOnlineOrders(snap.docs.map(d => ({ id:d.id, ...d.data() } as OnlineOrder))), err => setError("ऑर्डर लाइव अपडेट नहीं हो सके: "+err.message));
       } catch(e) { setError(e instanceof Error ? e.message : "जानकारी लोड नहीं हो सकी।"); }
       finally { if(active) setLoading(false); }
     });
