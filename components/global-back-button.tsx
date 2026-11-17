@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 function getFallbackPath(pathname: string): string {
@@ -13,23 +14,31 @@ function getFallbackPath(pathname: string): string {
 export default function GlobalBackButton() {
   const pathname = usePathname();
   const router = useRouter();
+  const visitedPaths = useRef<string[]>([]);
 
-  // The marketplace home page already has its own Back control in the header.
+  useEffect(() => {
+    if (!pathname) return;
+    const history = visitedPaths.current;
+    if (history[history.length - 1] !== pathname) {
+      history.push(pathname);
+      if (history.length > 30) history.shift();
+    }
+  }, [pathname]);
+
   if (pathname === "/") return null;
 
   function goBack() {
-    const fallback = getFallbackPath(pathname || "/");
-    try {
-      const referrer = document.referrer;
-      const cameFromThisSite = referrer && new URL(referrer).origin === window.location.origin;
-      if (cameFromThisSite && window.history.length > 1) {
-        router.back();
+    const history = visitedPaths.current;
+    const currentPath = pathname || "/";
+    if (history.length > 1 && history[history.length - 1] === currentPath) {
+      history.pop();
+      const previousPath = history[history.length - 1];
+      if (previousPath && previousPath !== currentPath) {
+        router.push(previousPath);
         return;
       }
-    } catch {
-      // If the referrer cannot be checked, use the safe in-site fallback.
     }
-    router.push(fallback);
+    router.push(getFallbackPath(currentPath));
   }
 
   return (
