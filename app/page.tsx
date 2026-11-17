@@ -24,6 +24,7 @@ export default function HomePage() {
   const [hiddenCustomerNoticeIds, setHiddenCustomerNoticeIds] = useState<string[]>([]);
   const [productLoadError, setProductLoadError] = useState("");
   const [loadingShops, setLoadingShops] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -83,6 +84,8 @@ export default function HomePage() {
         if (active) {
           const liveShops = liveResult.docs.map((item) => ({ id: item.id, ...item.data() } as Shop));
           setShops(liveShops);
+          // Show LIVE shops immediately; product reads continue independently.
+          setLoadingShops(false);
           const groups = await Promise.all(liveShops.map(async (shop) => {
             try {
               const snapshot = await getDocs(query(collection(firestore, "shops", shop.id, "products"), where("active", "==", true)));
@@ -103,14 +106,17 @@ export default function HomePage() {
               return getTime(b.createdAt) - getTime(a.createdAt);
             });
             setMarketProducts(newestFirst);
+            setLoadingProducts(false);
             const failedShops = groups.filter((group) => group.error).map((group) => group.error);
             setProductLoadError(failedShops.length ? "Product read permission issue for: " + failedShops.join(", ") + ". Firebase Console mein firebase/firestore.rules publish karein." : "");
           }
         }
       } catch (error) {
-        if (active) setMessage(error instanceof Error ? error.message : "Shops could not be loaded.");
-      } finally {
-        if (active) setLoadingShops(false);
+        if (active) {
+          setMessage(error instanceof Error ? error.message : "Shops could not be loaded.");
+          setLoadingShops(false);
+          setLoadingProducts(false);
+        }
       }
     }
     void loadLiveShops();
@@ -244,7 +250,7 @@ export default function HomePage() {
 
       {message && <p className="admin-error" role="alert">{message}</p>}
       {productLoadError && <p className="admin-error" role="alert">{productLoadError}</p>}
-      {loadingShops ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : visibleProducts.length === 0 ? <div className="empty-panel"><h3>अभी कोई प्रोडक्ट उपलब्ध नहीं है</h3><p>LIVE दुकानों के उपलब्ध प्रोडक्ट यहाँ दिखाई देंगे।</p></div> :
+      {loadingProducts ? <div className="empty-panel"><p>Loading delicious treats…</p></div> : visibleProducts.length === 0 ? <div className="empty-panel"><h3>अभी कोई प्रोडक्ट उपलब्ध नहीं है</h3><p>LIVE दुकानों के उपलब्ध प्रोडक्ट यहाँ दिखाई देंगे।</p></div> :
       <div className="shop-grid marketplace-product-grid">{visibleProducts.map((product) => <article className="shop-card customer-product-card" key={product.shopId + "-" + product.id}>
         <Link href={"/shop/" + product.shopId} className="marketplace-product-open" aria-label={"Open all products from " + product.shopName}>
           {product.imageUrl ? <img className="shop-banner" src={product.imageUrl} alt={product.name || "Ice cream"} /> : <div className="shop-banner shop-banner-placeholder">🍦</div>}
