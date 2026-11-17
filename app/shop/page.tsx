@@ -8,7 +8,7 @@ import { auth, db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
-type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; shopUpiQrDataUrl?: string; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
+type Shop = { id: string; name?: string; shopName?: string; status?: string; city?: string; address?: string; phone?: string; description?: string; ownerUid?: string; logoUrl?: string; bannerUrl?: string; pickupAvailable?: boolean; deliveryAvailable?: boolean; offerTitle?: string; offerDescription?: string; offerExpiresAt?: string; openingTime?: string; closingTime?: string; closedDays?: string[]; manualClosed?: boolean; shopUpiQrDataUrl?: string; shopUpiId?: string; onlinePaymentEnabled?: boolean; deliveryFee?: number; minimumOrder?: number; initialPaymentVerified?: boolean; subscriptionStatus?: string; subscriptionExpiresAt?: { toDate?: () => Date } | Date | null };
 type Order = { id: string; shopName?: string; customerName?: string; customerEmail?: string; customerUid?: string; customerPhone?: string; deliveryAddress?: string; fulfillmentType?: "pickup" | "delivery"; items?: { name: string; quantity: number; price?: number }[]; total?: number; status?: string; paymentStatus?: string; createdAt?: { toDate?: () => Date } };
 type Customer = { id: string; phone: string; uid: string; name?: string; email?: string; createdAt?: { toDate?: () => Date }; registered?: boolean };
 type CustomerOrder = { id: string; orderType?: "sale" | "online"; customerName?: string; customerEmail?: string; customerUid?: string; customerPhone?: string; deliveryAddress?: string; total?: number; subtotal?: number; discount?: number; status?: string; paymentStatus?: "paid" | "unpaid" | string; createdAt?: { toDate?: () => Date }; items?: { name: string; quantity: number; price?: number }[] };
@@ -34,6 +34,8 @@ export default function ShopPage() {
   const [logoUrl, setLogoUrl] = useState("");
   const [bannerUrl, setBannerUrl] = useState("");
   const [shopUpiQrDataUrl, setShopUpiQrDataUrl] = useState("");
+  const [shopUpiId, setShopUpiId] = useState("");
+  const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
   const [pickupAvailable, setPickupAvailable] = useState(true);
   const [deliveryAvailable, setDeliveryAvailable] = useState(false);
   const [openingTime, setOpeningTime] = useState("10:00");
@@ -183,7 +185,7 @@ export default function ShopPage() {
           if (window.location.hash === "#shop-profile") setActiveShopSection("profile");
           const lock = await getDoc(doc(db, "paymentPendingLocks", data.id));
           setPendingPayment(lock.exists() && !isLiveShop); setName(data.name || data.shopName || ""); setPhone(data.phone || "");
-          setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setShopUpiQrDataUrl(data.shopUpiQrDataUrl || ""); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
+          setCity(data.city || ""); setAddress(data.address || ""); setDescription(data.description || ""); setLogoUrl(data.logoUrl || ""); setBannerUrl(data.bannerUrl || ""); setShopUpiQrDataUrl(data.shopUpiQrDataUrl || ""); setShopUpiId(data.shopUpiId || ""); setOnlinePaymentEnabled(data.onlinePaymentEnabled === true); setPickupAvailable(data.pickupAvailable !== false); setDeliveryAvailable(data.deliveryAvailable === true); setOpeningTime(data.openingTime || "10:00"); setClosingTime(data.closingTime || "22:00"); setClosedDays(data.closedDays || []); setManualClosed(data.manualClosed === true); setDeliveryFee(String(data.deliveryFee ?? 0)); setMinimumOrder(String(data.minimumOrder ?? 0)); setOfferTitle(data.offerTitle || ""); setOfferDescription(data.offerDescription || ""); setOfferExpiresAt(data.offerExpiresAt || "");
           if (isLiveShop) {
             await loadProducts(data.id);
             const orderResult = await getDocs(query(collection(db, "orders"), where("shopId", "==", data.id)));
@@ -488,15 +490,25 @@ export default function ShopPage() {
     }
   }
 
-  async function saveShopUpiQr() {
+  async function saveCustomerPaymentSettings() {
     if (!db || !shop) return;
+    const cleanUpiId = shopUpiId.trim();
+    const validUpiId = /^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/.test(cleanUpiId);
+    if (onlinePaymentEnabled && !validUpiId) {
+      setError("Online payment चालू करने के लिए सही UPI ID दर्ज करें, जैसे name@upi।");
+      return;
+    }
     setBusy(true); setError(""); setNotice("");
     try {
-      await updateDoc(doc(db, "shops", shop.id), { shopUpiQrDataUrl, updatedAt: serverTimestamp() });
-      setShop({ ...shop, shopUpiQrDataUrl });
-      setNotice(shopUpiQrDataUrl ? "आपकी दुकान का Customer UPI QR सेव हो गया है।" : "दुकान का Customer UPI QR हटा दिया गया है।");
+      await updateDoc(doc(db, "shops", shop.id), {
+        shopUpiId: cleanUpiId,
+        onlinePaymentEnabled,
+        updatedAt: serverTimestamp()
+      });
+      setShop({ ...shop, shopUpiId: cleanUpiId, onlinePaymentEnabled });
+      setNotice(onlinePaymentEnabled ? "Online UPI payment चालू हो गया है। Checkout पर ग्राहक के Total का QR बनेगा।" : "Online payment बंद है। ग्राहक Cash Payment कर सकेंगे।");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "UPI QR सेव नहीं हो सका।");
+      setError(e instanceof Error ? e.message : "Payment settings सेव नहीं हुईं।");
     } finally { setBusy(false); }
   }
 
@@ -505,8 +517,8 @@ export default function ShopPage() {
     if (!db || !shop) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      await updateDoc(doc(db, "shops", shop.id), { name: name.trim(), shopName: name.trim(), phone: phone.trim(), city: city.trim(), address: address.trim(), description: description.trim(), logoUrl, bannerUrl, shopUpiQrDataUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), updatedAt: serverTimestamp() });
-      setShop({ ...shop, name: name.trim(), shopName: name.trim(), phone, city, address, description, logoUrl, bannerUrl, shopUpiQrDataUrl, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0) });
+      await updateDoc(doc(db, "shops", shop.id), { name: name.trim(), shopName: name.trim(), phone: phone.trim(), city: city.trim(), address: address.trim(), description: description.trim(), logoUrl, bannerUrl, shopUpiQrDataUrl, shopUpiId: shopUpiId.trim(), onlinePaymentEnabled, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0), updatedAt: serverTimestamp() });
+      setShop({ ...shop, name: name.trim(), shopName: name.trim(), phone, city, address, description, logoUrl, bannerUrl, shopUpiQrDataUrl, shopUpiId: shopUpiId.trim(), onlinePaymentEnabled, pickupAvailable, deliveryAvailable, openingTime, closingTime, closedDays, manualClosed, deliveryFee: Math.max(0, Number(deliveryFee) || 0), minimumOrder: Math.max(0, Number(minimumOrder) || 0) });
       setNotice("सेव हो गया। दुकान की जानकारी सफलतापूर्वक अपडेट हो गई है।");
     } catch (e) { setError(e instanceof Error ? e.message : "Profile update failed."); }
     finally { setBusy(false); }
@@ -790,7 +802,7 @@ export default function ShopPage() {
             <button type="button" className={activeShopSection === "products" ? "admin-primary" : "admin-secondary"} onClick={()=>{resetProduct();setActiveShopSection(activeShopSection === "products" ? "" : "products");}}>Add Product</button>
             <button type="button" className={activeShopSection === "myProducts" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "myProducts" ? "" : "myProducts")}>My Products</button>
             <button type="button" className={activeShopSection === "promotion" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "promotion" ? "" : "promotion")}>Offer / Promotion</button>
-            <button type="button" className={activeShopSection === "qr" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "qr" ? "" : "qr")}>💳 Customer UPI QR</button>
+            <button type="button" className={activeShopSection === "qr" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "qr" ? "" : "qr")}>💳 Online Payment</button>
             <Link href="/shop/orders" className="admin-secondary role-link">🧾 ONLINE ORDERS</Link>
           </div>
         </section>
@@ -816,19 +828,19 @@ export default function ShopPage() {
           <button type="button" className="admin-secondary" onClick={()=>void openPaymentHistory()}>Refresh history</button>
         </section>}
         {activeShopSection === "qr" && <section className="admin-panel" id="shop-upi-qr" style={{scrollMarginTop:20}}>
-          <p className="admin-kicker">CUSTOMER PAYMENT QR</p>
-          <h2>दुकान का UPI QR</h2>
-          <p>यह QR आपकी दुकान के ग्राहकों को checkout पर दिखेगा। इसे Shop Registration Details से अलग यहाँ manage करें।</p>
-          <label className="register-form">अपना UPI QR image अपलोड करें (WebP compressed, max 180 KB)
-            <input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"qr");}} />
-          </label>
-          {imageBusy && <p className="admin-muted">QR image compress हो रही है…</p>}
-          {shopUpiQrDataUrl ? <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",margin:"14px 0"}}>
-            <img src={shopUpiQrDataUrl} alt="Shop UPI QR preview" style={{width:190,height:190,objectFit:"contain",border:"1px solid #ddd",borderRadius:12,padding:6,background:"#fff"}} />
-            <button type="button" className="admin-secondary" disabled={busy||imageBusy} onClick={()=>setShopUpiQrDataUrl("")}>QR हटाएँ</button>
-          </div> : <p className="admin-muted">अभी दुकान का UPI QR अपलोड नहीं है।</p>}
-          <button type="button" className="admin-primary" disabled={busy||imageBusy} onClick={()=>void saveShopUpiQr()}>{busy ? "सेव हो रहा है…" : "UPI QR सेव करें"}</button>
-          <p className="admin-muted">QR सेव होने के बाद ग्राहक इसे आपकी दुकान के checkout पर देख सकेंगे। Payment की पुष्टि दुकान खुद करेगी।</p>
+          <p className="admin-kicker">CUSTOMER PAYMENT SETTINGS</p>
+          <h2>Online UPI Payment</h2>
+          <p>Online payment चालू करने पर ग्राहक के Cart Total के अनुसार QR अपने-आप बनेगा। दुकान का UPI ID एक बार दर्ज करें।</p>
+          <div className="register-form">
+            <label>दुकान की UPI ID<input type="text" autoComplete="off" maxLength={80} value={shopUpiId} onChange={e=>setShopUpiId(e.target.value.trim())} placeholder="जैसे: yourshop@upi" /></label>
+            <label style={{display:"flex",alignItems:"center",gap:10}}>
+              <input type="checkbox" checked={onlinePaymentEnabled} onChange={e=>setOnlinePaymentEnabled(e.target.checked)} />
+              ग्राहक के लिए Online UPI Payment चालू करें
+            </label>
+            <p className="admin-muted">{onlinePaymentEnabled ? "ON: Checkout पर UPI QR और UTR का विकल्प दिखेगा।" : "OFF: Checkout पर UPI QR नहीं दिखेगा; ग्राहक Cash Payment करेंगे।"}</p>
+            <button type="button" className="admin-primary" disabled={busy} onClick={()=>void saveCustomerPaymentSettings()}>{busy ? "सेव हो रहा है…" : "Payment Settings सेव करें"}</button>
+          </div>
+          <p className="admin-muted">UPI भुगतान की पुष्टि दुकान वाला UTR जाँचकर करेगा। Cash भुगतान मिलने पर Online Orders में Payment को Paid करें।</p>
         </section>}
         {activeShopSection === "profile" && <section className="admin-panel" id="shop-profile" style={{scrollMarginTop:20}}><h2>Shop profile / Registration details</h2><p>Apni registration ki details yahan update karein. Changes save karne ke baad Admin ko updated details dikhengi.</p><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
