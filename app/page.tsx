@@ -72,14 +72,15 @@ export default function HomePage() {
   }, [router]);
 
   useEffect(() => {
-    if (!db) { setLoadingShops(false); return; }
+    const firestore = db;
+    if (!firestore) { setLoadingShops(false); return; }
     let active = true;
     const productStops = new Map<string, () => void>();
     const productGroups = new Map<string, MarketplaceProduct[]>();
-    const stopBranding = onSnapshot(doc(db, "siteSettings", "branding"), snap => {
+    const stopBranding = onSnapshot(doc(firestore, "siteSettings", "branding"), snap => {
       if (active) setSiteLogo(snap.exists() ? String(snap.data().logoDataUrl || "") : "");
     }, () => {});
-    const stopShops = onSnapshot(query(collection(db, "shops"), where("status", "in", ["live", "LIVE", "Live"])), snapshot => {
+    const stopShops = onSnapshot(query(collection(firestore, "shops"), where("status", "in", ["live", "LIVE", "Live"])), snapshot => {
       if (!active) return;
       const liveShops = snapshot.docs.map(item => ({ id:item.id, ...item.data() } as Shop));
       setShops(liveShops);
@@ -89,7 +90,7 @@ export default function HomePage() {
       }
       for (const shop of liveShops) {
         if (productStops.has(shop.id)) continue;
-        const stop = onSnapshot(query(collection(db, "shops", shop.id, "products"), where("active", "==", true)), productsSnapshot => {
+        const stop = onSnapshot(query(collection(firestore, "shops", shop.id, "products"), where("active", "==", true)), productsSnapshot => {
           if (!active) return;
           productGroups.set(shop.id, productsSnapshot.docs.map(item => ({
             id:item.id, shopId:shop.id, shopName:shop.name || shop.shopName || "Ice Cream Shop", city:shop.city, ...item.data()
@@ -115,7 +116,7 @@ export default function HomePage() {
     }, error => {
       if (active) { setMessage(error.message || "Shops could not be loaded."); setLoadingShops(false); }
     });
-    const stopNotices = onSnapshot(query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(20)), snapshot => {
+    const stopNotices = onSnapshot(query(collection(firestore, "notifications"), orderBy("createdAt", "desc"), limit(20)), snapshot => {
       if (active) setCustomerNotices(snapshot.docs.map(item => ({ id:item.id, ...item.data() } as CustomerNotice)));
     }, () => { if (active) setCustomerNotices([]); });
     return () => {
