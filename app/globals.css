@@ -1225,3 +1225,90 @@ h1{font-family:"Playfair Display",Georgia,serif;font-size:clamp(42px,6vw,70px);l
 .home-back-button:hover{background:#fff0e3}
 .admin-header .admin-secondary[aria-label="होम पेज पर वापस जाएँ"]{white-space:nowrap}
 @media(max-width:560px){.home-back-button{padding:8px 10px;font-size:11px}.topbar{gap:8px}.brand-logo-image{max-width:125px}}
+
+
+/* MOBILE HEADER WIDTH FIX — prevent the homepage header from exceeding the viewport. */
+@media (max-width: 720px) {
+  /* Back navigation was the extra flex item pushing the header wider than the phone. */
+  .marketplace-3d .topbar > .home-back-button {
+    display: none !important;
+  }
+
+  .marketplace-3d .topbar {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    gap: 5px !important;
+    justify-content: space-between !important;
+  }
+
+  .marketplace-3d .topbar > .brand-3d-logo {
+    flex: 1 1 0% !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    overflow: hidden !important;
+  }
+
+  .marketplace-3d .topbar > .brand-3d-logo .brand-logo-image {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 44px !important;
+    object-fit: contain !important;
+    object-position: left center !important;
+  }
+
+  .marketplace-3d .topbar > .header-share-site {
+    display: inline-flex !important;
+    flex: 0 0 68px !important;
+    width: 68px !important;
+    min-width: 68px !important;
+    max-width: 68px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    margin: 0 !important;
+    padding: 0 3px !important;
+    gap: 3px !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    font-size: 9px !important;
+    letter-spacing: 0 !important;
+  }
+
+  .marketplace-3d .topbar > .header-share-site span {
+    display: inline !important;
+    font-size: 8px !important;
+    line-height: 1 !important;
+  }
+
+  .marketplace-3d .topbar > .customer-notifications {
+    flex: 0 0 34px !important;
+    width: 34px !important;
+    min-width: 34px !important;
+    margin: 0 !important;
+  }
+
+  .marketplace-3d .topbar > .header-menu-dropdown {
+    flex: 0 0 34px !important;
+    width: 34px !important;
+    min-width: 34px !important;
+    margin: 0 !important;
+  }
+
+  .marketplace-3d .topbar .customer-notification-icon,
+  .marketplace-3d .topbar .header-menu-dropdown > summary {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .marketplace-3d .topbar .header-menu-dropdown > summary > span:nth-child(2) {
+    display: none !important;
+  }
+}
