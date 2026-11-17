@@ -16,14 +16,14 @@ export default function ShopOrdersPage(){
    stopOrders?.();stopOrders=undefined;
    if(!u||u.isAnonymous){router.replace("/");return;}
    if(isAdminEmail(u.email)&&u.emailVerified){router.replace("/admin");return;}
-   if(!db)return;
+   const firestore=db;if(!firestore)return;
    setLoading(true);setError("");
    try{
-    const lock=await getDoc(doc(db,"shopOwnerLocks",u.uid));
+    const lock=await getDoc(doc(firestore,"shopOwnerLocks",u.uid));
     let shopId=lock.exists()?String(lock.data().shopId||""):"";
-    if(!shopId){const legacy=await getDocs(query(collection(db,"shops"),where("ownerUid","==",u.uid),limit(1)));shopId=legacy.empty?"":legacy.docs[0].id;}
+    if(!shopId){const legacy=await getDocs(query(collection(firestore,"shops"),where("ownerUid","==",u.uid),limit(1)));shopId=legacy.empty?"":legacy.docs[0].id;}
     if(!shopId){router.replace("/shop");return;}
-    stopOrders=onSnapshot(query(collection(db,"orders"),where("shopId","==",shopId)),snap=>{
+    stopOrders=onSnapshot(query(collection(firestore,"orders"),where("shopId","==",shopId)),snap=>{
      const next=snap.docs.map(d=>({id:d.id,...d.data()} as Order));
      next.sort((a,b)=>(b.createdAt?.toDate?.().getTime()||0)-(a.createdAt?.toDate?.().getTime()||0));
      setOrders(next);setLoading(false);
