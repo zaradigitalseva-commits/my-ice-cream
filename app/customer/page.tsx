@@ -108,7 +108,7 @@ export default function CustomerPage() {
     }
     setSaving(true); setError(""); setNotice("");
     try {
-      const ref = doc(db, "customers", digits);
+      const ref = doc(realtimeDb, "customers", digits);
       const existing = await getDoc(ref);
       if (existing.exists() && existing.data().uid !== user.uid) {
         throw new Error("यह मोबाइल नंबर पहले से दुकान के ग्राहक रिकॉर्ड में दर्ज है। सुरक्षा के लिए इसे अपने खाते से जोड़ने हेतु दुकान या Admin से संपर्क करें।");
