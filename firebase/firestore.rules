@@ -63,12 +63,9 @@ service cloud.firestore {
       return shop.status in ["live", "LIVE", "Live"];
     }
 
-    // Customer UPI checkout is allowed only when the shop has a usable QR
-    // saved on its shop document. This mirrors the checkout UI requirement.
-    function shopHasCustomerUpiQr(shopId) {
-      let qr = get(/databases/$(database)/documents/shops/$(shopId)).data.get("shopUpiQrDataUrl", "");
-      return qr is string && qr.size() > 0 && qr.size() <= 250000;
-    }
+    // Customer checkout is cash-only. No customer UPI QR or UTR is
+    // required; the order rule below requires paymentMethod "cash"
+    // and an empty paymentUtr.
 
     // Match the shop name stored on the shop document without failing when
     // one of the supported name fields is absent.
