@@ -488,17 +488,6 @@ export default function ShopPage() {
     }
   }
 
-  async function saveShopUpiQr() {
-    if (!db || !shop) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
-      await updateDoc(doc(db, "shops", shop.id), { shopUpiQrDataUrl, updatedAt: serverTimestamp() });
-      setShop({ ...shop, shopUpiQrDataUrl });
-      setNotice(shopUpiQrDataUrl ? "आपकी दुकान का Customer UPI QR सेव हो गया है।" : "दुकान का Customer UPI QR हटा दिया गया है।");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "UPI QR सेव नहीं हो सका।");
-    } finally { setBusy(false); }
-  }
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -790,7 +779,7 @@ export default function ShopPage() {
             <button type="button" className={activeShopSection === "products" ? "admin-primary" : "admin-secondary"} onClick={()=>{resetProduct();setActiveShopSection(activeShopSection === "products" ? "" : "products");}}>Add Product</button>
             <button type="button" className={activeShopSection === "myProducts" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "myProducts" ? "" : "myProducts")}>My Products</button>
             <button type="button" className={activeShopSection === "promotion" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "promotion" ? "" : "promotion")}>Offer / Promotion</button>
-            <button type="button" className={activeShopSection === "qr" ? "admin-primary" : "admin-secondary"} onClick={()=>setActiveShopSection(activeShopSection === "qr" ? "" : "qr")}>💳 Customer UPI QR</button>
+            
             <Link href="/shop/orders" className="admin-secondary role-link">🧾 ONLINE ORDERS</Link>
           </div>
         </section>
@@ -814,21 +803,6 @@ export default function ShopPage() {
               {paymentHistory.map(p=><tr key={p.id}><td>{p.createdAt?.toDate ? p.createdAt.toDate().toLocaleString("en-IN") : "—"}</td><td>₹{Number(p.amount||0).toFixed(2)}</td><td>{p.paymentType === "initial_listing" ? "First listing" : p.paymentType === "monthly_renewal" ? "Renewal" : p.paymentType || "Subscription"}</td><td>{p.utr || "—"}</td><td><span className={"admin-status " + String(p.status||"pending").toLowerCase()}>{String(p.status||"pending").toUpperCase()}</span></td></tr>)}
             </tbody></table></div>}
           <button type="button" className="admin-secondary" onClick={()=>void openPaymentHistory()}>Refresh history</button>
-        </section>}
-        {activeShopSection === "qr" && <section className="admin-panel" id="shop-upi-qr" style={{scrollMarginTop:20}}>
-          <p className="admin-kicker">CUSTOMER PAYMENT QR</p>
-          <h2>दुकान का UPI QR</h2>
-          <p>यह QR आपकी दुकान के ग्राहकों को checkout पर दिखेगा। इसे Shop Registration Details से अलग यहाँ manage करें।</p>
-          <label className="register-form">अपना UPI QR image अपलोड करें (WebP compressed, max 180 KB)
-            <input type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];if(file)void compressProfileImage(file,"qr");}} />
-          </label>
-          {imageBusy && <p className="admin-muted">QR image compress हो रही है…</p>}
-          {shopUpiQrDataUrl ? <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",margin:"14px 0"}}>
-            <img src={shopUpiQrDataUrl} alt="Shop UPI QR preview" style={{width:190,height:190,objectFit:"contain",border:"1px solid #ddd",borderRadius:12,padding:6,background:"#fff"}} />
-            <button type="button" className="admin-secondary" disabled={busy||imageBusy} onClick={()=>setShopUpiQrDataUrl("")}>QR हटाएँ</button>
-          </div> : <p className="admin-muted">अभी दुकान का UPI QR अपलोड नहीं है।</p>}
-          <button type="button" className="admin-primary" disabled={busy||imageBusy} onClick={()=>void saveShopUpiQr()}>{busy ? "सेव हो रहा है…" : "UPI QR सेव करें"}</button>
-          <p className="admin-muted">QR सेव होने के बाद ग्राहक इसे आपकी दुकान के checkout पर देख सकेंगे। Payment की पुष्टि दुकान खुद करेगी।</p>
         </section>}
         {activeShopSection === "profile" && <section className="admin-panel" id="shop-profile" style={{scrollMarginTop:20}}><h2>Shop profile / Registration details</h2><p>Apni registration ki details yahan update karein. Changes save karne ke baad Admin ko updated details dikhengi.</p><form className="register-form" onSubmit={saveProfile}>
           <label>Shop name<input required value={name} onChange={e=>setName(e.target.value)} /></label>
