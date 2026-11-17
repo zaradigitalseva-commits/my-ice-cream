@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, collectionGroup, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc, where, writeBatch, deleteDoc, limit } from "firebase/firestore/lite";
+import { collection, collectionGroup, getDocs, orderBy, query, updateDoc, doc, Timestamp, getDoc, setDoc, where, writeBatch, deleteDoc, limit, onSnapshot } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
@@ -180,7 +180,26 @@ export default function AdminPage() {
     } finally { setLoading(false); }
   }
 
-  useEffect(() => { if (user && isAdminEmail(user.email) && user.emailVerified) void loadShops(); }, [user]);
+  useEffect(() => {
+    if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
+    // Event-driven refresh: the registrations loader runs only when a shop
+    // document changes, not on a timer or a manual page refresh.
+    const stopShops = onSnapshot(query(collection(db, "shops"), orderBy("createdAt", "desc")), () => {
+      void loadShops();
+    }, err => setError("दुकानों की लाइव सूची अपडेट नहीं हो सकी: " + err.message));
+    const stopProducts = onSnapshot(collectionGroup(db, "products"), snapshot => {
+      const shopNames = new Map(shops.map(shop => [shop.id, shop.name || shop.shopName || shop.id]));
+      setShopProducts(snapshot.docs.map(item => {
+        const shopId = item.ref.parent.parent?.id || "";
+        return { id:item.id, shopId, shopName:shopNames.get(shopId) || shopId, ...item.data() } as AdminProduct;
+      }));
+      setProductError("");
+    }, err => setProductError("Products लाइव अपडेट नहीं हो सके: " + err.message));
+    const stopCustomers = onSnapshot(collection(db, "customers"), snapshot => {
+      setCustomers(snapshot.docs.map(item => ({ id:item.id, ...item.data() } as {id:string;name?:string;phone?:string;email?:string;uid?:string})));
+    }, err => setCustomerError("ग्राहक सूची लाइव अपडेट नहीं हो सकी: " + err.message));
+    return () => { stopShops(); stopProducts(); stopCustomers(); };
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!db || !user || !isAdminEmail(user.email) || !user.emailVerified) return;
