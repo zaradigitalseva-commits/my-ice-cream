@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { collection, getDocs, query, where, doc, getDoc, orderBy, limit, onSnapshot } from "firebase/firestore";
-import { auth, db, googleProvider } from "@/lib/firebase";
+import { auth, realtimeDb as db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { registerPushSubscription } from "@/lib/push-client";
 
