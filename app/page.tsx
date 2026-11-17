@@ -188,7 +188,6 @@ export default function HomePage() {
   const filteredBottomShops = shops.filter((shop) => [shop.name, shop.shopName, shop.city, shop.address, shop.description, shop.category].filter(Boolean).join(" ").toLowerCase().includes(shopSearchText.trim().toLowerCase()));
   return <main className="site-shell marketplace-3d">
     <header className="topbar">
-      <button type="button" className="home-back-button" aria-label="पिछले पेज पर वापस जाएँ" onClick={() => { if (window.history.length > 1) router.back(); else window.scrollTo({ top: 0, behavior: "smooth" }); }}>← Back</button>
       <Link className="brand brand-3d-logo" href="/" aria-label="MY ICE CREAM home"><img className="brand-logo-image" src={siteLogo || "/my-ice-cream-logo.svg"} alt="MY ICE CREAM" /></Link>
       <button type="button" className="header-share-site" onClick={() => { setShowShareSite(true); setShareError(""); }} aria-label="Share MY ICE CREAM website">↗ <span>SHARE SITE</span></button>
       <details className="header-menu-dropdown">
