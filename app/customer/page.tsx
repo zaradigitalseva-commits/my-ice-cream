@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
@@ -35,31 +35,25 @@ export default function CustomerPage() {
 
   useEffect(() => {
     if (!auth) { setLoading(false); return; }
-    return onAuthStateChanged(auth, async (u) => {
-      setUser(u?.isAnonymous ? null : u);
+    let stopSales: (() => void) | undefined, stopOrders: (() => void) | undefined, active = true;
+    const stopAuth = onAuthStateChanged(auth, async (u) => {
+      stopSales?.(); stopOrders?.(); stopSales = undefined; stopOrders = undefined;
+      setUser(u?.isAnonymous ? null : u); setSales([]); setOnlineOrders([]);
       if (!u || u.isAnonymous) { setLoading(false); return; }
       if (isAdminEmail(u.email) && u.emailVerified) { router.replace("/admin"); return; }
       if (!db) { setLoading(false); return; }
+      setLoading(true); setError("");
       try {
         const existing = await getDocs(query(collection(db, "customers"), where("uid", "==", u.uid)));
-        const linkedPhone = existing.empty ? "" : String(existing.docs[0].data().phone || "");
-        if (!existing.empty) {
-          const profile = existing.docs[0].data();
-          setName(String(profile.name || u.displayName || ""));
-          setPhone(linkedPhone);
-        }
-        const [salesResult, ordersResult] = await Promise.all([
-          getDocs(query(collection(db, "sales"), where("customerUid", "==", u.uid))),
-          getDocs(query(collection(db, "orders"), where("customerUid", "==", u.uid))),
-        ]);
-        setSales(salesResult.docs.map((d) => ({ id: d.id, ...d.data() } as Sale)));
-        setOnlineOrders(ordersResult.docs.map((d) => ({ id: d.id, ...d.data() } as OnlineOrder)));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "जानकारी लोड नहीं हो सकी।");
-      } finally {
-        setLoading(false);
-      }
+        if (!active) return;
+        if (!existing.empty) { const profile = existing.docs[0].data(); setName(String(profile.name || u.displayName || "")); setPhone(String(profile.phone || "")); }
+        else setName(u.displayName || "");
+        stopSales = onSnapshot(query(collection(db, "sales"), where("customerUid", "==", u.uid)), snap => setSales(snap.docs.map(d => ({ id:d.id, ...d.data() } as Sale))), err => setError("खरीदारी लाइव अपडेट नहीं हो सकी: "+err.message));
+        stopOrders = onSnapshot(query(collection(db, "orders"), where("customerUid", "==", u.uid)), snap => setOnlineOrders(snap.docs.map(d => ({ id:d.id, ...d.data() } as OnlineOrder))), err => setError("ऑर्डर लाइव अपडेट नहीं हो सके: "+err.message));
+      } catch(e) { setError(e instanceof Error ? e.message : "जानकारी लोड नहीं हो सकी।"); }
+      finally { if(active) setLoading(false); }
     });
+    return () => { active=false; stopAuth(); stopSales?.(); stopOrders?.(); };
   }, [router]);
 
   async function handleGoogleSignIn() {
