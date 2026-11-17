@@ -3,8 +3,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, orderBy, limit } from "firebase/firestore/lite";
-import { auth, db } from "@/lib/firebase";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, orderBy, limit, onSnapshot } from "firebase/firestore";
+import { auth, realtimeDb as db } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 import { compressImageToWebP } from "@/lib/image-compression";
 
@@ -206,50 +206,32 @@ export default function ShopPage() {
     return () => window.clearTimeout(timer);
   }, [shop?.id]);
 
-  // Refresh approval/payment state while the shopkeeper page is open.
-  // Admin changes are made from a separate session, so a one-time page load can otherwise stay stale.
+  // Subscribe to the shop and its live operational data. Changes made by
+  // Admin, customers, or this shopkeeper appear without refreshing the page.
   useEffect(() => {
     if (!db || !user || !shop) return;
     const firestore = db;
-    const ownerUid = user.uid;
-    let active = true;
-    const refreshApprovalState = async () => {
-      try {
-        // Resolve the shop through the private owner lock; public shop docs
-        // intentionally do not contain ownerUid.
-        const ownerLock = await getDoc(doc(firestore, "shopOwnerLocks", ownerUid));
-        const ownedShopId = ownerLock.exists() ? String(ownerLock.data().shopId || "") : "";
-        let owned = ownedShopId ? await getDoc(doc(firestore, "shops", ownedShopId)) : null;
-        if (!ownedShopId) {
-          const legacyOwned = await getDocs(query(collection(firestore, "shops"), where("ownerUid", "==", ownerUid), limit(1)));
-          owned = legacyOwned.empty ? null : legacyOwned.docs[0];
-        }
-        if (!owned || !owned.exists() || !active) return;
-        const latest = { id: owned.id, ...owned.data() } as Shop;
-        setShop(latest);
-        await loadShopAdminNotices(latest.id);
-        const lock = await getDoc(doc(firestore, "paymentPendingLocks", latest.id));
-        if (!active) return;
-        const isLive = ["live", "LIVE", "Live"].includes(String(latest.status || ""));
-        setPendingPayment(lock.exists() && !isLive);
-        if (isLive) {
-          await loadProducts(latest.id);
-          const orderResult = await getDocs(query(collection(firestore, "orders"), where("shopId", "==", latest.id)));
-          if (active) setOrders(orderResult.docs.map(item => ({ id: item.id, ...item.data() } as Order)));
-          // Keep sections closed until the shopkeeper selects one.
-        }
-      } catch (refreshError) {
-        if (active) setError(refreshError instanceof Error ? refreshError.message : "Shop status refresh नहीं हो पाया।");
-      }
-    };
-    const onFocus = () => { void refreshApprovalState(); };
-    window.addEventListener("focus", onFocus);
-    const interval = window.setInterval(() => { void refreshApprovalState(); }, 15000);
-    return () => {
-      active = false;
-      window.removeEventListener("focus", onFocus);
-      window.clearInterval(interval);
-    };
+    let currentIsLive = ["live", "LIVE", "Live"].includes(String(shop.status || ""));
+    const stopShop = onSnapshot(doc(firestore, "shops", shop.id), snapshot => {
+      if (!snapshot.exists()) { setError("यह दुकान अब उपलब्ध नहीं है।"); return; }
+      const latest = { id:snapshot.id, ...snapshot.data() } as Shop;
+      currentIsLive = ["live", "LIVE", "Live"].includes(String(latest.status || ""));
+      setShop(latest);
+      if (!currentIsLive) { setProducts([]); setOrders([]); }
+    }, err => setError("दुकान की लाइव जानकारी अपडेट नहीं हो सकी: " + err.message));
+    const stopProducts = onSnapshot(collection(firestore, "shops", shop.id, "products"), snapshot => {
+      setProducts(snapshot.docs.map(item => ({ id:item.id, ...item.data() } as Product)));
+    }, err => setError("Products लाइव अपडेट नहीं हो सके: " + err.message));
+    const stopOrders = onSnapshot(query(collection(firestore, "orders"), where("shopId", "==", shop.id)), snapshot => {
+      setOrders(snapshot.docs.map(item => ({ id:item.id, ...item.data() } as Order)));
+    }, err => setError("ऑर्डर लाइव अपडेट नहीं हो सके: " + err.message));
+    const stopNotices = onSnapshot(query(collection(firestore, "shops", shop.id, "adminNotices"), orderBy("createdAt", "desc"), limit(20)), snapshot => {
+      setAdminNotices(snapshot.docs.map(item => ({ id:item.id, ...item.data() } as ShopAdminNotice)));
+    }, () => setAdminNotices([]));
+    const stopPaymentLock = onSnapshot(doc(firestore, "paymentPendingLocks", shop.id), snapshot => {
+      setPendingPayment(snapshot.exists() && !currentIsLive);
+    }, () => setPendingPayment(false));
+    return () => { stopShop(); stopProducts(); stopOrders(); stopNotices(); stopPaymentLock(); };
   }, [user?.uid, shop?.id]);
 
   useEffect(() => {

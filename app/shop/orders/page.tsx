@@ -3,13 +3,35 @@ import Link from "next/link";
 import {useEffect,useState} from "react";
 import {useRouter} from "next/navigation";
 import {onAuthStateChanged,signOut} from "firebase/auth";
-import {collection,doc,getDoc,getDocs,limit,query,serverTimestamp,updateDoc,where} from "firebase/firestore/lite";
-import {auth,db} from "@/lib/firebase";
+import {collection,doc,getDoc,getDocs,limit,onSnapshot,query,serverTimestamp,updateDoc,where} from "firebase/firestore";
+import {auth,realtimeDb as db} from "@/lib/firebase";
 import {isAdminEmail} from "@/lib/admin";
 type Order={id:string;shopName?:string;customerName?:string;customerEmail?:string;customerPhone?:string;deliveryAddress?:string;fulfillmentType?:"pickup"|"delivery";items?:{productId?:string;name:string;quantity:number;price:number}[];subtotal?:number;deliveryFee?:number;total?:number;status?:string;paymentStatus?:string;paymentUtr?:string;shopId?:string;createdAt?:{toDate?:()=>Date}};
 export default function ShopOrdersPage(){
  const router=useRouter();const[orders,setOrders]=useState<Order[]>([]);const[error,setError]=useState("");const[loading,setLoading]=useState(true);const[search,setSearch]=useState("");
- useEffect(()=>{if(!auth)return;return onAuthStateChanged(auth,async u=>{if(!u || u.isAnonymous){router.replace("/");return;}if(isAdminEmail(u.email)&&u.emailVerified){router.replace("/admin");return;}if(!db)return;try{const ownerLock=await getDoc(doc(db,"shopOwnerLocks",u.uid));let shopId=ownerLock.exists()?String(ownerLock.data().shopId||""):"";if(!shopId){const legacyOwned=await getDocs(query(collection(db,"shops"),where("ownerUid","==",u.uid),limit(1)));shopId=legacyOwned.empty?"":legacyOwned.docs[0].id;}if(!shopId){router.replace("/shop");return;}const o=await getDocs(query(collection(db,"orders"),where("shopId","==",shopId)));setOrders(o.docs.map(d=>({id:d.id,...d.data()} as Order)).sort((a,b)=>(b.createdAt?.toDate?.().getTime()||0)-(a.createdAt?.toDate?.().getTime()||0)));}catch(e){setError(e instanceof Error?e.message:"Orders could not be loaded.");}finally{setLoading(false)}})},[router]);
+ useEffect(()=>{
+  if(!auth)return;
+  let stopOrders:(()=>void)|undefined;
+  const stopAuth=onAuthStateChanged(auth,async u=>{
+   stopOrders?.();stopOrders=undefined;
+   if(!u||u.isAnonymous){router.replace("/");return;}
+   if(isAdminEmail(u.email)&&u.emailVerified){router.replace("/admin");return;}
+   const firestore=db;if(!firestore)return;
+   setLoading(true);setError("");
+   try{
+    const lock=await getDoc(doc(firestore,"shopOwnerLocks",u.uid));
+    let shopId=lock.exists()?String(lock.data().shopId||""):"";
+    if(!shopId){const legacy=await getDocs(query(collection(firestore,"shops"),where("ownerUid","==",u.uid),limit(1)));shopId=legacy.empty?"":legacy.docs[0].id;}
+    if(!shopId){router.replace("/shop");return;}
+    stopOrders=onSnapshot(query(collection(firestore,"orders"),where("shopId","==",shopId)),snap=>{
+     const next=snap.docs.map(d=>({id:d.id,...d.data()} as Order));
+     next.sort((a,b)=>(b.createdAt?.toDate?.().getTime()||0)-(a.createdAt?.toDate?.().getTime()||0));
+     setOrders(next);setLoading(false);
+    },err=>{setError(err.message||"Orders could not be loaded.");setLoading(false);});
+   }catch(e){setError(e instanceof Error?e.message:"Orders could not be loaded.");setLoading(false);}
+  });
+  return()=>{stopAuth();stopOrders?.();};
+ },[router]);
  async function markPaid(id:string){if(!db)return;const current=orders.find(o=>o.id===id);if(!current||current.paymentStatus!=="unpaid"){setError("Only unpaid orders can be marked as paid.");return;}try{await updateDoc(doc(db,"orders",id),{paymentStatus:"paid",updatedAt:serverTimestamp()});setOrders(v=>v.map(o=>o.id===id?{...o,paymentStatus:"paid"}:o));setError("");}catch(e){setError(e instanceof Error?e.message:"Payment status update failed.");}}
  async function update(id:string,status:string){if(!db)return;const current=orders.find(o=>o.id===id);const allowed:Record<string,string>={placed:"accepted",accepted:"preparing",preparing:"ready",ready:"completed"};if(!current||allowed[current.status||""]!==status){setError("This order status change is not allowed.");return;}try{await updateDoc(doc(db,"orders",id),{status,updatedAt:serverTimestamp()});setOrders(v=>v.map(o=>o.id===id?{...o,status}:o));setError("");}catch(e){setError(e instanceof Error?e.message:"Update failed.");}}
  const visibleOrders=orders.filter(o=>[o.customerName,o.customerPhone,o.id].filter(Boolean).join(" ").toLowerCase().includes(search.trim().toLowerCase()));
