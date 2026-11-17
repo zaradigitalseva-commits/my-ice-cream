@@ -3,8 +3,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore/lite";
-import { auth, db, googleProvider } from "@/lib/firebase";
+import { collection, doc, getDoc, getFirestore, onSnapshot, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { auth, db, firebaseApp, googleProvider } from "@/lib/firebase";
 import { isAdminEmail } from "@/lib/admin";
 
 type Item = { name: string; quantity: number; price?: number };
@@ -33,34 +33,58 @@ export default function CustomerPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
 
+  const realtimeDb = firebaseApp ? getFirestore(firebaseApp) : null;
+
   useEffect(() => {
     if (!auth) { setLoading(false); return; }
-    return onAuthStateChanged(auth, async (u) => {
+    let unsubscribeProfile: (() => void) | undefined;
+    let unsubscribeSales: (() => void) | undefined;
+    let unsubscribeOrders: (() => void) | undefined;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
+      unsubscribeProfile?.(); unsubscribeProfile = undefined;
+      unsubscribeSales?.(); unsubscribeSales = undefined;
+      unsubscribeOrders?.(); unsubscribeOrders = undefined;
       setUser(u?.isAnonymous ? null : u);
+      setSales([]);
+      setOnlineOrders([]);
+      setError("");
       if (!u || u.isAnonymous) { setLoading(false); return; }
       if (isAdminEmail(u.email) && u.emailVerified) { router.replace("/admin"); return; }
-      if (!db) { setLoading(false); return; }
-      try {
-        const existing = await getDocs(query(collection(db, "customers"), where("uid", "==", u.uid)));
-        const linkedPhone = existing.empty ? "" : String(existing.docs[0].data().phone || "");
-        if (!existing.empty) {
-          const profile = existing.docs[0].data();
+      if (!realtimeDb) { setLoading(false); return; }
+
+      setLoading(true);
+      const profileQuery = query(collection(realtimeDb, "customers"), where("uid", "==", u.uid));
+      unsubscribeProfile = onSnapshot(profileQuery, (snapshot) => {
+        if (!snapshot.empty) {
+          const profile = snapshot.docs[0].data();
           setName(String(profile.name || u.displayName || ""));
-          setPhone(linkedPhone);
+          setPhone(String(profile.phone || ""));
+        } else {
+          setName(String(u.displayName || ""));
+          setPhone("");
         }
-        const [salesResult, ordersResult] = await Promise.all([
-          getDocs(query(collection(db, "sales"), where("customerUid", "==", u.uid))),
-          getDocs(query(collection(db, "orders"), where("customerUid", "==", u.uid))),
-        ]);
-        setSales(salesResult.docs.map((d) => ({ id: d.id, ...d.data() } as Sale)));
-        setOnlineOrders(ordersResult.docs.map((d) => ({ id: d.id, ...d.data() } as OnlineOrder)));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "जानकारी लोड नहीं हो सकी।");
-      } finally {
-        setLoading(false);
-      }
+      }, (e) => setError(e instanceof Error ? e.message : "ग्राहक जानकारी लोड नहीं हो सकी।"));
+
+      unsubscribeSales = onSnapshot(
+        query(collection(realtimeDb, "sales"), where("customerUid", "==", u.uid)),
+        (snapshot) => { setSales(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Sale))); setLoading(false); },
+        (e) => { setError(e instanceof Error ? e.message : "खरीदारी लोड नहीं हो सकी।"); setLoading(false); }
+      );
+      unsubscribeOrders = onSnapshot(
+        query(collection(realtimeDb, "orders"), where("customerUid", "==", u.uid)),
+        (snapshot) => { setOnlineOrders(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as OnlineOrder))); setLoading(false); },
+        (e) => { setError(e instanceof Error ? e.message : "ऑर्डर लोड नहीं हो सके।"); setLoading(false); }
+      );
     });
-  }, [router]);
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeProfile?.();
+      unsubscribeSales?.();
+      unsubscribeOrders?.();
+    };
+  }, [router, realtimeDb]);
 
   async function handleGoogleSignIn() {
     if (!auth) { setError("अभी Google Login उपलब्ध नहीं है। कृपया बाद में प्रयास करें।"); return; }
@@ -76,7 +100,7 @@ export default function CustomerPage() {
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
-    if (!db || !user) return;
+    if (!realtimeDb || !user) return;
     const digits = phone.replace(/\D/g, "");
     if (!name.trim() || !/^\d{10}$/.test(digits)) {
       setError("नाम और 10 अंकों का मोबाइल नंबर सही भरें।");
@@ -94,13 +118,7 @@ export default function CustomerPage() {
         registered: true, updatedAt: serverTimestamp(),
       }, { merge: true });
       setPhone(digits);
-      const [salesResult, ordersResult] = await Promise.all([
-        getDocs(query(collection(db, "sales"), where("customerUid", "==", user.uid))),
-        getDocs(query(collection(db, "orders"), where("customerUid", "==", user.uid))),
-      ]);
-      setSales(salesResult.docs.map((d) => ({ id: d.id, ...d.data() } as Sale)));
-      setOnlineOrders(ordersResult.docs.map((d) => ({ id: d.id, ...d.data() } as OnlineOrder)));
-      setNotice("आपकी जानकारी सेव हो गई। अब इस मोबाइल नंबर पर बनने वाले बिल आपके खाते में दिखेंगे।");
+      setNotice("आपकी जानकारी सेव हो गई। नई खरीदारी और ऑर्डर अब अपने-आप यहाँ अपडेट होंगे।");
     } catch (e) {
       const detail = e instanceof Error ? e.message : "";
       setError(detail.toLowerCase().includes("permission")
